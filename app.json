@@ -9,7 +9,9 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yazinsai.micapp",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {

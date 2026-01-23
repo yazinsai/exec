@@ -27,6 +27,27 @@ Notes:
 - If you don’t have an `eas.json` yet, `eas build` will generate one and prompt to create/link a project.
 - The `preview` profile is set up for internal distribution (APK).
 
+## Install on iOS (EAS)
+The closest APK‑equivalent on iOS is an **.ipa** built for **internal (ad‑hoc) distribution**. That installs directly on registered devices without going through TestFlight.
+
+1) Build an internal .ipa:
+```
+eas build -p ios --profile preview
+```
+
+2) When prompted, let EAS create/sign credentials and register device UDIDs.
+3) Install from the build page link that EAS prints.
+
+TestFlight is the Apple‑approved beta distribution path (requires App Store Connect). Use it when you want external testers:
+```
+eas build -p ios --profile production
+eas submit -p ios --latest
+```
+
+Notes:
+- You’ll need an Apple Developer account for iOS builds.
+- `app.json` includes the iOS bundle ID: `com.yazinsai.micapp`.
+
 ## App configuration
 Icons, splash, and adaptive icons live in `assets/images/` and are referenced from `app.json`.
 
