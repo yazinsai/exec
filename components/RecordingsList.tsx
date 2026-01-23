@@ -12,6 +12,8 @@ interface RecordingsListProps {
   onShare: (recording: Recording) => void;
   onPlay?: (recording: Recording) => void;
   playingId?: string | null;
+  playbackRate?: number;
+  onCyclePlaybackRate?: () => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -52,6 +54,8 @@ function RecordingItem({
   onShare,
   onPlay,
   isPlaying,
+  playbackRate,
+  onCyclePlaybackRate,
 }: {
   recording: Recording;
   onRetry: (id: string) => void;
@@ -59,6 +63,8 @@ function RecordingItem({
   onShare: (recording: Recording) => void;
   onPlay?: (recording: Recording) => void;
   isPlaying?: boolean;
+  playbackRate?: number;
+  onCyclePlaybackRate?: () => void;
 }) {
   const isFailed = recording.status.includes("failed");
   const statusInfo = getStatusInfo(recording.status);
@@ -131,9 +137,21 @@ function RecordingItem({
               <View style={styles.playIcon} />
             )}
           </Pressable>
-          <Text style={styles.itemDuration}>
-            {formatDuration(recording.duration)}
-          </Text>
+          {isPlaying ? (
+            <Pressable
+              style={styles.speedButton}
+              onPress={onCyclePlaybackRate}
+              hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+            >
+              <Text style={styles.speedText}>
+                {playbackRate === 1 ? "1x" : playbackRate === 1.5 ? "1.5x" : "2x"}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.itemDuration}>
+              {formatDuration(recording.duration)}
+            </Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -187,6 +205,8 @@ export function RecordingsList({
   onShare,
   onPlay,
   playingId,
+  playbackRate,
+  onCyclePlaybackRate,
 }: RecordingsListProps) {
   const [recordingToDelete, setRecordingToDelete] = useState<Recording | null>(null);
 
@@ -223,6 +243,8 @@ export function RecordingsList({
             onShare={onShare}
             onPlay={onPlay}
             isPlaying={playingId === item.id}
+            playbackRate={playbackRate}
+            onCyclePlaybackRate={onCyclePlaybackRate}
           />
         )}
         renderSectionHeader={({ section }) => (
@@ -359,6 +381,20 @@ const styles = StyleSheet.create({
   itemDuration: {
     color: colors.textTertiary,
     fontSize: typography.sm,
+    fontVariant: ["tabular-nums"],
+  },
+  speedButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  speedText: {
+    color: colors.textSecondary,
+    fontSize: typography.sm,
+    fontWeight: typography.medium,
     fontVariant: ["tabular-nums"],
   },
 });

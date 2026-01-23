@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { QueueStatus } from "@/components/QueueStatus";
 import { RecordingsList } from "@/components/RecordingsList";
@@ -56,6 +57,17 @@ export default function HomeScreen() {
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+
+  const cyclePlaybackRate = async () => {
+    const rates = [1, 1.5, 2];
+    const currentIndex = rates.indexOf(playbackRate);
+    const nextRate = rates[(currentIndex + 1) % rates.length];
+    setPlaybackRate(nextRate);
+    if (soundRef.current) {
+      await soundRef.current.setRateAsync(nextRate, true);
+    }
+  };
 
   const handlePlay = async (recording: Recording) => {
     try {
@@ -84,7 +96,7 @@ export default function HomeScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const { sound } = await Audio.Sound.createAsync(
         { uri: recording.localFilePath },
-        { shouldPlay: true }
+        { shouldPlay: true, rate: playbackRate, shouldCorrectPitch: true }
       );
       soundRef.current = sound;
       setPlayingId(recording.id);
@@ -118,6 +130,8 @@ export default function HomeScreen() {
           onShare={share}
           onPlay={handlePlay}
           playingId={playingId}
+          playbackRate={playbackRate}
+          onCyclePlaybackRate={cyclePlaybackRate}
         />
       </View>
 
@@ -137,10 +151,7 @@ export default function HomeScreen() {
         <View style={styles.fabSpacer}>
           <Link href="/settings" asChild>
             <Pressable style={styles.settingsButton}>
-              <View style={styles.settingsIcon}>
-                <View style={styles.gear} />
-                <View style={styles.gearCenter} />
-              </View>
+              <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
             </Pressable>
           </Link>
         </View>
@@ -221,25 +232,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  settingsIcon: {
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  gear: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: colors.textSecondary,
-  },
-  gearCenter: {
-    position: "absolute",
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.textSecondary,
   },
 });
