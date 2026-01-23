@@ -41,9 +41,10 @@
         "expo-share-intent",
         {
           "iosActivationRules": {
-            "NSExtensionActivationSupportsFileWithMaxCount": 1
+            "NSExtensionActivationSupportsFileWithMaxCount": 100
           },
-          "androidIntentFilters": ["audio/*"]
+          "androidIntentFilters": ["audio/*"],
+          "androidMultiIntentFilters": ["audio/*"]
         }
       ]
     ],
