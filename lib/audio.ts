@@ -152,6 +152,8 @@ export interface ImportResult {
   filePath: string;
   fileSize: number;
   duration: number;
+  createdAt: number;
+  sourceFingerprint: string;
   exceedsUploadLimit: boolean;
   exceedsTranscriptionLimit: boolean;
 }
@@ -161,6 +163,18 @@ export async function importSharedAudio(
   recordingId: string
 ): Promise<ImportResult> {
   await ensureRecordingsDir();
+
+  // Get source file info BEFORE copying (to preserve original timestamps)
+  const sourceInfo = await getInfoAsync(sourceUri);
+  if (!sourceInfo.exists) {
+    throw new Error("Source audio file not found");
+  }
+  // Use file's modification time, fallback to now
+  const modTime = sourceInfo.modificationTime ?? Math.floor(Date.now() / 1000);
+  const createdAt = modTime * 1000; // Convert seconds to ms
+
+  // Generate fingerprint for deduplication (size:modTime)
+  const sourceFingerprint = `${sourceInfo.size ?? 0}:${modTime}`;
 
   // Determine extension from source or default to .m4a
   const ext = sourceUri.match(/\.\w+$/)?.[0] ?? ".m4a";
@@ -191,6 +205,8 @@ export async function importSharedAudio(
     filePath: destPath,
     fileSize,
     duration,
+    createdAt,
+    sourceFingerprint,
     exceedsUploadLimit: fileSize > MAX_UPLOAD_SIZE,
     exceedsTranscriptionLimit: fileSize > MAX_TRANSCRIPTION_SIZE,
   };

@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useShareIntent as useExpoShareIntent } from "expo-share-intent";
 import { Alert } from "react-native";
 import { id } from "@instantdb/react-native";
+import { getInfoAsync } from "expo-file-system/legacy";
 import { db } from "@/lib/db";
 import {
   importSharedAudio,
@@ -9,11 +10,35 @@ import {
   type ImportResult,
 } from "@/lib/audio";
 
+async function checkDuplicate(sourceUri: string): Promise<boolean> {
+  const info = await getInfoAsync(sourceUri);
+  if (!info.exists) return false;
+
+  const fingerprint = `${info.size ?? 0}:${info.modificationTime ?? 0}`;
+  const { data } = await db.queryOnce({
+    recordings: {
+      $: { where: { sourceFingerprint: fingerprint }, limit: 1 },
+    },
+  });
+  return data.recordings.length > 0;
+}
+
 export function useShareIntent() {
   const { shareIntent, resetShareIntent } = useExpoShareIntent();
 
   const handleSharedAudio = useCallback(
     async (fileUri: string, fileName?: string) => {
+      // Check for duplicate before importing
+      const isDuplicate = await checkDuplicate(fileUri);
+      if (isDuplicate) {
+        Alert.alert(
+          "Already Imported",
+          "This recording has already been imported."
+        );
+        resetShareIntent();
+        return;
+      }
+
       const recordingId = id();
 
       try {
@@ -28,7 +53,8 @@ export function useShareIntent() {
           db.tx.recordings[recordingId].update({
             localFilePath: result.filePath,
             duration: result.duration,
-            createdAt: Date.now(),
+            createdAt: result.createdAt,
+            sourceFingerprint: result.sourceFingerprint,
             status: "recorded",
             retryCount: 0,
             errorMessage: null,

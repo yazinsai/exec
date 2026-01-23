@@ -22,6 +22,9 @@ const _schema = i.schema({
       duration: i.number(),
       createdAt: i.number().indexed(),
 
+      // Dedupe for shared files (size:modTime)
+      sourceFingerprint: i.string().unique().indexed().optional(),
+
       // Transcription
       transcription: i.string().optional(),
 
