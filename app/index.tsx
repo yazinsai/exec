@@ -1,11 +1,14 @@
-import { View, StyleSheet, SafeAreaView, Pressable, Text, TextInput } from "react-native";
+import { useState, useRef } from "react";
+import { View, StyleSheet, SafeAreaView, Pressable, Text, TextInput, Alert } from "react-native";
 import { Link } from "expo-router";
+import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { QueueStatus } from "@/components/QueueStatus";
 import { RecordingsList } from "@/components/RecordingsList";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
+import type { Recording } from "@/lib/queue";
 import { colors, spacing, typography, radii, shadows } from "@/constants/Colors";
 
 export default function HomeScreen() {
@@ -50,6 +53,57 @@ export default function HomeScreen() {
     }
   };
 
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  const handlePlay = async (recording: Recording) => {
+    try {
+      // If same recording, toggle pause/play
+      if (playingId === recording.id && soundRef.current) {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await soundRef.current.pauseAsync();
+          } else {
+            await soundRef.current.playAsync();
+          }
+          return;
+        }
+      }
+
+      // Stop any existing playback
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setPlayingId(null);
+      }
+
+      if (!recording.localFilePath) {
+        Alert.alert("Error", "Recording file not found");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recording.localFilePath },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+      setPlayingId(recording.id);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+          soundRef.current = null;
+          setPlayingId(null);
+        }
+      });
+    } catch (error) {
+      console.error("Playback error:", error);
+      Alert.alert("Error", "Could not play recording");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -89,6 +143,8 @@ export default function HomeScreen() {
           onRetry={retry}
           onDelete={remove}
           onShare={share}
+          onPlay={handlePlay}
+          playingId={playingId}
         />
       </View>
 
@@ -200,14 +256,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fab: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: colors.backgroundElevated,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 6,
-    borderColor: colors.border,
+    borderWidth: 5,
+    borderColor: colors.borderLight,
     ...shadows.md,
   },
   fabPressed: {
@@ -218,9 +274,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   fabInner: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.error,
   },
 });

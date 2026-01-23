@@ -9,6 +9,7 @@ interface RecordingsListProps {
   onDelete: (id: string) => void;
   onShare: (recording: Recording) => void;
   onPlay?: (recording: Recording) => void;
+  playingId?: string | null;
 }
 
 function formatDate(timestamp: number): string {
@@ -73,12 +74,14 @@ function RecordingItem({
   onDelete,
   onShare,
   onPlay,
+  isPlaying,
 }: {
   recording: Recording;
   onRetry: (id: string) => void;
   onDelete: (id: string) => void;
   onShare: (recording: Recording) => void;
   onPlay?: (recording: Recording) => void;
+  isPlaying?: boolean;
 }) {
   const isFailed = recording.status.includes("failed");
   const statusInfo = getStatusInfo(recording.status);
@@ -152,10 +155,14 @@ function RecordingItem({
 
         <View style={styles.itemRight}>
           <Pressable
-            style={styles.playButton}
+            style={[styles.playButton, isPlaying && styles.playButtonActive]}
             onPress={() => onPlay?.(recording)}
           >
-            <View style={styles.playIcon} />
+            {isPlaying ? (
+              <View style={styles.stopIcon} />
+            ) : (
+              <View style={styles.playIcon} />
+            )}
           </Pressable>
           <Text style={styles.itemDuration}>
             {formatDuration(recording.duration)}
@@ -172,6 +179,7 @@ export function RecordingsList({
   onDelete,
   onShare,
   onPlay,
+  playingId,
 }: RecordingsListProps) {
   if (recordings.length === 0) {
     return (
@@ -195,6 +203,7 @@ export function RecordingsList({
           onDelete={onDelete}
           onShare={onShare}
           onPlay={onPlay}
+          isPlaying={playingId === item.id}
         />
       )}
       contentContainerStyle={styles.list}
@@ -205,7 +214,9 @@ export function RecordingsList({
 
 const styles = StyleSheet.create({
   list: {
-    paddingBottom: 120,
+    paddingBottom: 160,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   empty: {
     flex: 1,
@@ -226,8 +237,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   item: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.backgroundElevated,
   },
@@ -282,6 +293,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  playButtonActive: {
+    backgroundColor: colors.error,
+  },
   playIcon: {
     width: 0,
     height: 0,
@@ -292,6 +306,12 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.white,
     borderTopColor: "transparent",
     borderBottomColor: "transparent",
+  },
+  stopIcon: {
+    width: 14,
+    height: 14,
+    backgroundColor: colors.white,
+    borderRadius: 2,
   },
   itemDuration: {
     color: colors.textTertiary,

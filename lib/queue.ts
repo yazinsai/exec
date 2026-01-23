@@ -81,11 +81,15 @@ async function processRecording(
     if (!afterTranscription) return;
 
     if (
-      (afterTranscription.status === "transcribed" ||
-        afterTranscription.status === "send_failed") &&
-      webhookUrl
+      afterTranscription.status === "transcribed" ||
+      afterTranscription.status === "send_failed"
     ) {
-      await handleWebhook(afterTranscription, webhookUrl);
+      if (webhookUrl) {
+        await handleWebhook(afterTranscription, webhookUrl);
+      } else {
+        // No webhook configured, mark as complete
+        await updateStatus(id, "sent");
+      }
     }
   } catch (error) {
     console.error(`Error processing recording ${id}:`, error);
