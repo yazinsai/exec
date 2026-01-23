@@ -1,5 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { colors, spacing, typography, radii } from "@/constants/Colors";
 
 interface QueueStatusProps {
   pendingCount: number;
@@ -49,32 +50,32 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    padding: 8,
+    gap: spacing.sm,
+    padding: spacing.sm,
   },
   badge: {
-    backgroundColor: "#3b82f6",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+    borderRadius: radii.xl,
   },
   failedBadge: {
-    backgroundColor: "#ef4444",
+    backgroundColor: colors.error,
   },
   offlineBadge: {
-    backgroundColor: "#f59e0b",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: colors.warning,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+    borderRadius: radii.xl,
   },
   badgeText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
+    color: colors.white,
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
   },
   offlineText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
+    color: colors.white,
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
   },
 });

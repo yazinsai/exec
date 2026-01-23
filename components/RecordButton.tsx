@@ -11,6 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useRecorder } from "@/hooks/useRecorder";
+import { colors, spacing, typography, shadows, radii } from "@/constants/Colors";
 
 interface RecordButtonProps {
   onRecordingComplete?: () => void;
@@ -24,39 +25,34 @@ function formatDuration(seconds: number): string {
 
 export function RecordButton({ onRecordingComplete }: RecordButtonProps) {
   const {
-    state,
     duration,
     hasPermission,
     startRecording,
     stopRecording,
+    pauseRecording,
+    resumeRecording,
     isRecording,
+    isPaused,
     isSaving,
+    isActive,
   } = useRecorder(onRecordingComplete);
 
   const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(0.6);
+  const pulseOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (isRecording) {
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.3, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) })
+          withTiming(1.15, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
         ),
         -1,
         false
       );
-      pulseOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.2, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-          withTiming(0.6, { duration: 800, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        false
-      );
+      pulseOpacity.value = withTiming(0.4, { duration: 300 });
     } else {
       cancelAnimation(pulseScale);
-      cancelAnimation(pulseOpacity);
       pulseScale.value = withTiming(1, { duration: 200 });
       pulseOpacity.value = withTiming(0, { duration: 200 });
     }
@@ -67,70 +63,112 @@ export function RecordButton({ onRecordingComplete }: RecordButtonProps) {
     opacity: pulseOpacity.value,
   }));
 
-  const handlePressIn = async () => {
+  const handleStartRecording = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     startRecording();
   };
 
-  const handlePressOut = async () => {
-    if (isRecording) {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      stopRecording();
+  const handleStopRecording = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    stopRecording();
+  };
+
+  const handlePauseResume = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPaused) {
+      resumeRecording();
+    } else {
+      pauseRecording();
     }
   };
 
   if (hasPermission === false) {
     return (
       <View style={styles.container}>
-        <View style={[styles.button, styles.buttonDisabled]}>
-          <Text style={styles.permissionText}>
-            Microphone access required
-          </Text>
+        <View style={[styles.recordButton, styles.buttonDisabled]}>
+          <Text style={styles.permissionText}>Microphone access required</Text>
         </View>
       </View>
     );
   }
 
+  // Active recording state - show controls
+  if (isActive || isSaving) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.durationText}>{formatDuration(duration)}</Text>
+
+        {isPaused && <Text style={styles.pausedLabel}>Paused</Text>}
+
+        <View style={styles.controlsContainer}>
+          {/* Pause/Resume Button */}
+          <Pressable
+            onPress={handlePauseResume}
+            disabled={isSaving}
+            style={({ pressed }) => [
+              styles.controlButton,
+              styles.pauseButton,
+              pressed && styles.controlButtonPressed,
+              isSaving && styles.controlButtonDisabled,
+            ]}
+          >
+            <View
+              style={isPaused ? styles.resumeIcon : styles.pauseIcon}
+            >
+              {isPaused ? (
+                <View style={styles.playTriangle} />
+              ) : (
+                <>
+                  <View style={styles.pauseBar} />
+                  <View style={styles.pauseBar} />
+                </>
+              )}
+            </View>
+          </Pressable>
+
+          {/* Stop Button */}
+          <Pressable
+            onPress={handleStopRecording}
+            disabled={isSaving}
+            style={({ pressed }) => [
+              styles.controlButton,
+              styles.stopButton,
+              pressed && styles.controlButtonPressed,
+            ]}
+          >
+            {isSaving ? (
+              <ActivityIndicator color={colors.white} size="small" />
+            ) : (
+              <View style={styles.stopSquare} />
+            )}
+          </Pressable>
+        </View>
+
+        <Text style={styles.instructionText}>
+          {isSaving ? "Saving..." : isPaused ? "Tap to resume or stop" : "Recording..."}
+        </Text>
+      </View>
+    );
+  }
+
+  // Idle state - show record button
   return (
     <View style={styles.container}>
-      {isRecording && (
-        <Text style={styles.durationText}>{formatDuration(duration)}</Text>
-      )}
-
       <View style={styles.buttonContainer}>
         <Animated.View style={[styles.pulseRing, pulseAnimatedStyle]} />
 
         <Pressable
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          disabled={isSaving}
+          onPress={handleStartRecording}
           style={({ pressed }) => [
-            styles.button,
-            isRecording && styles.buttonRecording,
-            isSaving && styles.buttonSaving,
-            pressed && !isRecording && styles.buttonPressed,
+            styles.recordButton,
+            pressed && styles.recordButtonPressed,
           ]}
         >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" size="large" />
-          ) : (
-            <View
-              style={[
-                styles.innerCircle,
-                isRecording && styles.innerCircleRecording,
-              ]}
-            />
-          )}
+          <View style={styles.innerCircle} />
         </Pressable>
       </View>
 
-      <Text style={styles.instructionText}>
-        {isSaving
-          ? "Saving..."
-          : isRecording
-            ? "Release to stop"
-            : "Hold to record"}
-      </Text>
+      <Text style={styles.instructionText}>Tap to record</Text>
     </View>
   );
 }
@@ -151,67 +189,122 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: "#ef4444",
+    backgroundColor: colors.error,
   },
-  button: {
+  recordButton: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#1f2937",
+    backgroundColor: colors.backgroundElevated,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 4,
-    borderColor: "#374151",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderColor: colors.border,
+    ...shadows.md,
   },
-  buttonPressed: {
+  recordButtonPressed: {
     transform: [{ scale: 0.95 }],
-    borderColor: "#ef4444",
-  },
-  buttonRecording: {
-    backgroundColor: "#dc2626",
-    borderColor: "#ef4444",
-  },
-  buttonSaving: {
-    backgroundColor: "#374151",
-    borderColor: "#4b5563",
+    borderColor: colors.error,
   },
   buttonDisabled: {
-    backgroundColor: "#374151",
-    borderColor: "#4b5563",
+    backgroundColor: colors.border,
+    borderColor: colors.borderLight,
   },
   innerCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#ef4444",
-  },
-  innerCircleRecording: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: "#fff",
+    backgroundColor: colors.error,
   },
   durationText: {
-    fontSize: 48,
-    fontWeight: "200",
-    color: "#f9fafb",
-    marginBottom: 24,
+    fontSize: typography.display,
+    fontWeight: typography.light,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
     fontVariant: ["tabular-nums"],
   },
+  pausedLabel: {
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
+    color: colors.warning,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: spacing.xl,
+  },
+  controlsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  controlButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.sm,
+  },
+  controlButtonPressed: {
+    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
+  },
+  controlButtonDisabled: {
+    opacity: 0.5,
+  },
+  pauseButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.backgroundElevated,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  stopButton: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.error,
+  },
+  pauseIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  pauseBar: {
+    width: 5,
+    height: 18,
+    backgroundColor: colors.textPrimary,
+    borderRadius: 2,
+  },
+  resumeIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 3,
+  },
+  playTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 16,
+    borderTopWidth: 10,
+    borderBottomWidth: 10,
+    borderLeftColor: colors.success,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
+  },
+  stopSquare: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.sm,
+    backgroundColor: colors.white,
+  },
   instructionText: {
-    fontSize: 16,
-    color: "#9ca3af",
-    marginTop: 24,
+    fontSize: typography.lg,
+    color: colors.textTertiary,
+    marginTop: spacing.xl,
   },
   permissionText: {
-    fontSize: 12,
-    color: "#9ca3af",
+    fontSize: typography.xs,
+    color: colors.textTertiary,
     textAlign: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
   },
 });

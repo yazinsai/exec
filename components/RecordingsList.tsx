@@ -1,5 +1,7 @@
-import { View, Text, Pressable, FlatList, StyleSheet, Alert } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, SectionList, StyleSheet, Alert } from "react-native";
 import { MiniWaveform } from "./Waveform";
+import { DeleteConfirmationOverlay } from "./DeleteConfirmationOverlay";
 import type { Recording } from "@/lib/queue";
 import { colors, spacing, typography, radii } from "@/constants/Colors";
 
@@ -12,30 +14,6 @@ interface RecordingsListProps {
   playingId?: string | null;
 }
 
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString(undefined, {
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
@@ -44,8 +22,7 @@ function formatDuration(seconds: number): string {
 
 function getTitle(recording: Recording): string {
   const date = new Date(recording.createdAt);
-  return date.toLocaleDateString(undefined, {
-    weekday: "long",
+  return date.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
   });
@@ -71,14 +48,14 @@ function getStatusInfo(status: string): { label: string; color: string } | null 
 function RecordingItem({
   recording,
   onRetry,
-  onDelete,
+  onDeleteRequest,
   onShare,
   onPlay,
   isPlaying,
 }: {
   recording: Recording;
   onRetry: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDeleteRequest: (recording: Recording) => void;
   onShare: (recording: Recording) => void;
   onPlay?: (recording: Recording) => void;
   isPlaying?: boolean;
@@ -101,20 +78,7 @@ function RecordingItem({
         {
           text: "Delete",
           style: "destructive" as const,
-          onPress: () => {
-            Alert.alert(
-              "Delete Recording",
-              "Are you sure? This cannot be undone.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Delete",
-                  style: "destructive",
-                  onPress: () => onDelete(recording.id),
-                },
-              ]
-            );
-          },
+          onPress: () => onDeleteRequest(recording),
         },
         { text: "Cancel", style: "cancel" as const },
       ]
@@ -132,17 +96,13 @@ function RecordingItem({
           <Text style={styles.itemTitle} numberOfLines={1}>
             {getTitle(recording)}
           </Text>
-          <View style={styles.itemMeta}>
-            <Text style={styles.itemDate}>{formatDate(recording.createdAt)}</Text>
-            {statusInfo && (
-              <>
-                <Text style={styles.metaDot}>•</Text>
-                <Text style={[styles.itemStatus, { color: statusInfo.color }]}>
-                  {statusInfo.label}
-                </Text>
-              </>
-            )}
-          </View>
+          {statusInfo && (
+            <View style={styles.itemMeta}>
+              <Text style={[styles.itemStatus, { color: statusInfo.color }]}>
+                {statusInfo.label}
+              </Text>
+            </View>
+          )}
           <View style={styles.waveformRow}>
             <MiniWaveform
               seed={waveformSeed}
@@ -173,6 +133,46 @@ function RecordingItem({
   );
 }
 
+function getDateKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const recordingDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (recordingDate.getTime() === today.getTime()) {
+    return "Today";
+  } else if (recordingDate.getTime() === yesterday.getTime()) {
+    return "Yesterday";
+  }
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+type Section = {
+  title: string;
+  data: Recording[];
+};
+
+function groupRecordingsByDate(recordings: Recording[]): Section[] {
+  const grouped = new Map<string, Recording[]>();
+
+  for (const recording of recordings) {
+    const key = getDateKey(recording.createdAt);
+    const existing = grouped.get(key) || [];
+    grouped.set(key, [...existing, recording]);
+  }
+
+  return Array.from(grouped.entries()).map(([title, data]) => ({
+    title,
+    data,
+  }));
+}
+
 export function RecordingsList({
   recordings,
   onRetry,
@@ -181,6 +181,8 @@ export function RecordingsList({
   onPlay,
   playingId,
 }: RecordingsListProps) {
+  const [recordingToDelete, setRecordingToDelete] = useState<Recording | null>(null);
+
   if (recordings.length === 0) {
     return (
       <View style={styles.empty}>
@@ -192,23 +194,46 @@ export function RecordingsList({
     );
   }
 
+  const sections = groupRecordingsByDate(recordings);
+
+  const handleConfirmDelete = () => {
+    if (recordingToDelete) {
+      onDelete(recordingToDelete.id);
+      setRecordingToDelete(null);
+    }
+  };
+
   return (
-    <FlatList
-      data={recordings}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <RecordingItem
-          recording={item}
-          onRetry={onRetry}
-          onDelete={onDelete}
-          onShare={onShare}
-          onPlay={onPlay}
-          isPlaying={playingId === item.id}
-        />
-      )}
-      contentContainerStyle={styles.list}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <RecordingItem
+            recording={item}
+            onRetry={onRetry}
+            onDeleteRequest={setRecordingToDelete}
+            onShare={onShare}
+            onPlay={onPlay}
+            isPlaying={playingId === item.id}
+          />
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+          </View>
+        )}
+        stickySectionHeadersEnabled
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
+      <DeleteConfirmationOverlay
+        visible={!!recordingToDelete}
+        message={recordingToDelete?.transcription?.slice(0, 150)}
+        onCancel={() => setRecordingToDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
+    </>
   );
 }
 
@@ -217,6 +242,19 @@ const styles = StyleSheet.create({
     paddingBottom: 160,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
+  },
+  sectionHeader: {
+    backgroundColor: colors.background,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.backgroundElevated,
+  },
+  sectionHeaderText: {
+    color: colors.textSecondary,
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   empty: {
     flex: 1,
@@ -237,10 +275,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   item: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.backgroundElevated,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.sm,
   },
   itemPressed: {
     backgroundColor: colors.backgroundElevated,
@@ -257,21 +293,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: typography.md,
     fontWeight: typography.medium,
-    marginBottom: 2,
+    marginBottom: spacing.xs,
   },
   itemMeta: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: spacing.sm,
-  },
-  itemDate: {
-    color: colors.textTertiary,
-    fontSize: typography.sm,
-  },
-  metaDot: {
-    color: colors.textMuted,
-    fontSize: typography.sm,
-    marginHorizontal: spacing.sm,
   },
   itemStatus: {
     fontSize: typography.sm,

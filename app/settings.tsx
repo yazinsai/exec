@@ -14,6 +14,7 @@ import {
 import { useSettings } from "@/hooks/useSettings";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { testWebhook } from "@/lib/webhook";
+import { colors, spacing, typography, radii } from "@/constants/Colors";
 
 export default function SettingsScreen() {
   const { webhookUrl, setWebhookUrl, isLoading } = useSettings();
@@ -67,7 +68,7 @@ export default function SettingsScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color="#3b82f6" size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -96,7 +97,7 @@ export default function SettingsScreen() {
               value={url}
               onChangeText={setUrl}
               placeholder="https://example.com/webhook"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
@@ -110,7 +111,7 @@ export default function SettingsScreen() {
               disabled={isSaving}
             >
               {isSaving ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={styles.buttonText}>Save</Text>
               )}
@@ -122,7 +123,7 @@ export default function SettingsScreen() {
               disabled={isTesting || !isOnline}
             >
               {isTesting ? (
-                <ActivityIndicator color="#3b82f6" size="small" />
+                <ActivityIndicator color={colors.primary} size="small" />
               ) : (
                 <Text style={[styles.buttonText, styles.testButtonText]}>
                   Test
@@ -138,7 +139,7 @@ export default function SettingsScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: isOnline ? "#22c55e" : "#ef4444" },
+                { backgroundColor: isOnline ? colors.success : colors.error },
               ]}
             />
             <Text style={styles.statusText}>
@@ -168,11 +169,11 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#111827",
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#111827",
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -180,72 +181,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: spacing.lg,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: spacing.xxl,
   },
   sectionTitle: {
-    color: "#f9fafb",
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
+    color: colors.textPrimary,
+    fontSize: typography.xl,
+    fontWeight: typography.semibold,
+    marginBottom: spacing.sm,
   },
   sectionDescription: {
-    color: "#9ca3af",
-    fontSize: 14,
+    color: colors.textTertiary,
+    fontSize: typography.base,
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   label: {
-    color: "#d1d5db",
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 8,
+    color: colors.textSecondary,
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    marginBottom: spacing.sm,
   },
   input: {
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
     padding: 14,
-    color: "#f9fafb",
-    fontSize: 16,
+    color: colors.textPrimary,
+    fontSize: typography.lg,
     borderWidth: 1,
-    borderColor: "#374151",
+    borderColor: colors.border,
   },
   buttons: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
   },
   button: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
   saveButton: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: colors.primary,
   },
   testButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#3b82f6",
+    borderColor: colors.primary,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: colors.white,
+    fontSize: typography.lg,
+    fontWeight: typography.semibold,
   },
   testButtonText: {
-    color: "#3b82f6",
+    color: colors.primary,
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   statusDot: {
     width: 10,
@@ -253,17 +254,17 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   statusText: {
-    color: "#d1d5db",
-    fontSize: 15,
+    color: colors.textSecondary,
+    fontSize: typography.md,
   },
   codeBlock: {
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
+    padding: spacing.lg,
   },
   codeText: {
-    color: "#d1d5db",
-    fontSize: 13,
+    color: colors.textSecondary,
+    fontSize: typography.sm,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
 });

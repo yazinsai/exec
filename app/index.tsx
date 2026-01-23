@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { View, StyleSheet, SafeAreaView, Pressable, Text, TextInput, Alert } from "react-native";
+import { View, StyleSheet, SafeAreaView, Pressable, Alert } from "react-native";
 import { Link } from "expo-router";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
@@ -9,7 +9,7 @@ import { RecordingsList } from "@/components/RecordingsList";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
 import type { Recording } from "@/lib/queue";
-import { colors, spacing, typography, radii, shadows } from "@/constants/Colors";
+import { colors, spacing, shadows } from "@/constants/Colors";
 
 export default function HomeScreen() {
   const {
@@ -103,31 +103,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <View style={styles.searchIcon}>
-            <View style={styles.searchCircle} />
-            <View style={styles.searchHandle} />
-          </View>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search your recordings"
-            placeholderTextColor={colors.textMuted}
-            editable={false}
-          />
-        </View>
-
-        <Link href="/settings" asChild>
-          <Pressable style={styles.menuButton}>
-            <View style={styles.menuDots}>
-              <View style={styles.menuDot} />
-              <View style={styles.menuDot} />
-              <View style={styles.menuDot} />
-            </View>
-          </Pressable>
-        </Link>
-      </View>
-
       {(pendingCount > 0 || failedCount > 0) && (
         <View style={styles.statusBar}>
           <QueueStatus pendingCount={pendingCount} failedCount={failedCount} />
@@ -145,7 +120,8 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={styles.fabContainer}>
+      <View style={styles.fabRow}>
+        <View style={styles.fabSpacer} />
         <Pressable
           onPress={handleStartRecording}
           disabled={hasPermission === false}
@@ -157,6 +133,16 @@ export default function HomeScreen() {
         >
           <View style={styles.fabInner} />
         </Pressable>
+        <View style={styles.fabSpacer}>
+          <Link href="/settings" asChild>
+            <Pressable style={styles.settingsButton}>
+              <View style={styles.settingsIcon}>
+                <View style={styles.gear} />
+                <View style={styles.gearCenter} />
+              </View>
+            </Pressable>
+          </Link>
+        </View>
       </View>
 
       <RecordingOverlay
@@ -179,78 +165,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.md,
-  },
-  searchIcon: {
-    width: 18,
-    height: 18,
-    position: "relative",
-  },
-  searchCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.textMuted,
-  },
-  searchHandle: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 6,
-    height: 2,
-    backgroundColor: colors.textMuted,
-    borderRadius: 1,
-    transform: [{ rotate: "45deg" }],
-  },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.base,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuDots: {
-    gap: 4,
-  },
-  menuDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.textSecondary,
-  },
   statusBar: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   content: {
     flex: 1,
   },
-  fabContainer: {
+  fabRow: {
     position: "absolute",
     bottom: 80,
     left: 0,
     right: 0,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  fabSpacer: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
   },
   fab: {
     width: 160,
@@ -275,5 +210,35 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     backgroundColor: colors.error,
+  },
+  settingsButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.backgroundElevated,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  settingsIcon: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gear: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 3,
+    borderColor: colors.textSecondary,
+  },
+  gearCenter: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.textSecondary,
   },
 });

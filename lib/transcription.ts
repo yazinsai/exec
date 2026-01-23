@@ -1,5 +1,3 @@
-import { readFileAsBlob } from "./audio";
-
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 
 export async function transcribeAudio(localFilePath: string): Promise<string> {
@@ -8,8 +6,12 @@ export async function transcribeAudio(localFilePath: string): Promise<string> {
     throw new Error("GROQ_API_KEY is not configured");
   }
 
-  const blob = await readFileAsBlob(localFilePath);
-  const file = new File([blob], "recording.m4a", { type: "audio/x-m4a" });
+  // React Native FormData expects an object with uri, name, and type
+  const file = {
+    uri: localFilePath,
+    name: "recording.m4a",
+    type: "audio/x-m4a",
+  } as unknown as Blob;
 
   const formData = new FormData();
   formData.append("file", file);
