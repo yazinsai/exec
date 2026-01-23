@@ -1,7 +1,9 @@
 import { View, Text, Pressable, StyleSheet, Modal } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, SlideInUp, SlideOutDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { colors, spacing, typography, radii, shadows } from "@/constants/Colors";
+
+const errorBgAlpha = "rgba(239, 68, 68, 0.12)";
 
 interface DeleteConfirmationOverlayProps {
   visible: boolean;
@@ -23,6 +25,11 @@ export function DeleteConfirmationOverlay({
     onConfirm();
   };
 
+  const handleCancel = () => {
+    Haptics.selectionAsync();
+    onCancel();
+  };
+
   if (!visible) return null;
 
   return (
@@ -33,11 +40,11 @@ export function DeleteConfirmationOverlay({
           exiting={FadeOut.duration(150)}
           style={styles.backdrop}
         >
-          <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
         </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.springify().damping(20).stiffness(300)}
+          entering={SlideInUp.duration(250)}
           exiting={SlideOutDown.duration(200)}
           style={styles.dialog}
         >
@@ -74,7 +81,7 @@ export function DeleteConfirmationOverlay({
                 styles.cancelButton,
                 pressed && styles.cancelButtonPressed,
               ]}
-              onPress={onCancel}
+              onPress={handleCancel}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
@@ -123,7 +130,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    backgroundColor: errorBgAlpha,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.md,
@@ -184,22 +191,18 @@ const styles = StyleSheet.create({
   },
   buttons: {
     flexDirection: "row",
-    gap: spacing.md,
+    justifyContent: "space-between",
   },
   button: {
-    flex: 1,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
   },
-  cancelButton: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  cancelButton: {},
   cancelButtonPressed: {
-    backgroundColor: colors.backgroundPressed,
+    backgroundColor: colors.border,
   },
   cancelButtonText: {
     color: colors.textPrimary,

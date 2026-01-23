@@ -104,12 +104,18 @@ function RecordingItem({
             </View>
           )}
           <View style={styles.waveformRow}>
-            <MiniWaveform
-              seed={waveformSeed}
-              width={120}
-              height={20}
-              color={colors.primary}
-            />
+            {recording.transcription ? (
+              <Text style={styles.transcriptSnippet} numberOfLines={2}>
+                {recording.transcription}
+              </Text>
+            ) : (
+              <MiniWaveform
+                seed={waveformSeed}
+                width={120}
+                height={20}
+                color={colors.primary}
+              />
+            )}
           </View>
         </View>
 
@@ -117,6 +123,7 @@ function RecordingItem({
           <Pressable
             style={[styles.playButton, isPlaying && styles.playButtonActive]}
             onPress={() => onPlay?.(recording)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {isPlaying ? (
               <View style={styles.stopIcon} />
@@ -223,6 +230,7 @@ export function RecordingsList({
             <Text style={styles.sectionHeaderText}>{section.title}</Text>
           </View>
         )}
+        ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         stickySectionHeadersEnabled
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -246,8 +254,10 @@ const styles = StyleSheet.create({
   sectionHeader: {
     backgroundColor: colors.background,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.backgroundElevated,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   sectionHeaderText: {
     color: colors.textSecondary,
@@ -276,7 +286,9 @@ const styles = StyleSheet.create({
   },
   item: {
     paddingVertical: spacing.lg,
-    marginBottom: spacing.sm,
+  },
+  itemSeparator: {
+    height: spacing.md,
   },
   itemPressed: {
     backgroundColor: colors.backgroundElevated,
@@ -305,6 +317,12 @@ const styles = StyleSheet.create({
   waveformRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  transcriptSnippet: {
+    color: colors.textSecondary,
+    fontSize: typography.sm,
+    lineHeight: typography.sm * 1.4,
+    flex: 1,
   },
   itemRight: {
     alignItems: "center",
