@@ -39,3 +39,7 @@ yarn-error.*
 app-example
 
 .env
+
+# Workspace (keep directories, ignore contents)
+workspace/projects/*
+!workspace/projects/.gitkeep

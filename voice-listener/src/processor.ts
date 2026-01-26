@@ -1,7 +1,8 @@
 import { spawn } from "bun";
+import { join, resolve } from "path";
 
 export interface ExtractedAction {
-  type: "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea";
+  type: "bug" | "feature" | "todo" | "question" | "command" | "idea";
   title: string;
   description?: string;
   status: "pending";
@@ -14,13 +15,16 @@ interface ProcessResult {
   error?: string;
 }
 
+// Resolve workspace paths relative to mic-app root (one level up from voice-listener)
+const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
+const WORKSPACE_PROJECTS = join(MIC_APP_ROOT, "workspace", "projects");
+
 const PROMPT_TEMPLATE = `You are an action extractor. Analyze the following voice transcription and extract any actionable items.
 
 For each action, determine its type:
 - "bug": Reports of bugs, issues, or things that are broken
 - "feature": Feature requests or enhancements
 - "todo": Tasks to complete, reminders
-- "note": General notes or observations
 - "question": Questions that need answers
 - "command": Direct commands to execute something
 - "idea": Ideas for products, features, or projects (phrases like "I have an idea", "what if we built", "we could create")
@@ -32,7 +36,7 @@ Format:
 {
   "actions": [
     {
-      "type": "bug|feature|todo|note|question|command|idea",
+      "type": "bug|feature|todo|question|command|idea",
       "title": "Brief title (under 80 chars)",
       "description": "Optional longer description",
       "status": "pending",
@@ -64,6 +68,7 @@ export async function processTranscription(transcription: string): Promise<Proce
       ],
       stdout: "pipe",
       stderr: "pipe",
+      cwd: WORKSPACE_PROJECTS,
     });
 
     // Set timeout (5 minutes)
@@ -138,7 +143,7 @@ function isValidAction(action: unknown): action is ExtractedAction {
   const a = action as Record<string, unknown>;
   return (
     typeof a.type === "string" &&
-    ["bug", "feature", "todo", "note", "question", "command", "idea"].includes(a.type) &&
+    ["bug", "feature", "todo", "question", "command", "idea"].includes(a.type) &&
     typeof a.title === "string" &&
     a.title.length > 0
   );

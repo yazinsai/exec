@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Voice Listener - Start both workers
-# Usage: ./start.sh [--once]
+# Usage: ./start.sh [--once] [--help]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -12,6 +12,27 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# Help function
+show_help() {
+  echo -e "${BLUE}Voice Listener - Start Script${NC}"
+  echo ""
+  echo "Usage: ./start.sh [OPTIONS]"
+  echo ""
+  echo "Options:"
+  echo "  --once     Run workers once and exit after processing"
+  echo "  --help, -h Show this help message"
+  echo ""
+  echo "Description:"
+  echo "  Starts both the extraction and execution workers for voice action processing."
+  echo "  Workers run continuously until interrupted (Ctrl+C) unless --once is used."
+  exit 0
+}
+
+# Check for help flag
+if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+  show_help
+fi
 
 # Trap to kill both processes on exit
 cleanup() {

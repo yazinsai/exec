@@ -1,4 +1,5 @@
 import { spawn } from "bun";
+import { join, resolve, isAbsolute } from "path";
 import { db } from "./db";
 
 interface Action {
@@ -12,7 +13,12 @@ interface Action {
 }
 
 const POLL_INTERVAL = 5000; // 5 seconds
-const STALE_THRESHOLD = 30 * 60 * 1000; // 30 minutes for execution (longer than extraction)
+const STALE_THRESHOLD = 60 * 60 * 1000; // 1 hour for execution (longer than extraction)
+
+// Resolve workspace paths relative to mic-app root (one level up from voice-listener)
+// voice-listener/src/action-executor.ts -> voice-listener -> mic-app root
+const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
+const WORKSPACE_PROJECTS = join(MIC_APP_ROOT, "workspace", "projects");
 
 // CLI args
 const args = process.argv.slice(2);
@@ -93,6 +99,20 @@ async function executeAction(action: Action): Promise<void> {
   // Build the prompt for Claude Code
   const prompt = buildExecutionPrompt(action);
 
+  // Resolve project directory
+  // If projectPath is set, resolve it relative to WORKSPACE_PROJECTS (or use absolute path as-is)
+  // Otherwise, use WORKSPACE_PROJECTS as base (Claude will need to find the project)
+  let projectDir = WORKSPACE_PROJECTS;
+  if (action.projectPath) {
+    if (isAbsolute(action.projectPath)) {
+      // Absolute path - use as-is
+      projectDir = action.projectPath;
+    } else {
+      // Relative path - resolve relative to workspace/projects
+      projectDir = join(WORKSPACE_PROJECTS, action.projectPath);
+    }
+  }
+
   try {
     const proc = spawn({
       cmd: [
@@ -105,7 +125,7 @@ async function executeAction(action: Action): Promise<void> {
       ],
       stdout: "pipe",
       stderr: "pipe",
-      cwd: action.projectPath || process.cwd(),
+      cwd: projectDir,
     });
 
     // Stream output
@@ -186,23 +206,24 @@ The user has provided feedback. Continue iterating based on their input.
 
   prompt += `
 INSTRUCTIONS:
-1. Read the project's CLAUDE.md for context and guidelines
-2. Execute this ${action.type} action appropriately:
-   - idea: Build a prototype, make reasonable assumptions
-   - bug: Investigate and fix
-   - feature: Implement the feature
-   - todo: Complete the task
-   - command: Execute the command
-3. Update the action in InstantDB as you work:
+1. **Working Directory**: ${action.projectPath ? `You are in the project directory: ${action.projectPath}. This project should already exist in workspace/projects/.` : `You are in workspace/projects/. ${action.type !== "idea" ? `For ${action.type} actions, you need to locate the target project directory first (it must already exist).` : ""}`}
+2. **Notes**: Store documentation, research, and planning notes in workspace/notes/ (use relative path from current directory).
+3. Read workspace/CLAUDE.md for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
+4. Execute this ${action.type} action appropriately (see workspace/CLAUDE.md for type-specific guidance):
+${action.type === "idea" ? `   - idea: Research, plan, and create a NEW project in workspace/projects/` : action.type === "bug" || action.type === "feature" ? `   - ${action.type}: Work within the existing project directory. The project must already exist.` : `   - ${action.type}: Complete the task`}
+5. Update the action in InstantDB as you work:
    - Use the db from voice-listener/src/db.ts
-   - Update 'result' field with your progress/output
+   - Update 'result' field with your progress/output (for ideas, include research, services, and plan)
    - If you deploy something, set 'deployUrl'
    - Append assistant messages to the 'messages' JSON array
-4. When done, set status to "completed"
+6. When done, set status to "completed"
 
 To update the action in InstantDB:
 \`\`\`typescript
-import { db } from "./voice-listener/src/db";
+// Adjust the import path based on your current directory depth
+// From workspace/projects/: "../../voice-listener/src/db"
+// From workspace/projects/my-app/: "../../../voice-listener/src/db"
+import { db } from "../../voice-listener/src/db";
 
 // Update result
 await db.transact(db.tx.actions["${action.id}"].update({

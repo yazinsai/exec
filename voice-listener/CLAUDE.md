@@ -67,7 +67,6 @@ bun run src/action-executor.ts --dry-run --once --limit 1
 - `bug`: Reports of bugs, issues, or things broken
 - `feature`: Feature requests or enhancements
 - `todo`: Tasks to complete, reminders
-- `note`: General notes or observations
 - `question`: Questions that need answers
 - `command`: Direct commands to execute
 - `idea`: Ideas for products/features
