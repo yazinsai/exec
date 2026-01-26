@@ -39,6 +39,7 @@ yarn-error.*
 app-example
 
 .env
+.beads/
 
 # Workspace (keep directories, ignore contents)
 workspace/projects/*
