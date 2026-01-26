@@ -18,12 +18,43 @@ const TYPE_CONFIG: Record<ActionType, { label: string; color: string; bg: string
   idea: { label: "IDEA", color: "#fbbf24", bg: "#92400e" },
 };
 
-const STATUS_CONFIG: Record<ActionStatus, { color: string }> = {
-  pending: { color: colors.textTertiary },
-  in_progress: { color: colors.primary },
-  completed: { color: colors.success },
-  failed: { color: colors.error },
-};
+interface StatusDisplay {
+  label: string;
+  color: string;
+  bg: string;
+}
+
+function getStatusDisplay(action: Action): StatusDisplay {
+  const status = action.status as ActionStatus;
+
+  // Check if awaiting user feedback (has assistant message, user hasn't replied)
+  if (action.messages) {
+    try {
+      const messages = JSON.parse(action.messages) as { role: string }[];
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.role === "assistant" && status === "completed") {
+          return { label: "Review", color: "#fbbf24", bg: "#78350f" };
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  switch (status) {
+    case "pending":
+      return { label: "Queued", color: colors.textTertiary, bg: colors.backgroundElevated };
+    case "in_progress":
+      return { label: "Running", color: colors.primary, bg: colors.primary + "20" };
+    case "completed":
+      return { label: "Done", color: colors.success, bg: colors.success + "20" };
+    case "failed":
+      return { label: "Failed", color: colors.error, bg: colors.error + "20" };
+    default:
+      return { label: "Queued", color: colors.textTertiary, bg: colors.backgroundElevated };
+  }
+}
 
 interface ActionItemProps {
   action: Action;
@@ -31,17 +62,23 @@ interface ActionItemProps {
 
 export function ActionItem({ action }: ActionItemProps) {
   const typeConfig = TYPE_CONFIG[action.type as ActionType] ?? TYPE_CONFIG.note;
-  const statusConfig = STATUS_CONFIG[action.status as ActionStatus] ?? STATUS_CONFIG.pending;
+  const statusDisplay = getStatusDisplay(action);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={[styles.typeBadge, { backgroundColor: typeConfig.bg }]}>
-          <Text style={[styles.typeBadgeText, { color: typeConfig.color }]}>
-            {typeConfig.label}
-          </Text>
+        <View style={styles.badges}>
+          <View style={[styles.typeBadge, { backgroundColor: typeConfig.bg }]}>
+            <Text style={[styles.typeBadgeText, { color: typeConfig.color }]}>
+              {typeConfig.label}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusDisplay.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusDisplay.color }]}>
+              {statusDisplay.label}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
       </View>
       <Text style={styles.title} numberOfLines={2}>
         {action.title}
@@ -76,6 +113,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: spacing.sm,
   },
+  badges: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   typeBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -86,10 +128,14 @@ const styles = StyleSheet.create({
     fontWeight: typography.semibold,
     letterSpacing: 0.5,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  statusBadgeText: {
+    fontSize: typography.xs,
+    fontWeight: typography.medium,
   },
   title: {
     color: colors.textPrimary,
