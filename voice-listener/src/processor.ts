@@ -1,7 +1,7 @@
 import { spawn } from "bun";
 
 export interface ExtractedAction {
-  type: "bug" | "feature" | "todo" | "note" | "question" | "command";
+  type: "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea";
   title: string;
   description?: string;
   status: "pending";
@@ -23,6 +23,7 @@ For each action, determine its type:
 - "note": General notes or observations
 - "question": Questions that need answers
 - "command": Direct commands to execute something
+- "idea": Ideas for products, features, or projects (phrases like "I have an idea", "what if we built", "we could create")
 
 Output ONLY a JSON block with the extracted actions. If no actions are found, output an empty array.
 
@@ -31,7 +32,7 @@ Format:
 {
   "actions": [
     {
-      "type": "bug|feature|todo|note|question|command",
+      "type": "bug|feature|todo|note|question|command|idea",
       "title": "Brief title (under 80 chars)",
       "description": "Optional longer description",
       "status": "pending",
@@ -137,7 +138,7 @@ function isValidAction(action: unknown): action is ExtractedAction {
   const a = action as Record<string, unknown>;
   return (
     typeof a.type === "string" &&
-    ["bug", "feature", "todo", "note", "question", "command"].includes(a.type) &&
+    ["bug", "feature", "todo", "note", "question", "command", "idea"].includes(a.type) &&
     typeof a.title === "string" &&
     a.title.length > 0
   );

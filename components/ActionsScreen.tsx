@@ -8,9 +8,9 @@ interface ActionsScreenProps {
   onActionPress?: (action: Action) => void;
 }
 
-type ActionType = "bug" | "feature" | "todo" | "note" | "question" | "command";
+type ActionType = "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea";
 
-const TYPE_ORDER: ActionType[] = ["bug", "todo", "feature", "question", "command", "note"];
+const TYPE_ORDER: ActionType[] = ["idea", "bug", "todo", "feature", "question", "command", "note"];
 const TYPE_LABELS: Record<ActionType, string> = {
   bug: "Bugs",
   feature: "Features",
@@ -18,6 +18,7 @@ const TYPE_LABELS: Record<ActionType, string> = {
   note: "Notes",
   question: "Questions",
   command: "Commands",
+  idea: "Ideas",
 };
 
 type Section = {

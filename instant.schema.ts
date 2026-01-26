@@ -46,7 +46,7 @@ const _schema = i.schema({
       processingError: i.string().optional(),
     }),
     actions: i.entity({
-      type: i.string().indexed(), // "bug" | "feature" | "todo" | "note" | "question" | "command"
+      type: i.string().indexed(), // "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea"
       title: i.string(),
       description: i.string().optional(),
       status: i.string().indexed(), // "pending" | "in_progress" | "completed" | "failed"
@@ -57,6 +57,20 @@ const _schema = i.schema({
       errorMessage: i.string().optional(),
       syncToken: i.string().unique().indexed(), // Idempotency: `${recordingId}:${index}`
       projectPath: i.string().indexed().optional(),
+
+      // Longrun tracking (for ideas)
+      longrunEpicId: i.string().optional(),
+      longrunStatus: i.string().indexed().optional(), // "running" | "completed" | "awaiting_feedback"
+
+      // Assumptions made during longrun
+      assumptions: i.string().optional(), // JSON: { customer, problem, market, etc. }
+
+      // Variants discovered during research
+      variants: i.string().optional(), // JSON array of alternative approaches
+      selectedVariant: i.number().optional(), // Index of chosen variant, null = original
+
+      // User feedback
+      userFeedback: i.string().optional(),
     }),
   },
   rooms: {},

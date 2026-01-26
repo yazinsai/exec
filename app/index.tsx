@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { View, Text, StyleSheet, Pressable, Alert } from "react-native";
+import { View, Text, StyleSheet, Pressable, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { Audio } from "expo-av";
@@ -9,12 +9,14 @@ import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { QueueStatus } from "@/components/QueueStatus";
 import { RecordingsList } from "@/components/RecordingsList";
 import { ActionsScreen } from "@/components/ActionsScreen";
+import { IdeaFeedbackScreen } from "@/components/IdeaFeedbackScreen";
 import { BottomNavBar } from "@/components/BottomNavBar";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
 import type { Recording } from "@/lib/queue";
 import type { Action } from "@/components/ActionItem";
 import { colors, spacing } from "@/constants/Colors";
+import { db } from "@/lib/db";
 
 type TabKey = "actions" | "recordings";
 
@@ -59,6 +61,77 @@ export default function HomeScreen() {
     // Sort by extractedAt descending (newest first)
     return actions.sort((a, b) => b.extractedAt - a.extractedAt);
   }, [recordings]);
+
+  // Idea feedback modal state
+  const [selectedIdea, setSelectedIdea] = useState<Action | null>(null);
+
+  const handleActionPress = (action: Action) => {
+    // If it's an idea awaiting feedback, show the feedback screen
+    if (action.type === "idea" && action.longrunStatus === "awaiting_feedback") {
+      setSelectedIdea(action);
+    } else if (action.type === "idea") {
+      // Show status for other idea states
+      Alert.alert(
+        "Idea Status",
+        action.longrunStatus === "running"
+          ? "This idea is currently being processed by /longrun. This may take a while."
+          : action.longrunStatus === "failed"
+          ? `Processing failed: ${action.errorMessage || "Unknown error"}`
+          : "This idea is pending processing.",
+        [{ text: "OK" }]
+      );
+    } else {
+      // For non-idea actions, show details
+      Alert.alert(action.title, action.description || "No description", [{ text: "OK" }]);
+    }
+  };
+
+  const handleAcceptIdea = async () => {
+    if (!selectedIdea) return;
+    // Mark as completed/accepted
+    await db.transact(
+      db.tx.actions[selectedIdea.id].update({
+        longrunStatus: "completed",
+        status: "completed",
+      })
+    );
+    setSelectedIdea(null);
+    Alert.alert("Accepted", "The idea implementation has been accepted.");
+  };
+
+  const handleSelectVariant = async (variantIndex: number) => {
+    if (!selectedIdea) return;
+    // Update action to trigger re-processing with selected variant
+    await db.transact(
+      db.tx.actions[selectedIdea.id].update({
+        selectedVariant: variantIndex,
+        longrunStatus: "pending_variant",
+        status: "pending",
+      })
+    );
+    setSelectedIdea(null);
+    Alert.alert(
+      "Variant Selected",
+      "The variant has been selected. Run the voice-listener with --ideas to process it."
+    );
+  };
+
+  const handleSubmitFeedback = async (feedback: string) => {
+    if (!selectedIdea) return;
+    // Save feedback and mark for re-processing
+    await db.transact(
+      db.tx.actions[selectedIdea.id].update({
+        userFeedback: feedback,
+        longrunStatus: "pending_feedback",
+        status: "pending",
+      })
+    );
+    setSelectedIdea(null);
+    Alert.alert(
+      "Feedback Submitted",
+      "Your feedback has been saved. Run the voice-listener with --ideas to process it."
+    );
+  };
 
   const handleStartRecording = async () => {
     if (hasPermission === false) return;
@@ -153,7 +226,7 @@ export default function HomeScreen() {
 
       <View style={styles.content}>
         {activeTab === "actions" ? (
-          <ActionsScreen actions={allActions} />
+          <ActionsScreen actions={allActions} onActionPress={handleActionPress} />
         ) : (
           <RecordingsList
             recordings={recordings}
@@ -186,6 +259,24 @@ export default function HomeScreen() {
         onStop={stopRecording}
         onDelete={cancelRecording}
       />
+
+      {/* Idea Feedback Modal */}
+      <Modal
+        visible={selectedIdea !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedIdea(null)}
+      >
+        {selectedIdea && (
+          <IdeaFeedbackScreen
+            action={selectedIdea}
+            onAccept={handleAcceptIdea}
+            onSelectVariant={handleSelectVariant}
+            onSubmitFeedback={handleSubmitFeedback}
+            onClose={() => setSelectedIdea(null)}
+          />
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }

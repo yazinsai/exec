@@ -20,11 +20,19 @@ bun run src/index.ts --once --limit 5
 
 # Run continuously (production mode)
 bun run src/index.ts
+
+# Process idea actions with /longrun workflow
+bun run src/index.ts --ideas --once --limit 1
+
+# Preview which ideas would be processed
+bun run src/index.ts --ideas --dry-run --once
 ```
 
 - `--dry-run` - Extract actions but don't save to database
 - `--once` - Process once and exit (don't poll continuously)
-- `--limit N` - Only process N recordings
+- `--limit N` - Only process N recordings/ideas
+- `--ideas` - Process idea actions (triggers /longrun workflow)
+- `--no-longrun` - Skip longrun trigger (just extract as idea type)
 
 ## Architecture
 
@@ -42,6 +50,7 @@ bun run src/index.ts
 - `note`: General notes or observations
 - `question`: Questions that need answers
 - `command`: Direct commands to execute
+- `idea`: Ideas for products/features (triggers /longrun workflow when processed with --ideas)
 
 ## Recovery
 
