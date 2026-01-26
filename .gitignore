@@ -44,3 +44,5 @@ app-example
 # Workspace (keep directories, ignore contents)
 workspace/projects/*
 !workspace/projects/.gitkeep
+workspace/logs/*
+!workspace/logs/.gitkeep
