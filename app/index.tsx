@@ -1,5 +1,16 @@
 import { useState, useRef, useMemo } from "react";
-import { View, Text, StyleSheet, Pressable, Alert, Modal } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Alert,
+  Modal,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { Audio } from "expo-av";
@@ -9,16 +20,30 @@ import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { QueueStatus } from "@/components/QueueStatus";
 import { RecordingsList } from "@/components/RecordingsList";
 import { ActionsScreen } from "@/components/ActionsScreen";
-import { IdeaFeedbackScreen } from "@/components/IdeaFeedbackScreen";
 import { BottomNavBar } from "@/components/BottomNavBar";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
 import type { Recording } from "@/lib/queue";
 import type { Action } from "@/components/ActionItem";
-import { colors, spacing } from "@/constants/Colors";
+import { colors, spacing, typography, radii } from "@/constants/Colors";
 import { db } from "@/lib/db";
 
 type TabKey = "actions" | "recordings";
+
+interface ThreadMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
+
+function parseMessages(json: string | undefined | null): ThreadMessage[] {
+  if (!json) return [];
+  try {
+    return JSON.parse(json) as ThreadMessage[];
+  } catch {
+    return [];
+  }
+}
 
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>("actions");
@@ -62,75 +87,37 @@ export default function HomeScreen() {
     return actions.sort((a, b) => b.extractedAt - a.extractedAt);
   }, [recordings]);
 
-  // Idea feedback modal state
-  const [selectedIdea, setSelectedIdea] = useState<Action | null>(null);
+  // Action detail/feedback modal state
+  const [selectedAction, setSelectedAction] = useState<Action | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
 
   const handleActionPress = (action: Action) => {
-    // If it's an idea awaiting feedback, show the feedback screen
-    if (action.type === "idea" && action.longrunStatus === "awaiting_feedback") {
-      setSelectedIdea(action);
-    } else if (action.type === "idea") {
-      // Show status for other idea states
-      Alert.alert(
-        "Idea Status",
-        action.longrunStatus === "running"
-          ? "This idea is currently being processed by /longrun. This may take a while."
-          : action.longrunStatus === "failed"
-          ? `Processing failed: ${action.errorMessage || "Unknown error"}`
-          : "This idea is pending processing.",
-        [{ text: "OK" }]
-      );
-    } else {
-      // For non-idea actions, show details
-      Alert.alert(action.title, action.description || "No description", [{ text: "OK" }]);
-    }
+    setSelectedAction(action);
+    setFeedbackText("");
   };
 
-  const handleAcceptIdea = async () => {
-    if (!selectedIdea) return;
-    // Mark as completed/accepted
-    await db.transact(
-      db.tx.actions[selectedIdea.id].update({
-        longrunStatus: "completed",
-        status: "completed",
-      })
-    );
-    setSelectedIdea(null);
-    Alert.alert("Accepted", "The idea implementation has been accepted.");
+  const handleCloseModal = () => {
+    setSelectedAction(null);
+    setFeedbackText("");
   };
 
-  const handleSelectVariant = async (variantIndex: number) => {
-    if (!selectedIdea) return;
-    // Update action to trigger re-processing with selected variant
-    await db.transact(
-      db.tx.actions[selectedIdea.id].update({
-        selectedVariant: variantIndex,
-        longrunStatus: "pending_variant",
-        status: "pending",
-      })
-    );
-    setSelectedIdea(null);
-    Alert.alert(
-      "Variant Selected",
-      "The variant has been selected. Run the voice-listener with --ideas to process it."
-    );
-  };
+  const handleSubmitFeedback = async () => {
+    if (!selectedAction || !feedbackText.trim()) return;
 
-  const handleSubmitFeedback = async (feedback: string) => {
-    if (!selectedIdea) return;
-    // Save feedback and mark for re-processing
+    const existingMessages = parseMessages(selectedAction.messages);
+    const newMessage: ThreadMessage = {
+      role: "user",
+      content: feedbackText.trim(),
+      timestamp: Date.now(),
+    };
+    const updatedMessages = [...existingMessages, newMessage];
+
     await db.transact(
-      db.tx.actions[selectedIdea.id].update({
-        userFeedback: feedback,
-        longrunStatus: "pending_feedback",
-        status: "pending",
+      db.tx.actions[selectedAction.id].update({
+        messages: JSON.stringify(updatedMessages),
       })
     );
-    setSelectedIdea(null);
-    Alert.alert(
-      "Feedback Submitted",
-      "Your feedback has been saved. Run the voice-listener with --ideas to process it."
-    );
+    setFeedbackText("");
   };
 
   const handleStartRecording = async () => {
@@ -260,21 +247,93 @@ export default function HomeScreen() {
         onDelete={cancelRecording}
       />
 
-      {/* Idea Feedback Modal */}
+      {/* Action Detail/Feedback Modal */}
       <Modal
-        visible={selectedIdea !== null}
+        visible={selectedAction !== null}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setSelectedIdea(null)}
+        onRequestClose={handleCloseModal}
       >
-        {selectedIdea && (
-          <IdeaFeedbackScreen
-            action={selectedIdea}
-            onAccept={handleAcceptIdea}
-            onSelectVariant={handleSelectVariant}
-            onSubmitFeedback={handleSubmitFeedback}
-            onClose={() => setSelectedIdea(null)}
-          />
+        {selectedAction && (
+          <KeyboardAvoidingView
+            style={styles.modalContainer}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <View style={styles.modalHeader}>
+              <Pressable onPress={handleCloseModal} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </Pressable>
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeBadgeText}>
+                  {selectedAction.type.toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.headerSpacer} />
+            </View>
+
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
+              <Text style={styles.modalTitle}>{selectedAction.title}</Text>
+              {selectedAction.description && (
+                <Text style={styles.modalDescription}>{selectedAction.description}</Text>
+              )}
+              {selectedAction.errorMessage && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={18} color={colors.error} />
+                  <Text style={styles.errorText}>{selectedAction.errorMessage}</Text>
+                </View>
+              )}
+
+              {/* Thread Messages */}
+              {parseMessages(selectedAction.messages).length > 0 && (
+                <View style={styles.threadSection}>
+                  <Text style={styles.threadLabel}>Thread</Text>
+                  {parseMessages(selectedAction.messages).map((msg, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.messageBubble,
+                        msg.role === "user" ? styles.userBubble : styles.assistantBubble,
+                      ]}
+                    >
+                      <Text style={styles.messageRole}>
+                        {msg.role === "user" ? "You" : "Claude"}
+                      </Text>
+                      <Text style={styles.messageContent}>{msg.content}</Text>
+                      <Text style={styles.messageTime}>
+                        {new Date(msg.timestamp).toLocaleString()}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Input for new message */}
+              <View style={styles.feedbackSection}>
+                <Text style={styles.feedbackLabel}>
+                  {parseMessages(selectedAction.messages).length > 0 ? "Reply" : "Start a thread"}
+                </Text>
+                <TextInput
+                  style={styles.feedbackInput}
+                  placeholder="Type your message..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                  value={feedbackText}
+                  onChangeText={setFeedbackText}
+                />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.submitButton,
+                    !feedbackText.trim() && styles.submitButtonDisabled,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={handleSubmitFeedback}
+                  disabled={!feedbackText.trim()}
+                >
+                  <Text style={styles.submitButtonText}>Send</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         )}
       </Modal>
     </SafeAreaView>
@@ -314,5 +373,162 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  typeBadge: {
+    backgroundColor: colors.backgroundElevated,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+  },
+  typeBadgeText: {
+    color: colors.textSecondary,
+    fontSize: typography.xs,
+    fontWeight: "600",
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
+  },
+  modalTitle: {
+    fontSize: typography.xl,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  modalDescription: {
+    fontSize: typography.base,
+    color: colors.textSecondary,
+    lineHeight: typography.base * 1.5,
+    marginBottom: spacing.lg,
+  },
+  resultBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+    padding: spacing.md,
+    borderRadius: radii.md,
+    marginBottom: spacing.lg,
+  },
+  resultText: {
+    flex: 1,
+    color: colors.success,
+    fontSize: typography.sm,
+    lineHeight: typography.sm * 1.4,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    padding: spacing.md,
+    borderRadius: radii.md,
+    marginBottom: spacing.lg,
+  },
+  errorText: {
+    flex: 1,
+    color: colors.error,
+    fontSize: typography.sm,
+    lineHeight: typography.sm * 1.4,
+  },
+  threadSection: {
+    marginBottom: spacing.lg,
+  },
+  threadLabel: {
+    fontSize: typography.sm,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  messageBubble: {
+    padding: spacing.md,
+    borderRadius: radii.md,
+    marginBottom: spacing.sm,
+  },
+  userBubble: {
+    backgroundColor: colors.primary + "20",
+    marginLeft: spacing.xl,
+  },
+  assistantBubble: {
+    backgroundColor: colors.backgroundElevated,
+    marginRight: spacing.xl,
+  },
+  messageRole: {
+    fontSize: typography.xs,
+    fontWeight: "600",
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+  },
+  messageContent: {
+    fontSize: typography.sm,
+    color: colors.textPrimary,
+    lineHeight: typography.sm * 1.5,
+  },
+  messageTime: {
+    fontSize: typography.xs,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  feedbackSection: {
+    marginTop: spacing.md,
+  },
+  feedbackLabel: {
+    fontSize: typography.sm,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  feedbackInput: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    fontSize: typography.base,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    alignItems: "center",
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: colors.background,
+    fontSize: typography.base,
+    fontWeight: "600",
+  },
+  buttonPressed: {
+    opacity: 0.8,
   },
 });

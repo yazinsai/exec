@@ -369,6 +369,58 @@ Fetch the URL for a topic to learn more about it.
 - [Instant CLI](https://instantdb.com/docs/cli.md): How to use the Instant CLI to manage schema.
 - [Storage](https://instantdb.com/docs/storage.md): How to upload and serve files with Instant.
 
+# Voice Action Processing
+
+When processing any action from InstantDB (bug, feature, todo, idea, etc.):
+1. Read the action's title and description
+2. Set `status: "in_progress"` to show work has started
+3. Do the work based on action type:
+   - **idea**: Run /longrun, make assumptions, build prototype
+   - **bug**: Investigate and fix
+   - **feature**: Implement the feature
+   - **todo**: Complete the task
+   - **command**: Execute the command
+4. Write progress/results to the `result` field
+5. Set `status: "completed"` when done
+
+**Thread-based feedback (messages field):**
+The `messages` field stores a JSON array of conversation messages for iterative feedback:
+
+```ts
+interface ThreadMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
+```
+
+**Reading messages:**
+```ts
+const messages = action.messages ? JSON.parse(action.messages) : [];
+const latestUserMessage = messages.filter(m => m.role === "user").pop();
+```
+
+**Appending your response:**
+```ts
+const existingMessages = action.messages ? JSON.parse(action.messages) : [];
+const newMessage = { role: "assistant", content: "Your response here", timestamp: Date.now() };
+const updatedMessages = [...existingMessages, newMessage];
+await db.transact(db.tx.actions[actionId].update({ messages: JSON.stringify(updatedMessages) }));
+```
+
+When you see new user messages in the thread, respond by appending an assistant message. This creates a back-and-forth conversation visible in the UI.
+
+The action entity in InstantDB has:
+- `type`: "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea"
+- `title`: Brief title
+- `description`: Optional longer description
+- `status`: "pending" | "in_progress" | "completed" | "failed"
+- `result`: Output/notes from processing (visible in UI)
+- `messages`: JSON array of thread messages (see above)
+- `errorMessage`: If something went wrong
+
+Update these fields as you work to surface progress in the UI.
+
 # Final Note
 
 Think before you answer. Make sure your code passes typechecks.

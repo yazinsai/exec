@@ -58,19 +58,8 @@ const _schema = i.schema({
       syncToken: i.string().unique().indexed(), // Idempotency: `${recordingId}:${index}`
       projectPath: i.string().indexed().optional(),
 
-      // Longrun tracking (for ideas)
-      longrunEpicId: i.string().optional(),
-      longrunStatus: i.string().indexed().optional(), // "running" | "completed" | "awaiting_feedback"
-
-      // Assumptions made during longrun
-      assumptions: i.string().optional(), // JSON: { customer, problem, market, etc. }
-
-      // Variants discovered during research
-      variants: i.string().optional(), // JSON array of alternative approaches
-      selectedVariant: i.number().optional(), // Index of chosen variant, null = original
-
-      // User feedback
-      userFeedback: i.string().optional(),
+      // Thread messages: JSON array of {role: "user"|"assistant", content: string, timestamp: number}
+      messages: i.string().optional(),
     }),
   },
   rooms: {},

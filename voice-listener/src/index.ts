@@ -1,6 +1,5 @@
 import { db, id } from "./db";
 import { processTranscription, type ExtractedAction } from "./processor";
-import { processIdea, queryPendingIdeas } from "./idea-processor";
 
 interface Recording {
   id: string;
@@ -17,8 +16,6 @@ const POLL_INTERVAL = 5000; // 5 seconds
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const ONCE = args.includes("--once");
-const IDEAS_MODE = args.includes("--ideas");
-const NO_LONGRUN = args.includes("--no-longrun");
 const LIMIT = (() => {
   const idx = args.indexOf("--limit");
   if (idx !== -1 && args[idx + 1]) {
@@ -215,28 +212,6 @@ async function pollForRecordings(): Promise<number> {
   }
 }
 
-async function processIdeas(): Promise<number> {
-  try {
-    const ideas = await queryPendingIdeas(LIMIT);
-
-    if (ideas.length === 0) {
-      console.log("No pending ideas found.");
-      return 0;
-    }
-
-    console.log(`Found ${ideas.length} pending idea(s)`);
-
-    for (const idea of ideas) {
-      await processIdea(idea, DRY_RUN);
-    }
-
-    return ideas.length;
-  } catch (error) {
-    console.error("Error processing ideas:", error);
-    return 0;
-  }
-}
-
 function printUsage(): void {
   console.log(`
 Voice Listener - Extract actions from voice transcriptions
@@ -246,16 +221,12 @@ Usage: bun run src/index.ts [options]
 Options:
   --dry-run     Extract actions but don't save to database
   --once        Process once and exit (don't poll continuously)
-  --limit N     Only process N recordings/ideas
-  --ideas       Process idea actions (trigger /longrun workflow)
-  --no-longrun  Skip longrun trigger (just extract as idea type)
+  --limit N     Only process N recordings
 
 Examples:
   bun run src/index.ts --dry-run --once --limit 1    # Test with one recording
   bun run src/index.ts --once --limit 5              # Process 5 recordings and exit
   bun run src/index.ts                               # Run continuously (production)
-  bun run src/index.ts --ideas --once --limit 1      # Process one idea with longrun
-  bun run src/index.ts --ideas --dry-run             # Preview what ideas would trigger
 `);
 }
 
@@ -268,27 +239,8 @@ async function main(): Promise<void> {
   console.log("Voice Listener starting...");
   if (DRY_RUN) console.log("  Mode: DRY RUN (no changes will be saved)");
   if (ONCE) console.log("  Mode: ONCE (will exit after processing)");
-  if (IDEAS_MODE) console.log("  Mode: IDEAS (processing idea actions with /longrun)");
-  if (NO_LONGRUN) console.log("  Mode: NO_LONGRUN (ideas extracted but not processed)");
   if (LIMIT < Infinity) console.log(`  Limit: ${LIMIT}`);
 
-  // Ideas mode: process pending ideas
-  if (IDEAS_MODE) {
-    console.log("\nQuerying for pending ideas...");
-    const processed = await processIdeas();
-
-    if (ONCE) {
-      console.log(`\nDone. Processed ${processed} idea(s).`);
-      process.exit(0);
-    }
-
-    // Set up polling interval for ideas
-    setInterval(processIdeas, POLL_INTERVAL);
-    console.log(`\nListening for new ideas (polling every ${POLL_INTERVAL / 1000}s)...`);
-    return;
-  }
-
-  // Regular mode: process recordings
   // Recover any stale processing records (skip in dry run)
   if (!DRY_RUN) {
     await recoverStaleRecordings();
