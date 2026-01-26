@@ -166,6 +166,11 @@ export default function HomeScreen() {
     return actions.sort((a, b) => b.extractedAt - a.extractedAt);
   }, [recordings]);
 
+  // Count running actions
+  const runningActionsCount = useMemo(() => {
+    return allActions.filter((a) => a.status === "in_progress").length;
+  }, [allActions]);
+
   // Action detail/feedback modal state - store ID for real-time updates
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
@@ -254,6 +259,7 @@ export default function HomeScreen() {
         onTabPress={setActiveTab}
         onRecordPress={handleStartRecording}
         recordDisabled={hasPermission === false}
+        runningCount={runningActionsCount}
       />
 
       <RecordingOverlay

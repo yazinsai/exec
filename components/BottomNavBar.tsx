@@ -9,6 +9,7 @@ interface BottomNavBarProps {
   onTabPress: (tab: TabKey) => void;
   onRecordPress: () => void;
   recordDisabled?: boolean;
+  runningCount?: number;
 }
 
 export function BottomNavBar({
@@ -16,6 +17,7 @@ export function BottomNavBar({
   onTabPress,
   onRecordPress,
   recordDisabled,
+  runningCount = 0,
 }: BottomNavBarProps) {
   return (
     <View style={styles.container}>
@@ -26,11 +28,20 @@ export function BottomNavBar({
           style={styles.tab}
           onPress={() => onTabPress("actions")}
         >
-          <Ionicons
-            name={activeTab === "actions" ? "flash" : "flash-outline"}
-            size={24}
-            color={activeTab === "actions" ? colors.primary : colors.textTertiary}
-          />
+          <View style={styles.iconContainer}>
+            <Ionicons
+              name={activeTab === "actions" ? "flash" : "flash-outline"}
+              size={24}
+              color={activeTab === "actions" ? colors.primary : colors.textTertiary}
+            />
+            {runningCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {runningCount > 99 ? "99+" : runningCount}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text
             style={[
               styles.tabLabel,
@@ -120,6 +131,26 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: colors.textTertiary,
     marginTop: 4,
+  },
+  iconContainer: {
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "700",
   },
   tabLabelActive: {
     color: colors.primary,
