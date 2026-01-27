@@ -72,6 +72,31 @@ const _schema = i.schema({
 
       // Flag to request cancellation of a running action
       cancelRequested: i.boolean().optional(),
+
+      // Rating system
+      rating: i.number().indexed().optional(), // 1-5 stars
+      ratingTags: i.string().optional(), // JSON: ["wrong-approach", "incomplete", ...]
+      ratingComment: i.string().optional(),
+      ratedAt: i.number().indexed().optional(),
+
+      // Execution metrics
+      durationMs: i.number().optional(), // Total execution time
+      errorCategory: i.string().indexed().optional(), // Structured error type
+      toolsUsed: i.number().optional(), // Count of tool invocations
+
+      // Prompt versioning
+      promptVersionId: i.string().indexed().optional(),
+    }),
+    promptVersions: i.entity({
+      version: i.string().unique().indexed(), // Hash-based version ID (first 12 chars of SHA256)
+      createdAt: i.number().indexed(),
+      claudeMdHash: i.string().indexed(), // Full SHA256 of CLAUDE.md
+      notes: i.string().optional(), // Manual notes about changes
+
+      // Computed metrics (updated by analysis script)
+      totalRuns: i.number().optional(),
+      avgRating: i.number().optional(),
+      successRate: i.number().optional(),
     }),
   },
   rooms: {},

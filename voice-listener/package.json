@@ -7,6 +7,7 @@
     "extract": "bun run src/index.ts",
     "execute": "bun run src/action-executor.ts",
     "logwatch": "bun run src/log-watcher.ts",
+    "analyze": "bun run scripts/analyze-metrics.ts",
     "dev:extract": "bun --watch src/index.ts",
     "dev:execute": "bun --watch src/action-executor.ts",
     "dev:logwatch": "bun --watch src/log-watcher.ts"

@@ -24,6 +24,7 @@ import { ActionsScreen } from "@/components/ActionsScreen";
 import { BottomNavBar } from "@/components/BottomNavBar";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { VersionBadge } from "@/components/VersionBadge";
+import { RatingSection } from "@/components/RatingSection";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
 import type { Recording } from "@/lib/queue";
@@ -688,6 +689,16 @@ export default function HomeScreen() {
                   </Pressable>
                 </View>
               </View>
+
+              {/* Rating Section - only for completed/failed actions */}
+              {(selectedAction.status === "completed" || selectedAction.status === "failed") && (
+                <RatingSection
+                  actionId={selectedAction.id}
+                  existingRating={selectedAction.rating}
+                  existingTags={selectedAction.ratingTags ? JSON.parse(selectedAction.ratingTags) : []}
+                  existingComment={selectedAction.ratingComment}
+                />
+              )}
             </ScrollView>
             </KeyboardAvoidingView>
           </GestureHandlerRootView>

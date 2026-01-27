@@ -2,6 +2,8 @@ import { spawn } from "bun";
 import { join, resolve, isAbsolute } from "path";
 import { mkdir, appendFile } from "fs/promises";
 import { db } from "./db";
+import { initPromptVersioning, getCurrentVersionId } from "./prompt-versioning";
+import { classifyError } from "./error-categories";
 
 interface Action {
   id: string;
@@ -166,6 +168,7 @@ function formatStreamEvent(event: StreamEvent): { console: string; log: string }
 }
 
 async function claimAction(actionId: string, logFile: string | null): Promise<boolean> {
+  const promptVersionId = getCurrentVersionId();
   try {
     await db.transact(
       db.tx.actions[actionId].update({
@@ -173,6 +176,7 @@ async function claimAction(actionId: string, logFile: string | null): Promise<bo
         startedAt: Date.now(),
         logFile: logFile,
         progress: null, // Clear any previous progress
+        promptVersionId: promptVersionId ?? null,
       })
     );
     return true;
@@ -242,6 +246,10 @@ ${"=".repeat(60)}
       projectDir = join(WORKSPACE_PROJECTS, action.projectPath);
     }
   }
+
+  // Track execution metrics
+  const executionStartTime = Date.now();
+  let toolsUsedCount = 0;
 
   try {
     // Use stream-json for debug logging to capture thinking/reasoning
@@ -339,6 +347,10 @@ ${"=".repeat(60)}
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+            // Count tool invocations
+            if (event.type === "content_block_start" && event.content_block?.type === "tool_use") {
+              toolsUsedCount++;
+            }
             const formatted = formatStreamEvent(event);
             if (formatted.console) {
               process.stdout.write(formatted.console);
@@ -392,24 +404,35 @@ ${"=".repeat(60)}
       await appendFile(logFile, `\n\n=== EXIT ===\nCode: ${exitCode}\nStderr: ${stderr || "(none)"}\nCancelled: ${wasCancelled}\n`);
     }
 
+    // Calculate execution duration
+    const durationMs = Date.now() - executionStartTime;
+
     if (wasCancelled) {
       console.log(`\nAction ${action.id} was cancelled`);
+      const { category } = classifyError(0, "", true);
       await db.transact(
         db.tx.actions[action.id].update({
           status: "cancelled",
           cancelRequested: null,
           completedAt: Date.now(),
+          durationMs,
+          toolsUsed: toolsUsedCount,
+          errorCategory: category,
         })
       );
     } else if (exitCode !== 0) {
       console.error(`\nClaude exited with code ${exitCode}`);
       if (stderr) console.error("stderr:", stderr);
 
+      const { category } = classifyError(exitCode, stderr, false);
       await db.transact(
         db.tx.actions[action.id].update({
           status: "failed",
           errorMessage: `Exit code ${exitCode}: ${stderr.slice(0, 500)}`,
           completedAt: Date.now(),
+          durationMs,
+          toolsUsed: toolsUsedCount,
+          errorCategory: category,
         })
       );
     } else {
@@ -425,6 +448,16 @@ ${"=".repeat(60)}
           db.tx.actions[action.id].update({
             status: "completed",
             completedAt: Date.now(),
+            durationMs,
+            toolsUsed: toolsUsedCount,
+          })
+        );
+      } else {
+        // Still update metrics even if status was changed by Claude Code
+        await db.transact(
+          db.tx.actions[action.id].update({
+            durationMs,
+            toolsUsed: toolsUsedCount,
           })
         );
       }
@@ -436,11 +469,16 @@ ${"=".repeat(60)}
       await appendFile(logFile, `\n\n=== ERROR ===\n${errMsg}\n`);
     }
     // Note: pollInterval may not exist if error occurred before spawn
+    const durationMs = Date.now() - executionStartTime;
+    const { category } = classifyError(1, errMsg, false);
     await db.transact(
       db.tx.actions[action.id].update({
         status: "failed",
         errorMessage: errMsg,
         completedAt: Date.now(),
+        durationMs,
+        toolsUsed: toolsUsedCount,
+        errorCategory: category,
       })
     );
   }
@@ -638,6 +676,16 @@ async function main(): Promise<void> {
   if (LIMIT < Infinity) console.log(`  Limit: ${LIMIT}`);
   if (ACTION_ID) console.log(`  Action ID: ${ACTION_ID}`);
   if (DEBUG_LOG) console.log(`  Debug logging: ENABLED`);
+
+  // Initialize prompt versioning
+  if (!DRY_RUN) {
+    try {
+      const versionId = await initPromptVersioning();
+      console.log(`  Prompt version: ${versionId}`);
+    } catch (error) {
+      console.error("Warning: Failed to initialize prompt versioning:", error);
+    }
+  }
 
   // If specific action ID provided, execute that and exit
   if (ACTION_ID) {
