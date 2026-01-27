@@ -24,6 +24,7 @@ interface ThreadMessage {
 
 const POLL_INTERVAL = 5000; // 5 seconds
 const STALE_THRESHOLD = 60 * 60 * 1000; // 1 hour for execution (longer than extraction)
+const MAX_CONCURRENCY = 5; // Maximum parallel action executions
 
 // CLI flag to skip immediate recovery (for testing)
 const SKIP_RECOVERY = process.argv.includes("--skip-recovery");
@@ -875,9 +876,13 @@ async function pollForActions(): Promise<number> {
       actions = actions.slice(0, LIMIT);
     }
 
-    // Execute one at a time
-    for (const action of actions) {
-      await executeAction(action);
+    // Execute actions in parallel batches of MAX_CONCURRENCY
+    let processed = 0;
+    while (processed < actions.length) {
+      const batch = actions.slice(processed, processed + MAX_CONCURRENCY);
+      console.log(`\nExecuting batch of ${batch.length} action(s) in parallel...`);
+      await Promise.all(batch.map((action) => executeAction(action)));
+      processed += batch.length;
     }
 
     return actions.length;
@@ -904,6 +909,8 @@ Options:
 Debug logging saves FULL Claude output including thinking/reasoning to
 workspace/logs/{action-id}-{timestamp}.log. The log file path is stored
 in the action record for the log watcher to tail.
+
+Actions are executed in parallel batches of up to ${MAX_CONCURRENCY} at a time.
 
 On startup, the executor recovers any actions stuck in "in_progress" state
 (orphaned when the worker was previously stopped). Use --skip-recovery to
