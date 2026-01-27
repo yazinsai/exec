@@ -1,3 +1,100 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+mic-app is a voice-to-action React Native/Expo app. Users record voice notes describing bugs, features, or ideas on their phone. These are transcribed, synced to InstantDB, and automatically implemented by Claude Code via background workers on a Mac.
+
+## Development Commands
+
+```bash
+# Package manager: pnpm
+
+# Start Expo dev server
+pnpm start
+
+# Run on specific platform
+pnpm ios
+pnpm android
+pnpm web
+
+# Lint
+pnpm lint
+
+# Push OTA update (after making app changes)
+pnpm update:preview       # Preview channel
+pnpm update:production    # Production channel
+
+# Push InstantDB schema/permissions
+npx instant-cli push schema --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
+npx instant-cli push perms --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
+```
+
+### Voice Listener Workers (Mac)
+
+```bash
+cd voice-listener
+bun install
+
+# Start both workers (recommended)
+./start.sh
+
+# Or run individually
+bun run extract    # Extraction worker
+bun run execute    # Execution worker
+
+# CLI options: --dry-run, --once, --limit N
+```
+
+## Architecture
+
+```
+/app                    # Expo Router pages (file-based routing)
+/components             # React Native UI components
+/hooks                  # Custom hooks (useRecorder, useQueue, useThemeColors)
+/lib                    # Core business logic
+  ├── db.ts             # InstantDB client init
+  ├── audio.ts          # Audio file operations
+  ├── queue.ts          # Processing queue
+  ├── storage.ts        # File storage utilities
+  └── transcription.ts  # Groq transcription API
+
+/voice-listener         # Bun-based backend workers
+  └── src/
+      ├── index.ts           # Extraction worker (transcription → actions)
+      ├── action-executor.ts # Execution worker (actions → Claude Code)
+      └── log-watcher.ts     # Live progress updates
+```
+
+### Data Flow
+
+1. Phone records audio → uploads to InstantDB Storage
+2. App transcribes via Groq → saves recording with transcription
+3. **Extraction worker** polls transcriptions → extracts actions (bug/feature/todo/idea)
+4. **Execution worker** picks up pending actions → spawns Claude Code to implement
+5. Results sync back to app in real-time via InstantDB
+
+### Key Entities (instant.schema.ts)
+
+- `recordings` - Audio files with transcription, status, processing metadata
+- `actions` - Extracted items with type, status, result, thread messages, deployUrl
+
+## Styling
+
+- **NativeWind** (Tailwind for React Native)
+- System theme detection (light/dark follows device)
+- Design tokens in `/constants/Colors.ts`
+
+## Key Patterns
+
+- Always pass `schema` to InstantDB `init()` for type safety
+- Use `id()` from InstantDB to generate entity IDs
+- Index any field used in `where` filters or `order` clauses
+- Pagination only works at top-level queries, not nested relations
+
+---
+
 Act as a world-class senior frontend engineer with deep expertise in InstantDB
 and UI/UX design. Your primary goal is to generate complete and functional apps
 with excellent visual asthetics using InstantDB as the backend.

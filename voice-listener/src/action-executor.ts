@@ -470,12 +470,17 @@ The user has provided feedback. Continue iterating based on their input.
 `;
   }
 
+  // Calculate relative path to workspace/CLAUDE.md from projectDir
+  const workspaceClaudePath = action.projectPath 
+    ? "../../CLAUDE.md"  // From workspace/projects/{projectPath}/
+    : "../CLAUDE.md";    // From workspace/projects/
+
   prompt += `
 INSTRUCTIONS:
 1. **Working Directory**: ${action.projectPath ? `You are in the project directory: ${action.projectPath}. This project should already exist in workspace/projects/.` : `You are in workspace/projects/. ${action.type !== "idea" ? `For ${action.type} actions, you need to locate the target project directory first (it must already exist).` : ""}`}
 2. **Notes**: Store documentation, research, and planning notes in workspace/notes/ (use relative path from current directory).
-3. Read workspace/CLAUDE.md for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
-4. Execute this ${action.type} action appropriately (see workspace/CLAUDE.md for type-specific guidance):
+3. Read ${workspaceClaudePath} for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
+4. Execute this ${action.type} action appropriately (see ${workspaceClaudePath} for type-specific guidance):
 ${action.type === "idea" ? `   - idea: Research, plan, and create a NEW project in workspace/projects/` : action.type === "bug" || action.type === "feature" ? `   - ${action.type}: Work within the existing project directory. The project must already exist.` : `   - ${action.type}: Complete the task`}
 5. Update the action in InstantDB as you work:
    - Use the db from voice-listener/src/db.ts
