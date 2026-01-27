@@ -87,9 +87,9 @@ const darkColors = {
 // Light theme tokens
 const lightColors = {
   // Backgrounds
-  background: gray[50],
+  background: gray[100],
   backgroundElevated: "#fff",
-  backgroundPressed: gray[100],
+  backgroundPressed: gray[200],
 
   // Borders
   border: gray[200],

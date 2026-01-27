@@ -43,7 +43,7 @@ function getStatusDisplay(action: Action, colors: ThemeColors): StatusDisplay {
 
   switch (status) {
     case "pending":
-      return { label: "Queued", color: colors.textTertiary, bg: colors.backgroundElevated };
+      return { label: "Queued", color: colors.textTertiary, bg: colors.textMuted + "20" };
     case "in_progress":
       return { label: "Running", color: colors.primary, bg: colors.primary + "20" };
     case "completed":
@@ -53,7 +53,7 @@ function getStatusDisplay(action: Action, colors: ThemeColors): StatusDisplay {
     case "cancelled":
       return { label: "Stopped", color: colors.warning, bg: colors.warning + "20" };
     default:
-      return { label: "Queued", color: colors.textTertiary, bg: colors.backgroundElevated };
+      return { label: "Queued", color: colors.textTertiary, bg: colors.textMuted + "20" };
   }
 }
 

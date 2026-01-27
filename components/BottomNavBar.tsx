@@ -1,7 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, shadows, radii } from "@/constants/Colors";
-import { useColors } from "@/hooks/useThemeColors";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 type TabKey = "actions" | "recordings";
 
@@ -20,12 +20,31 @@ export function BottomNavBar({
   recordDisabled,
   runningCount = 0,
 }: BottomNavBarProps) {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
+  const recordButtonBg = isDark || !recordDisabled
+    ? colors.primary
+    : colors.backgroundElevated;
+  const recordIconColor = recordDisabled
+    ? colors.textMuted
+    : isDark
+      ? colors.white
+      : colors.primary;
+  const recordButtonBorder =
+    isDark
+      ? { borderWidth: 0, borderColor: "transparent" }
+      : {
+          borderWidth: 2,
+          borderColor: recordDisabled ? colors.border : colors.primary,
+        };
 
   return (
     <View style={styles.container}>
       {/* Background bar */}
-      <View style={[styles.bar, { backgroundColor: colors.backgroundElevated, borderTopColor: colors.border }]}>
+      <View style={[
+        styles.bar,
+        { backgroundColor: colors.backgroundElevated, borderTopColor: colors.border },
+        !isDark && styles.barLightShadow,
+      ]}>
         {/* Actions Tab */}
         <Pressable
           style={styles.tab}
@@ -83,18 +102,22 @@ export function BottomNavBar({
 
       {/* Centered Record Button */}
       <View style={styles.recordButtonContainer}>
-        <View style={[styles.recordButtonOuter, { backgroundColor: colors.backgroundElevated, borderColor: colors.border }]}>
+        <View style={[
+          styles.recordButtonOuter,
+          { backgroundColor: colors.backgroundElevated, borderColor: colors.border },
+          !isDark && styles.recordButtonOuterLightShadow,
+        ]}>
           <Pressable
             onPress={onRecordPress}
             disabled={recordDisabled}
             style={({ pressed }) => [
               styles.recordButton,
-              { backgroundColor: colors.primary },
+              { backgroundColor: recordButtonBg },
+              recordButtonBorder,
               pressed && styles.recordButtonPressed,
-              recordDisabled && styles.recordButtonDisabled,
             ]}
           >
-            <Ionicons name="mic" size={36} color={colors.white} />
+            <Ionicons name="mic" size={36} color={recordIconColor} />
           </Pressable>
         </View>
       </View>
@@ -122,6 +145,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.xl,
     width: "100%",
+  },
+  barLightShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 4,
+    borderTopWidth: 0,
   },
   tab: {
     alignItems: "center",
@@ -170,6 +201,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
+  recordButtonOuterLightShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 0,
+  },
   recordButton: {
     width: RECORD_BUTTON_SIZE,
     height: RECORD_BUTTON_SIZE,
@@ -181,8 +220,5 @@ const styles = StyleSheet.create({
   recordButtonPressed: {
     transform: [{ scale: 0.95 }],
     opacity: 0.9,
-  },
-  recordButtonDisabled: {
-    opacity: 0.5,
   },
 });

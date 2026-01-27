@@ -3,7 +3,7 @@ import { View, Text, SectionList, StyleSheet, Pressable, Alert, TextInput } from
 import { Ionicons } from "@expo/vector-icons";
 import { ActionItem, type Action } from "./ActionItem";
 import { spacing, typography, radii } from "@/constants/Colors";
-import { useColors } from "@/hooks/useThemeColors";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 interface ActionsScreenProps {
   actions: Action[];
@@ -133,10 +133,15 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 function ActionCard({ action, onPress }: { action: Action; onPress?: () => void }) {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.backgroundElevated }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.backgroundElevated },
+        !isDark && styles.cardLightShadow,
+        pressed && styles.cardPressed,
+      ]}
       onPress={onPress}
       onLongPress={() => {
         Alert.alert(
@@ -158,9 +163,9 @@ interface ViewToggleProps {
 }
 
 function ViewToggle({ value, onChange }: ViewToggleProps) {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
   return (
-    <View style={[styles.toggleContainer, { backgroundColor: colors.backgroundElevated }]}>
+    <View style={[styles.toggleContainer, { backgroundColor: colors.backgroundElevated }, !isDark && styles.toggleLightBorder]}>
       <Pressable
         style={[styles.toggleOption, value === "timeline" && { backgroundColor: colors.background }]}
         onPress={() => onChange("timeline")}
@@ -205,7 +210,7 @@ function ViewToggle({ value, onChange }: ViewToggleProps) {
 }
 
 export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -252,7 +257,7 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchInputWrapper, { backgroundColor: colors.backgroundElevated }]}>
+        <View style={[styles.searchInputWrapper, { backgroundColor: colors.backgroundElevated }, !isDark && styles.searchLightBorder]}>
           <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
@@ -296,7 +301,11 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
               <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }, section.isRunning && { color: colors.primary }]}>
                 {section.title}
               </Text>
-              <View style={[styles.sectionBadge, { backgroundColor: colors.backgroundElevated }, section.isRunning && { backgroundColor: colors.primary + "20" }]}>
+              <View style={[
+                styles.sectionBadge,
+                { backgroundColor: isDark ? colors.backgroundElevated : colors.textMuted + "25" },
+                section.isRunning && { backgroundColor: colors.primary + "20" },
+              ]}>
                 <Text style={[styles.sectionBadgeText, { color: colors.textTertiary }, section.isRunning && { color: colors.primary }]}>
                   {section.data.length}
                 </Text>
@@ -329,6 +338,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     paddingHorizontal: spacing.md,
   },
+  searchLightBorder: {
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.08)",
+  },
   searchIcon: {
     marginRight: spacing.sm,
   },
@@ -346,6 +359,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderRadius: radii.lg,
     padding: 4,
+  },
+  toggleLightBorder: {
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   toggleOption: {
     flex: 1,
@@ -410,6 +427,13 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radii.lg,
     overflow: "hidden",
+  },
+  cardLightShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
   },
   cardPressed: {
     opacity: 0.8,

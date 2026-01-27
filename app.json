@@ -11,7 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yazinsai.micapp",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +35,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 120,
           "resizeMode": "contain",
           "backgroundColor": "#0B0B0C"
         }
@@ -43,8 +46,12 @@
           "iosActivationRules": {
             "NSExtensionActivationSupportsFileWithMaxCount": 100
           },
-          "androidIntentFilters": ["audio/*"],
-          "androidMultiIntentFilters": ["audio/*"]
+          "androidIntentFilters": [
+            "audio/*"
+          ],
+          "androidMultiIntentFilters": [
+            "audio/*"
+          ]
         }
       ]
     ],
@@ -60,7 +67,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5ec9c9e2-8570-48d7-981d-0ce40288330b"
+        "projectId": "5ec9c9e2-8570-48d7-981d-0ce40288330b",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ShareExtension",
+                  "bundleIdentifier": "com.yazinsai.micapp.share-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.yazinsai.micapp"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

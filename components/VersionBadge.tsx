@@ -3,10 +3,10 @@ import { View, Text, Pressable, Modal, StyleSheet } from "react-native";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import { spacing, typography, radii } from "@/constants/Colors";
-import { useColors } from "@/hooks/useThemeColors";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 export function VersionBadge() {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
   const [showDetails, setShowDetails] = useState(false);
 
   const updateId = Updates.updateId;
@@ -19,7 +19,7 @@ export function VersionBadge() {
 
   return (
     <>
-      <Pressable onPress={() => setShowDetails(true)} style={[styles.badge, { backgroundColor: colors.backgroundElevated }]}>
+      <Pressable onPress={() => setShowDetails(true)} style={[styles.badge, { backgroundColor: colors.backgroundElevated }, !isDark && styles.badgeLightBorder]}>
         <View style={[styles.dot, { backgroundColor: updateId ? colors.success : colors.warning }]} />
         <Text style={[styles.badgeText, { color: colors.textMuted }]}>{shortId}</Text>
       </Pressable>
@@ -74,6 +74,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radii.sm,
     gap: 6,
+  },
+  badgeLightBorder: {
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   dot: {
     width: 6,
