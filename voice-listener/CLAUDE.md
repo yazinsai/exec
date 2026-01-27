@@ -73,6 +73,8 @@ bun run src/action-executor.ts --dry-run --once --limit 1
 
 ## Recovery
 
-Both workers recover stale items on startup:
+Both workers recover orphaned items on startup:
 - Extractor: Recordings stuck in "processing" for >10 min
-- Executor: Actions stuck in "in_progress" for >30 min
+- Executor: ALL actions in "in_progress" state (since they're orphaned when worker restarts)
+
+Use `--skip-recovery` flag to disable recovery on startup if needed.

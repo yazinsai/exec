@@ -25,6 +25,9 @@ interface ThreadMessage {
 const POLL_INTERVAL = 5000; // 5 seconds
 const STALE_THRESHOLD = 60 * 60 * 1000; // 1 hour for execution (longer than extraction)
 
+// CLI flag to skip immediate recovery (for testing)
+const SKIP_RECOVERY = process.argv.includes("--skip-recovery");
+
 // Resolve workspace paths relative to mic-app root (one level up from voice-listener)
 // voice-listener/src/action-executor.ts -> voice-listener -> mic-app root
 const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
@@ -54,7 +57,8 @@ const ACTION_ID = (() => {
 const DEBUG_LOG = !args.includes("--no-debug-log");
 
 async function recoverStaleActions(): Promise<void> {
-  const now = Date.now();
+  // On startup, ALL in_progress actions are orphaned (the worker wasn't running)
+  // Reset them to pending so they can be picked up again
   const result = await db.query({
     actions: {
       $: {
@@ -66,16 +70,14 @@ async function recoverStaleActions(): Promise<void> {
   });
 
   const actions = (result.actions ?? []) as (Action & { startedAt?: number })[];
-  const stale = actions.filter(
-    (a) => a.startedAt && now - a.startedAt > STALE_THRESHOLD
-  );
 
-  if (stale.length > 0) {
-    console.log(`Recovering ${stale.length} stale actions...`);
-    const txs = stale.map((a) =>
+  if (actions.length > 0) {
+    console.log(`Recovering ${actions.length} orphaned in_progress actions...`);
+    const txs = actions.map((a) =>
       db.tx.actions[a.id].update({
         status: "pending",
         startedAt: null,
+        logFile: null,
       })
     );
     await db.transact(txs);
@@ -603,10 +605,15 @@ Options:
   --limit N         Only process N actions
   --action-id ID    Execute a specific action by ID (for testing)
   --no-debug-log    Disable debug logging (logging is ON by default)
+  --skip-recovery   Skip recovering orphaned in_progress actions on startup
 
 Debug logging saves FULL Claude output including thinking/reasoning to
 workspace/logs/{action-id}-{timestamp}.log. The log file path is stored
 in the action record for the log watcher to tail.
+
+On startup, the executor recovers any actions stuck in "in_progress" state
+(orphaned when the worker was previously stopped). Use --skip-recovery to
+disable this behavior.
 
 Examples:
   bun run src/action-executor.ts --dry-run --once --limit 1
@@ -694,8 +701,8 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Recover stale actions
-  if (!DRY_RUN) {
+  // Recover orphaned in_progress actions (they were abandoned when the worker stopped)
+  if (!DRY_RUN && !SKIP_RECOVERY) {
     await recoverStaleActions();
   }
 
