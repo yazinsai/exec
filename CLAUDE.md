@@ -425,6 +425,16 @@ Update these fields as you work to surface progress in the UI.
 **Deploying to dokku:**
 When deploying an idea/feature to the dokku-server, set the `deployUrl` field with the deployed URL (e.g., `http://ip:port`). The UI will show an "Open App" button that opens the URL for testing.
 
+# OTA Updates
+
+After making changes to the Expo app, push an OTA update so the user's device auto-updates:
+
+```bash
+cd /Users/rock/projects/mic-app && pnpm update:preview
+```
+
+This pushes to the `preview` channel. The app will download and apply the update on next launch.
+
 # Final Note
 
 Think before you answer. Make sure your code passes typechecks.
