@@ -403,6 +403,7 @@ export default function HomeScreen() {
       >
         {selectedAction && (
           <GestureHandlerRootView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <SafeAreaView style={styles.flex1} edges={["top"]}>
             <KeyboardAvoidingView
               style={styles.flex1}
               behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -701,6 +702,7 @@ export default function HomeScreen() {
               )}
             </ScrollView>
             </KeyboardAvoidingView>
+            </SafeAreaView>
           </GestureHandlerRootView>
         )}
       </Modal>
