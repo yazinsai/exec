@@ -15,11 +15,12 @@ This workspace is used by the voice-to-action system. Claude Code executes actio
 - **Process**:
   1. **Locate the project**: Find the project directory in `workspace/projects/` (check `projectPath` field or match by name)
   2. **Navigate to project**: Change to the project directory
-  3. Reproduce the bug if possible
-  4. Identify root cause
-  5. Implement fix within the project
-  6. Test the fix
-  7. Document the fix in `result` field
+  3. **Check if already fixed**: Search the codebase to see if this bug was already fixed (check git history, existing code)
+  4. Reproduce the bug if possible
+  5. Identify root cause
+  6. Implement fix within the project
+  7. Test the fix
+  8. Document the fix in `result` field
 - **Notes**: The project must already exist in `workspace/projects/`.
 
 ### `feature`
@@ -27,11 +28,12 @@ This workspace is used by the voice-to-action system. Claude Code executes actio
 - **Process**:
   1. **Locate the project**: Find the project directory in `workspace/projects/` (check `projectPath` field or match by name)
   2. **Navigate to project**: Change to the project directory
-  3. Understand requirements from title/description
-  4. Design the implementation approach
-  5. Implement the feature within the project
-  6. Test thoroughly
-  7. Document implementation in `result` field
+  3. **Check if already implemented**: Search the codebase to see if this feature (or similar) already exists. Check existing components, functions, and git history to avoid duplicate work.
+  4. Understand requirements from title/description
+  5. Design the implementation approach
+  6. Implement the feature within the project
+  7. Test thoroughly
+  8. Document implementation in `result` field
 - **Notes**: The project must already exist in `workspace/projects/`.
 
 ### `todo`
@@ -73,7 +75,12 @@ This workspace is used by the voice-to-action system. Claude Code executes actio
      - Build a working prototype in the new project directory
      - Implement core functionality
      - Test basic flows
-  4. **Documentation**:
+  4. **Deployment** (for web apps):
+     - Deploy to dokku using a subdomain of `*.whhite.com` (DNS already configured)
+     - Domain format: `{app-name}.whhite.com` (e.g., `my-app.whhite.com`)
+     - After deployment, obtain the URL from dokku output and **set `deployUrl`** in InstantDB
+     - This enables the "Open App" button in the mobile app UI
+  5. **Documentation**:
      - Update `result` field with research summary, services identified, and plan
      - If deployed, set `deployUrl`
 - **Notes**: Ideas create NEW projects in `workspace/projects/`. This is the only action type that creates new projects.
@@ -120,10 +127,28 @@ await db.transact(db.tx.actions["${actionId}"].update({
 }));
 ```
 
+## Deploying to Dokku
+
+When deploying web apps (especially for `idea` type actions):
+
+1. **Domain**: Use `{app-name}.whhite.com` - DNS is pre-configured to point to `dokku-server`
+2. **Create app**: `ssh dokku@dokku-server apps:create {app-name}`
+3. **Add domain**: `ssh dokku@dokku-server domains:add {app-name} {app-name}.whhite.com`
+4. **Deploy**: Push via git or use `dokku git:sync`
+5. **Set deployUrl**: After successful deployment, update the action in InstantDB:
+   ```typescript
+   await db.transact(db.tx.actions["${actionId}"].update({
+     deployUrl: "https://{app-name}.whhite.com",
+   }));
+   ```
+
+**Important**: Always set `deployUrl` after deployment. This enables the "Open App" button in the mobile app, allowing the user to test the deployed app directly.
+
 ## Best Practices
 
 1. **Always read project CLAUDE.md** if present in workspace for project-specific guidelines
-2. **Keep projects organized** - use subdirectories for different projects
-3. **Update progress frequently** - especially for long-running ideas
-4. **Document in result field** - include important details in the action's `result` field
-5. **Deploy when appropriate** - set `deployUrl` for deployed prototypes/apps
+2. **Check for existing implementations** - Before working on bugs/features, verify they haven't already been addressed
+3. **Keep projects organized** - use subdirectories for different projects
+4. **Update progress frequently** - especially for long-running ideas
+5. **Document in result field** - include important details in the action's `result` field
+6. **Deploy when appropriate** - set `deployUrl` for deployed prototypes/apps

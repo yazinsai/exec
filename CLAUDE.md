@@ -521,7 +521,18 @@ The action entity in InstantDB has:
 Update these fields as you work to surface progress in the UI.
 
 **Deploying to dokku:**
-When deploying an idea/feature to the dokku-server, set the `deployUrl` field with the deployed URL (e.g., `http://ip:port`). The UI will show an "Open App" button that opens the URL for testing.
+When deploying web apps to dokku-server:
+1. **Domain**: Use `{app-name}.whhite.com` - DNS is pre-configured (no setup needed)
+2. **Create app**: `ssh dokku@dokku-server apps:create {app-name}`
+3. **Add domain**: `ssh dokku@dokku-server domains:add {app-name} {app-name}.whhite.com`
+4. **Deploy**: Push via git or use `dokku git:sync`
+5. **Set deployUrl**: After deployment, update the action with the URL:
+   ```typescript
+   await db.transact(db.tx.actions[actionId].update({
+     deployUrl: "https://{app-name}.whhite.com",
+   }));
+   ```
+The UI will show an "Open App" button that opens the URL for testing.
 
 # OTA Updates
 

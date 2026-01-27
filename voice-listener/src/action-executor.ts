@@ -550,17 +550,33 @@ ${"=".repeat(60)}
       const userMessages = messages.filter((m) => m.role === "user");
 
       if (userMessages.length <= lastSeenUserMessageCount) {
-        // No new feedback - check if we should continue waiting or complete
-        // Wait up to 30 seconds for feedback before marking complete
-        const waitStartTime = Date.now();
-        const FEEDBACK_WAIT_TIMEOUT = 30000; // 30 seconds
+        // No new feedback - wait indefinitely for user feedback
+        // Only exits when: new feedback arrives, action is completed externally, or cancelled
+        console.log(`Waiting for user feedback on action ${action.id}...`);
         let foundFeedback = false;
 
-        while (Date.now() - waitStartTime < FEEDBACK_WAIT_TIMEOUT) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+        while (true) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
 
           const refreshedAction = await fetchAction(action.id);
-          if (!refreshedAction) break;
+          if (!refreshedAction) {
+            console.log(`Action ${action.id} not found, exiting feedback loop`);
+            break;
+          }
+
+          // Check if action was completed externally (user marked as done in UI)
+          if (refreshedAction.status === "completed") {
+            console.log(`Action ${action.id} was marked completed externally`);
+            // Just update metrics without changing status
+            const durationMs = Date.now() - executionStartTime;
+            await db.transact(
+              db.tx.actions[action.id].update({
+                durationMs,
+                toolsUsed: totalToolsUsed,
+              })
+            );
+            return logFile;
+          }
 
           if (refreshedAction.cancelRequested) {
             console.log(`\nCancellation requested for action ${action.id}`);
@@ -592,8 +608,7 @@ ${"=".repeat(60)}
         }
 
         if (!foundFeedback) {
-          // No feedback received within timeout, mark as completed
-          console.log(`\nNo feedback received, marking action ${action.id} as completed`);
+          // Action was deleted or externally completed
           break;
         }
 

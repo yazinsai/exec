@@ -6,7 +6,7 @@ import { useThemeColors } from "@/hooks/useThemeColors";
 
 export type Action = InstaQLEntity<AppSchema, "actions">;
 
-type ActionStatus = "pending" | "in_progress" | "completed" | "failed" | "cancelled";
+type ActionStatus = "pending" | "in_progress" | "awaiting_feedback" | "completed" | "failed" | "cancelled";
 
 interface StatusDisplay {
   label: string;
@@ -16,6 +16,7 @@ interface StatusDisplay {
 
 interface ThemeColors {
   textTertiary: string;
+  textMuted: string;
   backgroundElevated: string;
   primary: string;
   success: string;
@@ -50,6 +51,8 @@ function getStatusDisplay(action: Action, colors: ThemeColors, isDark: boolean):
       return { label: "Queued", color: colors.textTertiary, bg: colors.textMuted + alpha };
     case "in_progress":
       return { label: "Running", color: colors.primary, bg: colors.primary + alpha };
+    case "awaiting_feedback":
+      return { label: "Awaiting Reply", color: colors.warning, bg: colors.warning + alpha };
     case "completed":
       return { label: "Done", color: colors.success, bg: colors.success + alpha };
     case "failed":

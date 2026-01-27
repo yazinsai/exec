@@ -44,7 +44,7 @@ import { useThemeColors, type ThemeColors } from "@/hooks/useThemeColors";
 import { db } from "@/lib/db";
 
 type TabKey = "actions" | "recordings";
-type ActionStatus = "pending" | "in_progress" | "completed" | "failed" | "cancelled";
+type ActionStatus = "pending" | "in_progress" | "awaiting_feedback" | "completed" | "failed" | "cancelled";
 
 function getStatusDisplay(action: Action, colors: ThemeColors, isDark: boolean): { label: string; color: string; bg: string } {
   const status = action.status as ActionStatus;
@@ -73,6 +73,8 @@ function getStatusDisplay(action: Action, colors: ThemeColors, isDark: boolean):
       return { label: "Queued", color: colors.textTertiary, bg: colors.textMuted + alpha };
     case "in_progress":
       return { label: "Running", color: colors.primary, bg: colors.primary + alpha };
+    case "awaiting_feedback":
+      return { label: "Awaiting Reply", color: colors.warning, bg: colors.warning + alpha };
     case "completed":
       return { label: "Done", color: colors.success, bg: colors.success + alpha };
     case "failed":
@@ -246,6 +248,17 @@ export default function HomeScreen() {
           },
         },
       ]
+    );
+  };
+
+  const handleMarkDone = async () => {
+    if (!selectedAction) return;
+
+    await db.transact(
+      db.tx.actions[selectedAction.id].update({
+        status: "completed",
+        completedAt: Date.now(),
+      })
     );
   };
 
@@ -443,6 +456,16 @@ export default function HomeScreen() {
                   <View style={styles.stopButtonContent}>
                     <Ionicons name="stop-circle" size={20} color={colors.error} />
                     <Text style={[styles.stopButtonText, { color: colors.error }]}>Stop</Text>
+                  </View>
+                </Pressable>
+              ) : selectedAction.status === "awaiting_feedback" ? (
+                <Pressable
+                  onPress={handleMarkDone}
+                  style={({ pressed }) => [styles.doneButton, { backgroundColor: colors.success + "20" }, pressed && styles.buttonPressed]}
+                >
+                  <View style={styles.stopButtonContent}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    <Text style={[styles.stopButtonText, { color: colors.success }]}>Done</Text>
                   </View>
                 </Pressable>
               ) : (
@@ -756,6 +779,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stopButton: {
+    borderRadius: radii.md,
+  },
+  doneButton: {
     borderRadius: radii.md,
   },
   stopButtonContent: {
