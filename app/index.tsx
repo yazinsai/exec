@@ -15,7 +15,6 @@ import {
 import Markdown from "react-native-markdown-display";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Link } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
@@ -273,16 +272,9 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{headerTitle}</Text>
-        <View style={styles.headerRight}>
-          {(pendingCount > 0 || failedCount > 0) && (
-            <QueueStatus pendingCount={pendingCount} failedCount={failedCount} />
-          )}
-          <Link href="/settings" asChild>
-            <Pressable style={styles.settingsButton}>
-              <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-            </Pressable>
-          </Link>
-        </View>
+        {(pendingCount > 0 || failedCount > 0) && (
+          <QueueStatus pendingCount={pendingCount} failedCount={failedCount} />
+        )}
       </View>
 
       <View style={styles.content}>
@@ -639,21 +631,8 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "700",
   },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
   content: {
     flex: 1,
-  },
-  settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.backgroundElevated,
-    justifyContent: "center",
-    alignItems: "center",
   },
   // Modal styles
   modalContainer: {

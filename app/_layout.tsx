@@ -34,14 +34,6 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="settings"
-            options={{
-              headerShown: true,
-              headerTitle: "Settings",
-              presentation: "modal",
-            }}
-          />
           <Stack.Screen name="+not-found" />
         </Stack>
         <ShareIntentHandler />

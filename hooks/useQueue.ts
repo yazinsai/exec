@@ -3,21 +3,17 @@ import { db } from "@/lib/db";
 import { processQueue, type Recording, retryRecording, deleteRecording } from "@/lib/queue";
 import { exportRecording } from "@/lib/audio";
 import { useNetworkStatus } from "./useNetworkStatus";
-import { useSettings } from "./useSettings";
 
-const FAILED_STATUSES = ["upload_failed", "transcription_failed", "send_failed"];
+const FAILED_STATUSES = ["upload_failed", "transcription_failed"];
 const PENDING_STATUSES = [
   "recorded",
   "uploading",
   "uploaded",
   "transcribing",
-  "transcribed",
-  "sending",
 ];
 
 export function useQueue() {
   const { isOnline } = useNetworkStatus();
-  const { webhookUrl } = useSettings();
   const processingRef = useRef(false);
 
   const { data, isLoading, error } = db.useQuery({
@@ -45,7 +41,7 @@ export function useQueue() {
     if (processingRef.current || !isOnline) return;
 
     processingRef.current = true;
-    processQueue(webhookUrl, isOnline).finally(() => {
+    processQueue(isOnline).finally(() => {
       processingRef.current = false;
       // Re-check for pending items that may have been added during processing
       // Use setTimeout to allow React state to update before re-checking
@@ -69,7 +65,7 @@ export function useQueue() {
         }
       }, 100);
     });
-  }, [webhookUrl, isOnline]);
+  }, [isOnline]);
 
   useEffect(() => {
     if (!isOnline || (pendingCount === 0 && failedCount === 0)) return;

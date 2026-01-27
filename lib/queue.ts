@@ -4,7 +4,6 @@ import { db } from "./db";
 import { uploadToStorage, FileTooLargeError } from "./storage";
 import { transcribeAudio } from "./transcription";
 import { generateTitle } from "./titleGeneration";
-import { sendWebhook, type WebhookPayload } from "./webhook";
 import { getLocalFileInfo, getFileSize, MAX_TRANSCRIPTION_SIZE } from "./audio";
 
 export type Recording = InstaQLEntity<AppSchema, "recordings", { audioFile: {}; actions: {} }>;
@@ -16,17 +15,11 @@ export type RecordingStatus =
   | "uploaded"
   | "transcribing"
   | "transcription_failed"
-  | "transcribed"
-  | "sending"
-  | "send_failed"
-  | "sent";
+  | "transcribed";
 
 let isProcessing = false;
 
-export async function processQueue(
-  webhookUrl: string | null,
-  isOnline: boolean
-): Promise<void> {
+export async function processQueue(isOnline: boolean): Promise<void> {
   if (isProcessing || !isOnline) {
     return;
   }
@@ -39,7 +32,7 @@ export async function processQueue(
         $: {
           where: {
             status: {
-              $ne: "sent",
+              $ne: "transcribed",
             },
           },
           order: { createdAt: "asc" },
@@ -51,7 +44,7 @@ export async function processQueue(
     const recordings = result.data.recordings as Recording[];
 
     for (const recording of recordings) {
-      await processRecording(recording, webhookUrl);
+      await processRecording(recording);
     }
   } catch (error) {
     console.error("Queue processing error:", error);
@@ -60,10 +53,7 @@ export async function processQueue(
   }
 }
 
-async function processRecording(
-  recording: Recording,
-  webhookUrl: string | null
-): Promise<void> {
+async function processRecording(recording: Recording): Promise<void> {
   const { id, status, localFilePath } = recording;
 
   try {
@@ -78,21 +68,6 @@ async function processRecording(
 
     if (refreshed.status === "uploaded" || refreshed.status === "transcription_failed") {
       await handleTranscription(id, localFilePath);
-    }
-
-    const afterTranscription = await getRecording(id);
-    if (!afterTranscription) return;
-
-    if (
-      afterTranscription.status === "transcribed" ||
-      afterTranscription.status === "send_failed"
-    ) {
-      if (webhookUrl) {
-        await handleWebhook(afterTranscription, webhookUrl);
-      } else {
-        // No webhook configured, mark as complete
-        await updateStatus(id, "sent");
-      }
     }
   } catch (error) {
     console.error(`Error processing recording ${id}:`, error);
@@ -176,45 +151,6 @@ async function handleTranscription(
   }
 }
 
-async function handleWebhook(
-  recording: Recording,
-  webhookUrl: string
-): Promise<void> {
-  const { id, transcription, duration, createdAt } = recording;
-  if (!transcription) return;
-
-  await updateStatus(id, "sending");
-
-  const payload: WebhookPayload = {
-    text: transcription,
-    recordingId: id,
-    duration,
-    createdAt,
-  };
-
-  try {
-    const success = await sendWebhook(webhookUrl, payload);
-    if (!success) throw new Error("Webhook returned non-200 status");
-
-    await db.transact(
-      db.tx.recordings[id].update({
-        status: "sent",
-        errorMessage: null,
-        lastAttemptAt: Date.now(),
-      })
-    );
-  } catch (error) {
-    await db.transact(
-      db.tx.recordings[id].update({
-        status: "send_failed",
-        errorMessage: getErrorMessage(error),
-        retryCount: recording.retryCount + 1,
-        lastAttemptAt: Date.now(),
-      })
-    );
-  }
-}
-
 async function updateStatus(
   id: string,
   status: RecordingStatus,
@@ -241,16 +177,13 @@ const RETRY_STATUS_MAP: Partial<Record<RecordingStatus, RecordingStatus>> = {
   // Failed states
   upload_failed: "recorded",
   transcription_failed: "uploaded",
-  send_failed: "transcribed",
 
   // In-progress states (recover from app kill / background suspension)
   uploading: "recorded",
   transcribing: "uploaded",
-  sending: "transcribed",
 
   // Allow manual re-run even when a stage completed but downstream didn't happen
   uploaded: "uploaded",
-  transcribed: "transcribed",
 };
 
 export async function retryRecording(id: string): Promise<void> {
