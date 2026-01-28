@@ -236,7 +236,7 @@ function TabBar({ value, onChange, counts }: TabBarProps) {
                 ]}>
                   {tab.label}
                 </Text>
-                {tab.count > 0 && tab.key !== "done" && (
+                {tab.count > 0 && (
                   <View style={[styles.badge, { backgroundColor: tab.badgeColor + "25" }]}>
                     <Text style={[styles.badgeText, { color: tab.badgeColor }]}>
                       {tab.count > 99 ? "99+" : tab.count}

@@ -24,14 +24,15 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function AudioPlayer({ uri, duration, title }: AudioPlayerProps) {
+export function AudioPlayer({ uri, duration: initialDuration, title }: AudioPlayerProps) {
   const colors = useColors();
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [waveformWidth, setWaveformWidth] = useState(0);
+  const [displayDuration, setDisplayDuration] = useState(initialDuration);
   const soundRef = useRef<Audio.Sound | null>(null);
-  const durationMs = useRef(duration * 1000);
+  const durationMs = useRef(initialDuration * 1000);
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -68,6 +69,7 @@ export function AudioPlayer({ uri, duration, title }: AudioPlayerProps) {
 
       if (status.isLoaded && status.durationMillis) {
         durationMs.current = status.durationMillis;
+        setDisplayDuration(status.durationMillis / 1000);
       }
 
       setIsPlaying(true);
@@ -147,7 +149,7 @@ export function AudioPlayer({ uri, duration, title }: AudioPlayerProps) {
   const barCount = 50;
   const bars = [];
   for (let i = 0; i < barCount; i++) {
-    const pseudoRandom = Math.sin(duration * 100 + i * 0.8) * 0.5 + 0.5;
+    const pseudoRandom = Math.sin(initialDuration * 100 + i * 0.8) * 0.5 + 0.5;
     const barHeight = 0.15 + pseudoRandom * 0.85;
     bars.push(
       <View
@@ -191,7 +193,7 @@ export function AudioPlayer({ uri, duration, title }: AudioPlayerProps) {
               <Animated.View style={[styles.progressContainer, progressStyle]}>
                 <View style={styles.waveformProgress}>
                   {bars.map((_, i) => {
-                    const pseudoRandom = Math.sin(duration * 100 + i * 0.8) * 0.5 + 0.5;
+                    const pseudoRandom = Math.sin(initialDuration * 100 + i * 0.8) * 0.5 + 0.5;
                     const barHeight = 0.15 + pseudoRandom * 0.85;
                     return (
                       <View
@@ -216,7 +218,7 @@ export function AudioPlayer({ uri, duration, title }: AudioPlayerProps) {
         </GestureDetector>
 
         <Text style={[styles.time, { color: colors.textTertiary }]}>
-          {formatTime(position)} / {formatTime(duration)}
+          {formatTime(position)} / {formatTime(displayDuration)}
         </Text>
       </View>
     </View>

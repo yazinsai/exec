@@ -104,6 +104,25 @@ function formatRelativeTime(timestamp: number): string {
   return "just now";
 }
 
+function formatDuration(ms: number | undefined, startedAt?: number): string {
+  // If no duration provided but we have startedAt, compute running duration
+  const duration = ms ?? (startedAt ? Date.now() - startedAt : 0);
+  if (duration < 1000) return "<1s";
+  const seconds = Math.floor(duration / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (minutes > 0) {
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${seconds}s`;
+}
+
 interface ThreadMessage {
   role: "user" | "assistant";
   content: string;
@@ -119,12 +138,24 @@ function parseMessages(json: string | undefined | null): ThreadMessage[] {
   }
 }
 
+interface TimelineEntry {
+  id: string;
+  name: string;
+  type: "tool" | "skill" | "subagent" | "thinking";
+  status: "running" | "completed" | "failed";
+  startedAt: number;
+  completedAt?: number;
+  duration?: number;
+  description?: string;
+}
+
 interface Progress {
   currentTask?: string;
   todos?: Array<{ content: string; status: string }>;
   recentTools?: Array<{ name: string; timestamp: number }>;
   lastThinkingSummary?: string;
   lastUpdate: number;
+  timeline?: TimelineEntry[];
 }
 
 function parseProgress(json: string | undefined | null): Progress | null {
@@ -622,16 +653,58 @@ export default function HomeScreen() {
                       </View>
                     )}
 
-                    {/* Recent Tools */}
-                    {progress.recentTools && progress.recentTools.length > 0 && (
-                      <View style={styles.recentToolsBox}>
-                        <Text style={[styles.recentToolsLabel, { color: colors.textMuted }]}>Recent tools:</Text>
-                        <View style={styles.toolsRow}>
-                          {progress.recentTools.slice(-5).map((tool, idx) => (
-                            <View key={idx} style={[styles.toolBadge, { backgroundColor: colors.backgroundElevated }]}>
-                              <Text style={[styles.toolBadgeText, { color: colors.textSecondary }]}>{tool.name}</Text>
-                            </View>
-                          ))}
+                    {/* Timeline View */}
+                    {progress.timeline && progress.timeline.length > 0 && (
+                      <View style={styles.timelineBox}>
+                        <Text style={[styles.timelineLabel, { color: colors.textMuted }]}>Timeline:</Text>
+                        <View style={styles.timelineList}>
+                          {progress.timeline.slice(-15).reverse().map((entry) => {
+                            const isRunning = entry.status === "running";
+                            const isFailed = entry.status === "failed";
+                            const statusColor = isRunning
+                              ? colors.primary
+                              : isFailed
+                              ? colors.error
+                              : colors.success;
+                            const typeIcon = entry.type === "subagent"
+                              ? "git-branch"
+                              : entry.type === "skill"
+                              ? "flash"
+                              : entry.type === "thinking"
+                              ? "bulb"
+                              : "code-slash";
+                            return (
+                              <View key={entry.id} style={styles.timelineEntry}>
+                                <View style={[styles.timelineIndicator, { borderColor: statusColor }]}>
+                                  {isRunning ? (
+                                    <View style={[styles.timelinePulse, { backgroundColor: statusColor }]} />
+                                  ) : (
+                                    <Ionicons
+                                      name={isFailed ? "close" : "checkmark"}
+                                      size={10}
+                                      color={statusColor}
+                                    />
+                                  )}
+                                </View>
+                                <View style={styles.timelineContent}>
+                                  <View style={styles.timelineHeader}>
+                                    <View style={styles.timelineNameRow}>
+                                      <Ionicons name={typeIcon as any} size={12} color={colors.textMuted} />
+                                      <Text style={[styles.timelineName, { color: colors.textPrimary }]} numberOfLines={1}>
+                                        {entry.name}
+                                      </Text>
+                                    </View>
+                                    <Text style={[styles.timelineDuration, { color: statusColor }]}>
+                                      {isRunning ? formatDuration(undefined, entry.startedAt) : formatDuration(entry.duration)}
+                                    </Text>
+                                  </View>
+                                  <Text style={[styles.timelineStatus, { color: colors.textMuted }]}>
+                                    {isRunning ? "Running" : isFailed ? "Failed" : "Completed"}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
                         </View>
                       </View>
                     )}
@@ -645,6 +718,59 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     )}
+                  </View>
+                );
+              })()}
+
+              {/* Timeline History (for completed/failed/cancelled actions) */}
+              {selectedAction.status !== "in_progress" && (() => {
+                const progress = parseProgress(selectedAction.progress);
+                if (!progress?.timeline || progress.timeline.length === 0) return null;
+                return (
+                  <View style={[styles.timelineHistorySection, { borderColor: colors.border }]}>
+                    <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Execution Timeline</Text>
+                    <View style={styles.timelineList}>
+                      {progress.timeline.slice(-20).reverse().map((entry) => {
+                        const isRunning = entry.status === "running";
+                        const isFailed = entry.status === "failed";
+                        const statusColor = isRunning
+                          ? colors.warning
+                          : isFailed
+                          ? colors.error
+                          : colors.success;
+                        const typeIcon = entry.type === "subagent"
+                          ? "git-branch"
+                          : entry.type === "skill"
+                          ? "flash"
+                          : entry.type === "thinking"
+                          ? "bulb"
+                          : "code-slash";
+                        return (
+                          <View key={entry.id} style={styles.timelineEntry}>
+                            <View style={[styles.timelineIndicator, { borderColor: statusColor }]}>
+                              <Ionicons
+                                name={isFailed ? "close" : isRunning ? "ellipse" : "checkmark"}
+                                size={isRunning ? 6 : 10}
+                                color={statusColor}
+                              />
+                            </View>
+                            <View style={styles.timelineContent}>
+                              <View style={styles.timelineHeader}>
+                                <View style={styles.timelineNameRow}>
+                                  <Ionicons name={typeIcon as any} size={12} color={colors.textMuted} />
+                                  <Text style={[styles.timelineName, { color: colors.textPrimary }]} numberOfLines={1}>
+                                    {entry.name}
+                                  </Text>
+                                </View>
+                                <Text style={[styles.timelineDuration, { color: colors.textMuted }]}>
+                                  {formatDuration(entry.duration)}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
                   </View>
                 );
               })()}
@@ -1002,6 +1128,73 @@ const styles = StyleSheet.create({
   toolBadgeText: {
     fontSize: typography.xs,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  // Timeline styles
+  timelineHistorySection: {
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+  },
+  timelineBox: {
+    marginBottom: spacing.md,
+  },
+  timelineLabel: {
+    fontSize: typography.xs,
+    marginBottom: spacing.sm,
+    fontWeight: "600",
+  },
+  timelineList: {
+    gap: spacing.xs,
+  },
+  timelineEntry: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  timelineIndicator: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  timelinePulse: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  timelineNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+  },
+  timelineName: {
+    fontSize: typography.sm,
+    fontWeight: "500",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    flex: 1,
+  },
+  timelineDuration: {
+    fontSize: typography.xs,
+    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  timelineStatus: {
+    fontSize: typography.xs,
+    marginTop: 1,
   },
   thinkingBox: {
     borderRadius: radii.sm,
