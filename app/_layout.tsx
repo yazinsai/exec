@@ -7,12 +7,7 @@ import "react-native-reanimated";
 import { ShareIntentProvider } from "expo-share-intent";
 
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
-import { useShareIntent } from "@/hooks/useShareIntent";
-
-function ShareIntentHandler() {
-  useShareIntent();
-  return null;
-}
+import { ShareIntentHandler } from "@/hooks/useShareIntent";
 
 function AppContent() {
   const { colors, isDark } = useThemeColors();
@@ -29,7 +24,6 @@ function AppContent() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <ShareIntentHandler />
       <StatusBar style={isDark ? "light" : "dark"} />
     </NavigationThemeProvider>
   );
@@ -47,7 +41,9 @@ export default function RootLayout() {
   return (
     <ShareIntentProvider>
       <ThemeProvider>
-        <AppContent />
+        <ShareIntentHandler>
+          <AppContent />
+        </ShareIntentHandler>
       </ThemeProvider>
     </ShareIntentProvider>
   );

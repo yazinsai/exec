@@ -51,10 +51,12 @@
             "NSExtensionActivationSupportsFileWithMaxCount": 100
           },
           "androidIntentFilters": [
-            "audio/*"
+            "audio/*",
+            "image/*"
           ],
           "androidMultiIntentFilters": [
-            "audio/*"
+            "audio/*",
+            "image/*"
           ]
         }
       ]

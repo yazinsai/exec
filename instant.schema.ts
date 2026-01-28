@@ -146,6 +146,18 @@ const _schema = i.schema({
         label: "actions",
       },
     },
+    recordingImages: {
+      forward: {
+        on: "recordings",
+        has: "many",
+        label: "images",
+      },
+      reverse: {
+        on: "$files",
+        has: "one",
+        label: "imageRecording",
+      },
+    },
   },
 });
 

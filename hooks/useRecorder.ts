@@ -8,6 +8,8 @@ import {
   requestAudioPermissions,
   configureAudioMode,
 } from "@/lib/audio";
+import { uploadImageToStorage } from "@/lib/image";
+import type { PendingImage } from "./useShareIntent";
 
 export type RecorderState = "idle" | "recording" | "paused" | "saving";
 
@@ -25,15 +27,18 @@ export function useRecorder(onRecordingComplete?: () => void) {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
 
   useEffect(() => {
     requestAudioPermissions().then(setHasPermission);
   }, []);
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (pendingImages?: PendingImage[]) => {
     if (state !== "idle" || hasPermission === false) {
       return;
     }
+
+    pendingImagesRef.current = pendingImages ?? [];
 
     try {
       await configureAudioMode();
@@ -124,6 +129,8 @@ export function useRecorder(onRecordingComplete?: () => void) {
 
     const recording = recordingRef.current;
     recordingRef.current = null;
+    const imagesToUpload = [...pendingImagesRef.current];
+    pendingImagesRef.current = [];
 
     setState("saving");
 
@@ -137,7 +144,6 @@ export function useRecorder(onRecordingComplete?: () => void) {
     }
 
     try {
-      // Get duration BEFORE stopping
       const status = await recording.getStatusAsync();
       const actualDuration = status.durationMillis ? status.durationMillis / 1000 : duration;
 
@@ -162,6 +168,15 @@ export function useRecorder(onRecordingComplete?: () => void) {
         })
       );
 
+      // Upload and link any pending images
+      for (let i = 0; i < imagesToUpload.length; i++) {
+        try {
+          await uploadImageToStorage(imagesToUpload[i].localPath, recordingId, i);
+        } catch (error) {
+          console.error("Failed to upload image:", error);
+        }
+      }
+
       setDuration(0);
       setMetering(-160);
       setState("idle");
@@ -179,6 +194,8 @@ export function useRecorder(onRecordingComplete?: () => void) {
     if (!recordingRef.current) {
       return;
     }
+
+    pendingImagesRef.current = [];
 
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);

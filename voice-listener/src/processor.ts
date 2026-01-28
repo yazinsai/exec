@@ -52,19 +52,67 @@ Transcription:
 {{TRANSCRIPTION}}
 """`;
 
-export async function processTranscription(transcription: string): Promise<ProcessResult> {
-  const prompt = PROMPT_TEMPLATE.replace("{{TRANSCRIPTION}}", transcription);
+const PROMPT_WITH_IMAGES_TEMPLATE = `You are an action extractor. Analyze the following voice transcription along with the attached screenshot(s) to extract actionable items.
+
+The user has shared screenshot(s) and is describing what they want done. Use both the visual context from the images AND the voice transcription to understand the full request.
+
+For each action, determine its type:
+- "bug": Reports of bugs, issues, or things that are broken (if the screenshot shows an error, broken UI, or unexpected behavior)
+- "feature": Feature requests or enhancements
+- "todo": Tasks to complete, reminders
+- "question": Questions that need answers
+- "command": Direct commands to execute something
+- "idea": Ideas for products, features, or projects
+- "post": Social media post ideas
+
+Output ONLY a JSON block with the extracted actions. If no actions are found, output an empty array.
+
+Format:
+\`\`\`json
+{
+  "actions": [
+    {
+      "type": "bug|feature|todo|question|command|idea",
+      "title": "Brief title (under 80 chars)",
+      "description": "REQUIRED: Comprehensive description containing ALL context needed to execute this action. Include: what the screenshot shows, what needs to be done, specific requirements mentioned in the voice note, any visible UI elements/errors/text from the image, and any other relevant details. Reference specific elements visible in the screenshot when applicable.",
+      "status": "pending",
+      "projectPath": "Optional project path if mentioned"
+    }
+  ]
+}
+\`\`\`
+
+Transcription:
+"""
+{{TRANSCRIPTION}}
+"""`;
+
+export async function processTranscription(
+  transcription: string,
+  imageUrls: string[] = []
+): Promise<ProcessResult> {
+  const hasImages = imageUrls.length > 0;
+  const promptTemplate = hasImages ? PROMPT_WITH_IMAGES_TEMPLATE : PROMPT_TEMPLATE;
+  const prompt = promptTemplate.replace("{{TRANSCRIPTION}}", transcription);
 
   try {
+    // Build command arguments
+    const cmdArgs = [
+      "claude",
+      "-p",
+      prompt,
+      "--dangerously-skip-permissions",
+      "--output-format",
+      "text",
+    ];
+
+    // Add image arguments if present
+    for (const imageUrl of imageUrls) {
+      cmdArgs.push("--image", imageUrl);
+    }
+
     const proc = spawn({
-      cmd: [
-        "claude",
-        "-p",
-        prompt,
-        "--dangerously-skip-permissions",
-        "--output-format",
-        "text",
-      ],
+      cmd: cmdArgs,
       stdout: "pipe",
       stderr: "pipe",
       cwd: WORKSPACE_PROJECTS,

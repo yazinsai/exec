@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -20,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { Waveform } from "./Waveform";
 import { spacing, typography, radii } from "@/constants/Colors";
 import { useColors } from "@/hooks/useThemeColors";
+import type { PendingImage } from "@/hooks/useShareIntent";
 
 interface RecordingOverlayProps {
   isVisible: boolean;
@@ -31,6 +33,7 @@ interface RecordingOverlayProps {
   onPauseResume: () => void;
   onStop: () => void;
   onDelete: () => void;
+  pendingImages?: PendingImage[];
 }
 
 function formatDuration(seconds: number): string {
@@ -50,10 +53,13 @@ export function RecordingOverlay({
   onPauseResume,
   onStop,
   onDelete,
+  pendingImages,
 }: RecordingOverlayProps) {
   const colors = useColors();
   const recordingDotOpacity = useSharedValue(1);
   const buttonScale = useSharedValue(1);
+
+  const hasImages = pendingImages && pendingImages.length > 0;
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -104,11 +110,39 @@ export function RecordingOverlay({
       style={[styles.overlay, { backgroundColor: colors.background }]}
     >
       <View style={styles.topSection}>
-        <View style={styles.speechIndicator}>
-          <Text style={[styles.speechText, { color: colors.primary }]}>
-            {isPaused ? "Paused" : "Audio"}
-          </Text>
-        </View>
+        {hasImages ? (
+          <View style={styles.imageContextContainer}>
+            <View style={styles.thumbnailRow}>
+              {pendingImages.slice(0, 3).map((img, idx) => (
+                <Image
+                  key={img.id}
+                  source={{ uri: img.localPath }}
+                  style={[
+                    styles.thumbnail,
+                    { borderColor: colors.primary },
+                    idx > 0 && { marginLeft: -12 },
+                  ]}
+                />
+              ))}
+              {pendingImages.length > 3 && (
+                <View style={[styles.thumbnailMore, { backgroundColor: colors.backgroundElevated, borderColor: colors.primary }]}>
+                  <Text style={[styles.thumbnailMoreText, { color: colors.textSecondary }]}>
+                    +{pendingImages.length - 3}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.contextText, { color: colors.textSecondary }]}>
+              Add voice context for your {pendingImages.length === 1 ? "screenshot" : "screenshots"}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.speechIndicator}>
+            <Text style={[styles.speechText, { color: colors.primary }]}>
+              {isPaused ? "Paused" : "Audio"}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.waveformSection}>
@@ -197,6 +231,38 @@ const styles = StyleSheet.create({
   speechText: {
     fontSize: typography.base,
     fontWeight: typography.medium,
+  },
+  imageContextContainer: {
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  thumbnailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  thumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
+    borderWidth: 2,
+  },
+  thumbnailMore: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
+    borderWidth: 2,
+    marginLeft: -12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbnailMoreText: {
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
+  },
+  contextText: {
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    textAlign: "center",
   },
   waveformSection: {
     flex: 1,

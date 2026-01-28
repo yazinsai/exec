@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import { VocabularyScreen } from "@/components/VocabularyScreen";
 import { useQueue } from "@/hooks/useQueue";
 import { useRecorder } from "@/hooks/useRecorder";
 import { useVocabulary } from "@/hooks/useVocabulary";
+import { useShareIntentState } from "@/hooks/useShareIntent";
 import type { Recording } from "@/lib/queue";
 import type { Action } from "@/components/ActionItem";
 
@@ -142,6 +143,7 @@ export default function HomeScreen() {
   const [showVocabulary, setShowVocabulary] = useState(false);
 
   const { terms: vocabularyTerms } = useVocabulary();
+  const { pendingImages, showRecordingOverlay, clearPendingImages } = useShareIntentState();
 
   const {
     recordings,
@@ -168,6 +170,7 @@ export default function HomeScreen() {
     isActive,
   } = useRecorder(() => {
     triggerProcessing();
+    clearPendingImages();
   });
 
   // Collect all actions from all recordings, including parent recording data
@@ -196,6 +199,18 @@ export default function HomeScreen() {
   const runningActionsCount = useMemo(() => {
     return allActions.filter((a) => a.status === "in_progress").length;
   }, [allActions]);
+
+  // Auto-start recording when images are shared
+  const hasTriggeredRecording = useRef(false);
+  useEffect(() => {
+    if (showRecordingOverlay && pendingImages.length > 0 && !isActive && !hasTriggeredRecording.current) {
+      hasTriggeredRecording.current = true;
+      handleStartRecording(true);
+    }
+    if (!showRecordingOverlay) {
+      hasTriggeredRecording.current = false;
+    }
+  }, [showRecordingOverlay, pendingImages.length, isActive]);
 
   // Action detail/feedback modal state - store ID for real-time updates
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
@@ -269,10 +284,10 @@ export default function HomeScreen() {
     );
   };
 
-  const handleStartRecording = async () => {
+  const handleStartRecording = async (withPendingImages?: boolean) => {
     if (hasPermission === false) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    startRecording();
+    startRecording(withPendingImages ? pendingImages : undefined);
   };
 
   const handlePauseResume = () => {
@@ -422,7 +437,11 @@ export default function HomeScreen() {
         isSaving={isSaving}
         onPauseResume={handlePauseResume}
         onStop={stopRecording}
-        onDelete={cancelRecording}
+        onDelete={() => {
+          cancelRecording();
+          clearPendingImages();
+        }}
+        pendingImages={pendingImages}
       />
 
       {/* Settings Modal */}

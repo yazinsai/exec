@@ -1,12 +1,18 @@
 import { db, id } from "./db";
 import { processTranscription, type ExtractedAction } from "./processor";
 
+interface RecordingImage {
+  id: string;
+  url?: string;
+}
+
 interface Recording {
   id: string;
   transcription?: string;
   status: string;
   processingStatus?: string;
   processingStartedAt?: number;
+  images?: RecordingImage[];
 }
 
 const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
@@ -112,7 +118,7 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
 }
 
 async function processRecording(recording: Recording): Promise<void> {
-  const { id: recordingId, transcription } = recording;
+  const { id: recordingId, transcription, images } = recording;
 
   if (!transcription) {
     console.log(`Recording ${recordingId} has no transcription, skipping`);
@@ -122,6 +128,15 @@ async function processRecording(recording: Recording): Promise<void> {
   console.log(`\n${"=".repeat(60)}`);
   console.log(`Processing recording ${recordingId}`);
   console.log(`Transcription: "${transcription.slice(0, 200)}${transcription.length > 200 ? "..." : ""}"`);
+
+  // Get image URLs if available
+  const imageUrls = (images ?? [])
+    .filter((img) => img.url)
+    .map((img) => img.url as string);
+
+  if (imageUrls.length > 0) {
+    console.log(`Images: ${imageUrls.length} attached`);
+  }
   console.log("=".repeat(60));
 
   if (!DRY_RUN) {
@@ -134,7 +149,7 @@ async function processRecording(recording: Recording): Promise<void> {
   }
 
   // Process with Claude
-  const result = await processTranscription(transcription);
+  const result = await processTranscription(transcription, imageUrls);
 
   if (!result.success) {
     console.error(`Failed to process recording ${recordingId}:`, result.error);
@@ -178,6 +193,7 @@ async function pollForRecordings(): Promise<number> {
             or: [{ status: "transcribed" }, { status: "sent" }],
           },
         },
+        images: {},
       },
     });
 
