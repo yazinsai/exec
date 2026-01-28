@@ -215,6 +215,7 @@ async function runClaudeSession(
   logFile: string | null,
   action: Action,
   onCancel: () => void,
+  env?: Record<string, string>,
 ): Promise<ClaudeExecutionResult> {
   const proc = spawn({
     cmd,
@@ -222,6 +223,7 @@ async function runClaudeSession(
     stdout: "pipe",
     stderr: "pipe",
     cwd: projectDir,
+    env: env ? { ...process.env, ...env } : undefined,
   });
 
   console.log(`Process spawned, PID: ${proc.pid}`);
@@ -420,13 +422,21 @@ ${"=".repeat(60)}
     console.log(`Spawning: ${cmd.join(" ").slice(0, 100)}...`);
     console.log(`Working directory: ${projectDir}`);
 
+    // Prepare env vars for the CLI script
+    const cliScriptPath = join(import.meta.dir, "../scripts/update-action-cli.ts");
+    const claudeEnv = {
+      ACTION_ID: action.id,
+      ACTION_CLI: `bun run ${cliScriptPath}`,
+    };
+
     // Run Claude Code once
     const result = await runClaudeSession(
       cmd,
       projectDir,
       logFile,
       action,
-      () => { wasCancelled = true; }
+      () => { wasCancelled = true; },
+      claudeEnv,
     );
 
     totalToolsUsed = result.toolsUsedCount;
@@ -503,9 +513,6 @@ ${"=".repeat(60)}
 }
 
 function buildExecutionPrompt(action: Action): string {
-  // CLI script path - resolve relative to this file's location
-  const cliScriptPath = join(import.meta.dir, "../scripts/update-action-cli.ts");
-
   // Calculate relative path to workspace/CLAUDE.md from projectDir
   const workspaceClaudePath = action.projectPath
     ? "../../CLAUDE.md"
@@ -592,7 +599,6 @@ The user has provided feedback. Continue iterating based on their input.
     WORKING_DIR_INSTRUCTION: workingDirInstruction,
     WORKSPACE_CLAUDE_PATH: workspaceClaudePath,
     TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
-    CLI_SCRIPT_PATH: cliScriptPath,
   });
 }
 

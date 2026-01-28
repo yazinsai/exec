@@ -14,26 +14,14 @@ INSTRUCTIONS:
 2. Read {{WORKSPACE_CLAUDE_PATH}} for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
 3. Execute this {{ACTION_TYPE}} action appropriately:
 {{TYPE_SPECIFIC_INSTRUCTION}}
-4. **Update action status via CLI** - IMPORTANT: Do NOT create .ts files for updating actions. Use these CLI commands:
+4. **Update action** via the `$ACTION_CLI` command (ACTION_ID is set automatically):
 
-   # Update result (simple)
-   bun run {{CLI_SCRIPT_PATH}} "{{ACTION_ID}}" result "Your result text here"
-
-   # Update result (multiline with heredoc)
-   bun run {{CLI_SCRIPT_PATH}} "{{ACTION_ID}}" result "$(cat <<'EOF'
-   ## Summary
-   Your multiline result here...
-   EOF
-   )"
-
-   # Update status
-   bun run {{CLI_SCRIPT_PATH}} "{{ACTION_ID}}" status completed
-
-   # Update deployUrl (for Project type with web apps)
-   bun run {{CLI_SCRIPT_PATH}} "{{ACTION_ID}}" deployUrl "https://your-app.whhite.com"
-
-   # Update multiple fields at once (JSON)
-   bun run {{CLI_SCRIPT_PATH}} "{{ACTION_ID}}" json '{"status":"completed","result":"Done!","deployUrl":"https://..."}'
+   ```bash
+   $ACTION_CLI result "Your result text here"
+   $ACTION_CLI status completed
+   $ACTION_CLI deployUrl "https://your-app.whhite.com"
+   $ACTION_CLI json '{"status":"completed","result":"Done!"}'
+   ```
 
 5. When done, set status to "completed"
 
