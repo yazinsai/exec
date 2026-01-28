@@ -58,7 +58,9 @@ export function useShareIntentState(): ShareIntentContextValue {
 }
 
 export function ShareIntentHandler({ children }: { children?: ReactNode }) {
-  const { shareIntent, resetShareIntent } = useExpoShareIntent();
+  const { shareIntent, resetShareIntent } = useExpoShareIntent({
+    resetOnBackground: false,  // Don't reset when app backgrounds
+  });
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [showRecordingOverlay, setShowRecordingOverlay] = useState(false);
 
@@ -173,7 +175,8 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
   useEffect(() => {
     if (!shareIntent) return;
 
-    if (shareIntent.type === "file" && shareIntent.files?.length) {
+    // Handle both "file" and "media" types (images come as "media")
+    if ((shareIntent.type === "file" || shareIntent.type === "media") && shareIntent.files?.length) {
       handleSharedFiles(shareIntent.files);
     } else if (shareIntent.type) {
       resetShareIntent();
@@ -301,7 +304,8 @@ export function useShareIntent() {
   useEffect(() => {
     if (!shareIntent) return;
 
-    if (shareIntent.type === "file" && shareIntent.files?.length) {
+    // Handle both "file" and "media" types
+    if ((shareIntent.type === "file" || shareIntent.type === "media") && shareIntent.files?.length) {
       handleSharedFiles(shareIntent.files);
     } else if (shareIntent.type) {
       resetShareIntent();
