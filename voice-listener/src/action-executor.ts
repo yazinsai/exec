@@ -23,8 +23,7 @@ interface ThreadMessage {
 }
 
 const POLL_INTERVAL = 5000; // 5 seconds
-const STALE_THRESHOLD = 60 * 60 * 1000; // 1 hour for execution (longer than extraction)
-const MAX_CONCURRENCY = 5; // Maximum parallel action executions
+const MAX_CONCURRENCY = 15; // Maximum parallel action executions
 
 // CLI flag to skip immediate recovery (for testing)
 const SKIP_RECOVERY = process.argv.includes("--skip-recovery");
@@ -821,9 +820,12 @@ The user has provided feedback. Continue iterating based on their input.
   }
 
   // Calculate relative path to workspace/CLAUDE.md from projectDir
-  const workspaceClaudePath = action.projectPath 
+  const workspaceClaudePath = action.projectPath
     ? "../../CLAUDE.md"  // From workspace/projects/{projectPath}/
     : "../CLAUDE.md";    // From workspace/projects/
+
+  // CLI script path (absolute to work from any directory)
+  const cliScriptPath = "/Users/rock/projects/mic-app/voice-listener/scripts/update-action-cli.ts";
 
   prompt += `
 INSTRUCTIONS:
@@ -832,33 +834,31 @@ INSTRUCTIONS:
 3. Read ${workspaceClaudePath} for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
 4. Execute this ${action.type} action appropriately (see ${workspaceClaudePath} for type-specific guidance):
 ${action.type === "idea" ? `   - idea: Research, plan, and create a NEW project in workspace/projects/` : action.type === "bug" || action.type === "feature" ? `   - ${action.type}: Work within the existing project directory. The project must already exist.` : `   - ${action.type}: Complete the task`}
-5. Update the action in InstantDB as you work:
-   - Use the db from voice-listener/src/db.ts
-   - Update 'result' field with your progress/output (for ideas, include research, services, and plan)
-   - If you deploy something, set 'deployUrl'
-   - Append assistant messages to the 'messages' JSON array
+5. **Update action status via CLI** - IMPORTANT: Do NOT create .ts files for updating actions. Use these CLI commands:
+
+   # Update result (simple)
+   bun run ${cliScriptPath} "${action.id}" result "Your result text here"
+
+   # Update result (multiline with heredoc)
+   bun run ${cliScriptPath} "${action.id}" result "$(cat <<'EOF'
+   ## Summary
+   Your multiline result here...
+   EOF
+   )"
+
+   # Update status
+   bun run ${cliScriptPath} "${action.id}" status completed
+
+   # Update deployUrl
+   bun run ${cliScriptPath} "${action.id}" deployUrl "https://your-app.whhite.com"
+
+   # Update multiple fields at once (JSON)
+   bun run ${cliScriptPath} "${action.id}" json '{"status":"completed","result":"Done!","deployUrl":"https://..."}'
+
+   # Append a message to the thread
+   bun run ${cliScriptPath} "${action.id}" messages '${JSON.stringify([...messages, { role: "assistant", content: "YOUR_RESPONSE_HERE", timestamp: 0 }]).replace(/0\}]$/, "' + '\"$(date +%s)000\"}]'")}'
+
 6. When done, set status to "completed"
-
-To update the action in InstantDB:
-\`\`\`typescript
-// Adjust the import path based on your current directory depth
-// From workspace/projects/: "../../voice-listener/src/db"
-// From workspace/projects/my-app/: "../../../voice-listener/src/db"
-import { db } from "../../voice-listener/src/db";
-
-// Update result
-await db.transact(db.tx.actions["${action.id}"].update({
-  result: "Description of what was done...",
-  deployUrl: "http://...", // if deployed
-}));
-
-// Append a message to the thread
-const messages = ${JSON.stringify(messages)};
-messages.push({ role: "assistant", content: "Your response", timestamp: Date.now() });
-await db.transact(db.tx.actions["${action.id}"].update({
-  messages: JSON.stringify(messages),
-}));
-\`\`\`
 
 Now execute this action.`;
 
