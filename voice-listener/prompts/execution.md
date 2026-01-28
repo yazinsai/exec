@@ -14,16 +14,15 @@ INSTRUCTIONS:
 2. Read {{WORKSPACE_CLAUDE_PATH}} for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
 3. Execute this {{ACTION_TYPE}} action appropriately:
 {{TYPE_SPECIFIC_INSTRUCTION}}
-4. **Update action** using these commands (ACTION_ID env var is set):
+4. **Update action** when done (ACTION_ID env var is set):
 
    ```bash
-   "$ACTION_CLI" result "Your result text here"
+   "$ACTION_CLI" result "Brief summary of what was done"
    "$ACTION_CLI" status completed
-   "$ACTION_CLI" deployUrl "https://your-app.whhite.com"
-   "$ACTION_CLI" json '{"status":"completed","result":"Done!"}'
+   "$ACTION_CLI" deployUrl "https://your-app.whhite.com"  # if deployed
    ```
 
-5. When done, set status to "completed"
+5. Always set status to "completed" when done (or "failed" if it couldn't be completed)
 {{SAFEGUARDS}}
 {{RESULT_FORMATTING}}
 Now execute this action.

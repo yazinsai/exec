@@ -1,3 +1,14 @@
+/**
+ * CLI to update action fields from Claude Code execution.
+ *
+ * Simplified to only essential fields:
+ * - status: Mark action complete/failed
+ * - result: Set final summary
+ * - deployUrl: Set deployment URL
+ *
+ * Progress updates are handled by log-watcher.
+ */
+
 import { db } from "../src/db";
 
 const args = process.argv.slice(2);
@@ -7,7 +18,9 @@ let actionId: string;
 let field: string;
 let value: string;
 
-if (args.length >= 2 && !["result", "status", "deployUrl", "messages", "json"].includes(args[0])) {
+const VALID_FIELDS = ["status", "result", "deployUrl"];
+
+if (args.length >= 2 && !VALID_FIELDS.includes(args[0])) {
   // First arg is not a field name, so it's an action ID
   actionId = args[0];
   field = args[1];
@@ -21,43 +34,35 @@ if (args.length >= 2 && !["result", "status", "deployUrl", "messages", "json"].i
 
 if (!actionId || !field) {
   console.error("Usage: $ACTION_CLI <field> <value>");
-  console.error("   or: bun run scripts/update-action-cli.ts <actionId> <field> <value>");
   console.error("");
   console.error("Fields:");
-  console.error("  result     - Set the result text");
-  console.error("  status     - Set status (pending, in_progress, completed, failed)");
-  console.error("  deployUrl  - Set the deployment URL");
-  console.error("  messages   - Set messages JSON array");
-  console.error("  json       - Update multiple fields from JSON object");
+  console.error("  status     - Set status (completed, failed, cancelled)");
+  console.error("  result     - Set final result summary");
+  console.error("  deployUrl  - Set deployment URL");
   console.error("");
-  console.error("Examples (with ACTION_ID and ACTION_CLI env vars set):");
+  console.error("Examples:");
   console.error('  $ACTION_CLI status completed');
   console.error('  $ACTION_CLI result "Task completed successfully"');
-  console.error('  $ACTION_CLI json \'{"status":"completed","result":"Done!"}\'');
+  console.error('  $ACTION_CLI deployUrl "https://my-app.whhite.com"');
+  process.exit(1);
+}
+
+if (!VALID_FIELDS.includes(field)) {
+  console.error(`Unknown field: ${field}`);
+  console.error(`Valid fields: ${VALID_FIELDS.join(", ")}`);
   process.exit(1);
 }
 
 async function update() {
-  const updateObj: Record<string, unknown> = {};
+  const updateObj: Record<string, string> = { [field]: value };
 
-  if (field === "status") {
-    updateObj.status = value;
-  } else if (field === "result") {
-    updateObj.result = value;
-  } else if (field === "deployUrl") {
-    updateObj.deployUrl = value;
-  } else if (field === "messages") {
-    updateObj.messages = value;
-  } else if (field === "json") {
-    Object.assign(updateObj, JSON.parse(value));
-  } else {
-    console.error(`Unknown field: ${field}`);
-    console.error("Valid fields: result, status, deployUrl, messages, json");
-    process.exit(1);
+  // Add completedAt timestamp when marking as complete/failed
+  if (field === "status" && ["completed", "failed", "cancelled"].includes(value)) {
+    (updateObj as Record<string, unknown>).completedAt = Date.now();
   }
 
   await db.transact(db.tx.actions[actionId].update(updateObj));
-  console.log(`Updated action ${actionId}: ${field}`);
+  console.log(`Updated action ${actionId}: ${field} = ${value}`);
   process.exit(0);
 }
 
