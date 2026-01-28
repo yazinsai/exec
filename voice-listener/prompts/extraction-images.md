@@ -1,6 +1,9 @@
-You are an action extractor. Analyze the following voice transcription along with the attached screenshot(s) to extract actionable items.
+You are an action extractor. Analyze the following voice transcription along with the screenshot(s) to extract actionable items.
 
-The user has shared screenshot(s) and is describing what they want done. Use both the visual context from the images AND the voice transcription to understand the full request.
+IMPORTANT: First, read the screenshot image(s) at the following path(s):
+{{IMAGE_PATHS}}
+
+Use the Read tool to view each image file above. Then use both the visual context from the images AND the voice transcription below to understand the full request.
 
 For each action, determine its type:
 

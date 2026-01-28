@@ -1,7 +1,9 @@
 import { spawn } from "bun";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join, resolve, isAbsolute } from "path";
 import { loadPrompt } from "./prompt-loader";
+
+const TEMP_DIR = join(import.meta.dir, "..", ".temp-images");
 
 export interface ExtractedAction {
   type: "CodeChange" | "Project" | "Research" | "Write" | "UserTask";
@@ -27,15 +29,78 @@ interface ProcessResult {
 const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
 const WORKSPACE_PROJECTS = join(MIC_APP_ROOT, "workspace", "projects");
 
+async function downloadImages(imageUrls: string[]): Promise<string[]> {
+  if (imageUrls.length === 0) return [];
+
+  // Ensure temp directory exists
+  if (!existsSync(TEMP_DIR)) {
+    mkdirSync(TEMP_DIR, { recursive: true });
+  }
+
+  const localPaths: string[] = [];
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    const url = imageUrls[i];
+    const ext = url.includes(".png") ? ".png" : url.includes(".jpg") || url.includes(".jpeg") ? ".jpg" : ".png";
+    const filename = `image-${Date.now()}-${i}${ext}`;
+    const localPath = join(TEMP_DIR, filename);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to download image ${url}: ${response.status}`);
+        continue;
+      }
+      const buffer = await response.arrayBuffer();
+      writeFileSync(localPath, Buffer.from(buffer));
+      localPaths.push(localPath);
+    } catch (error) {
+      console.error(`Error downloading image ${url}:`, error);
+    }
+  }
+
+  return localPaths;
+}
+
+function cleanupImages(localPaths: string[]): void {
+  for (const path of localPaths) {
+    try {
+      if (existsSync(path)) {
+        rmSync(path);
+      }
+    } catch (error) {
+      console.error(`Failed to cleanup image ${path}:`, error);
+    }
+  }
+}
+
 export async function processTranscription(
   transcription: string,
   imageUrls: string[] = []
 ): Promise<ProcessResult> {
   const hasImages = imageUrls.length > 0;
-  const promptName = hasImages ? "extraction-images" : "extraction";
-  const prompt = loadPrompt(promptName, { TRANSCRIPTION: transcription });
+  let localImagePaths: string[] = [];
 
   try {
+    // Download images if present
+    if (hasImages) {
+      localImagePaths = await downloadImages(imageUrls);
+      if (localImagePaths.length === 0) {
+        console.warn("Failed to download any images, proceeding without them");
+      }
+    }
+
+    const useImagesPrompt = localImagePaths.length > 0;
+    const promptName = useImagesPrompt ? "extraction-images" : "extraction";
+
+    // Build variables for prompt
+    const promptVars: Record<string, string> = { TRANSCRIPTION: transcription };
+    if (useImagesPrompt) {
+      promptVars.IMAGE_PATHS = localImagePaths.join("\n");
+    }
+
+    const prompt = loadPrompt(promptName, promptVars);
+
     // Build command arguments
     const cmdArgs = [
       "claude",
@@ -45,11 +110,6 @@ export async function processTranscription(
       "--output-format",
       "text",
     ];
-
-    // Add image arguments if present
-    for (const imageUrl of imageUrls) {
-      cmdArgs.push("--image", imageUrl);
-    }
 
     const proc = spawn({
       cmd: cmdArgs,
@@ -71,6 +131,7 @@ export async function processTranscription(
 
     if (exitCode !== 0) {
       console.error("Claude stderr:", stderr);
+      cleanupImages(localImagePaths);
       return {
         success: false,
         actions: [],
@@ -80,8 +141,10 @@ export async function processTranscription(
 
     // Extract JSON from the output
     const actions = validateExtractedActions(parseActionsFromOutput(output));
+    cleanupImages(localImagePaths);
     return { success: true, actions };
   } catch (error) {
+    cleanupImages(localImagePaths);
     return {
       success: false,
       actions: [],
