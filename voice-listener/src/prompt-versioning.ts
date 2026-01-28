@@ -5,7 +5,7 @@ interface PromptVersion {
   id: string;
   version: string;
   createdAt: number;
-  claudeMdHash: string; // Now stores hash of all prompts/*.md files
+  claudeMdHash: string; // Hash of prompts/*.md + workspace CLAUDE.md files
   notes?: string;
 }
 

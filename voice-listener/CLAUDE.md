@@ -10,7 +10,14 @@ All prompts are in `prompts/*.md` files with `{{VARIABLE}}` placeholders:
 - `prompts/extraction-images.md` - Extract actions from transcriptions + screenshots
 - `prompts/execution.md` - Execute an action with Claude Code
 
-To iterate on prompts, edit the `.md` files directly. The prompt version hash is computed from all prompt files combined.
+To iterate on prompts, edit the `.md` files directly.
+
+**Version tracking includes:**
+- `prompts/*.md` - Prompt templates
+- `workspace/CLAUDE.md` - Action type definitions
+- `workspace/projects/CLAUDE.md` - Project-specific lessons
+
+Changes to any of these files create a new prompt version for analytics.
 
 ## Architecture
 
