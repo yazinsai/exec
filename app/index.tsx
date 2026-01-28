@@ -38,7 +38,7 @@ import type { Action } from "@/components/ActionItem";
 export interface ActionWithRecording extends Action {
   _recording?: {
     id: string;
-    localFilePath: string;
+    audioUrl?: string;
     duration: number;
     title?: string | null;
   };
@@ -183,7 +183,7 @@ export default function HomeScreen() {
             ...action,
             _recording: {
               id: recording.id,
-              localFilePath: recording.localFilePath,
+              audioUrl: recording.audioFile?.url,
               duration: recording.duration,
               title: recording.title,
             },
@@ -650,11 +650,11 @@ export default function HomeScreen() {
               })()}
 
               {/* Original Voice Note */}
-              {selectedAction._recording && (
+              {selectedAction._recording?.audioUrl && (
                 <View style={styles.voiceNoteSection}>
                   <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Original Voice Note</Text>
                   <AudioPlayer
-                    uri={selectedAction._recording.localFilePath}
+                    uri={selectedAction._recording.audioUrl}
                     duration={selectedAction._recording.duration}
                     title={selectedAction._recording.title ?? undefined}
                   />
