@@ -23,10 +23,16 @@ async function checkDuplicate(sourceUri: string): Promise<boolean> {
   return data.recordings.length > 0;
 }
 
-function isAudioFile(file: { mimeType?: string; path?: string }): boolean {
+// expo-share-intent uses `path` in unified type but `filePath` on Android
+function getFilePath(file: { path?: string; filePath?: string }): string | undefined {
+  return file.path || file.filePath;
+}
+
+function isAudioFile(file: { mimeType?: string; path?: string; filePath?: string }): boolean {
+  const path = getFilePath(file);
   return (
     file.mimeType?.startsWith("audio/") ||
-    /\.(m4a|mp3|wav|aac|ogg|flac|wma)$/i.test(file.path || "")
+    /\.(m4a|mp3|wav|aac|ogg|flac|wma)$/i.test(path || "")
   );
 }
 
@@ -62,21 +68,22 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
   }, []);
 
   const handleSharedFiles = useCallback(
-    async (files: Array<{ path?: string; fileName?: string; mimeType?: string }>) => {
-      const audioFiles = files.filter((f) => f.path && isAudioFile(f));
-      const imageFiles = files.filter((f) => f.path && isImageFile(f));
+    async (files: Array<{ path?: string; filePath?: string; fileName?: string; mimeType?: string }>) => {
+      const audioFiles = files.filter((f) => getFilePath(f) && isAudioFile(f));
+      const imageFiles = files.filter((f) => getFilePath(f) && isImageFile(f));
 
       // If only images shared, prompt for voice recording
       if (audioFiles.length === 0 && imageFiles.length > 0) {
         const imported: PendingImage[] = [];
         for (const file of imageFiles) {
-          if (!file.path) continue;
+          const filePath = getFilePath(file);
+          if (!filePath) continue;
           try {
             const imageId = id();
-            const result = await importSharedImage(file.path, imageId);
+            const result = await importSharedImage(filePath, imageId);
             imported.push({ id: imageId, localPath: result.localPath });
           } catch (error) {
-            console.error("Failed to import image:", file.path, error);
+            console.error("Failed to import image:", filePath, error);
           }
         }
 
@@ -104,10 +111,11 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
       let largeFiles = 0;
 
       for (const file of audioFiles) {
-        if (!file.path) continue;
+        const filePath = getFilePath(file);
+        if (!filePath) continue;
 
         try {
-          const isDuplicate = await checkDuplicate(file.path);
+          const isDuplicate = await checkDuplicate(filePath);
           if (isDuplicate) {
             skipped++;
             continue;
@@ -115,7 +123,7 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
 
           const recordingId = id();
           const result: ImportResult = await importSharedAudio(
-            file.path,
+            filePath,
             recordingId
           );
 
@@ -136,7 +144,7 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
             largeFiles++;
           }
         } catch (error) {
-          console.error("Failed to import:", file.path, error);
+          console.error("Failed to import:", filePath, error);
           failed++;
         }
       }
@@ -191,20 +199,21 @@ export function useShareIntent() {
   }, []);
 
   const handleSharedFiles = useCallback(
-    async (files: Array<{ path?: string; fileName?: string; mimeType?: string }>) => {
-      const audioFiles = files.filter((f) => f.path && isAudioFile(f));
-      const imageFiles = files.filter((f) => f.path && isImageFile(f));
+    async (files: Array<{ path?: string; filePath?: string; fileName?: string; mimeType?: string }>) => {
+      const audioFiles = files.filter((f) => getFilePath(f) && isAudioFile(f));
+      const imageFiles = files.filter((f) => getFilePath(f) && isImageFile(f));
 
       if (audioFiles.length === 0 && imageFiles.length > 0) {
         const imported: PendingImage[] = [];
         for (const file of imageFiles) {
-          if (!file.path) continue;
+          const filePath = getFilePath(file);
+          if (!filePath) continue;
           try {
             const imageId = id();
-            const result = await importSharedImage(file.path, imageId);
+            const result = await importSharedImage(filePath, imageId);
             imported.push({ id: imageId, localPath: result.localPath });
           } catch (error) {
-            console.error("Failed to import image:", file.path, error);
+            console.error("Failed to import image:", filePath, error);
           }
         }
 
@@ -230,10 +239,11 @@ export function useShareIntent() {
       let largeFiles = 0;
 
       for (const file of audioFiles) {
-        if (!file.path) continue;
+        const filePath = getFilePath(file);
+        if (!filePath) continue;
 
         try {
-          const isDuplicate = await checkDuplicate(file.path);
+          const isDuplicate = await checkDuplicate(filePath);
           if (isDuplicate) {
             skipped++;
             continue;
@@ -241,7 +251,7 @@ export function useShareIntent() {
 
           const recordingId = id();
           const result: ImportResult = await importSharedAudio(
-            file.path,
+            filePath,
             recordingId
           );
 
@@ -262,7 +272,7 @@ export function useShareIntent() {
             largeFiles++;
           }
         } catch (error) {
-          console.error("Failed to import:", file.path, error);
+          console.error("Failed to import:", filePath, error);
           failed++;
         }
       }

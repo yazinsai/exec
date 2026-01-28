@@ -10,11 +10,11 @@ export const IMAGES_DIR = `${documentDirectory}images/`;
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"];
 
-export function isImageFile(file: { mimeType?: string; path?: string }): boolean {
+export function isImageFile(file: { mimeType?: string; path?: string; filePath?: string }): boolean {
   if (file.mimeType?.startsWith("image/")) {
     return true;
   }
-  const path = file.path?.toLowerCase() || "";
+  const path = (file.path || file.filePath)?.toLowerCase() || "";
   return IMAGE_EXTENSIONS.some((ext) => path.endsWith(ext));
 }
 
