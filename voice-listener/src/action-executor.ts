@@ -423,10 +423,10 @@ ${"=".repeat(60)}
     console.log(`Working directory: ${projectDir}`);
 
     // Prepare env vars for the CLI script
-    const cliScriptPath = join(import.meta.dir, "../scripts/update-action-cli.ts");
+    const cliScriptPath = join(import.meta.dir, "../scripts/update-action-cli.sh");
     const claudeEnv = {
       ACTION_ID: action.id,
-      ACTION_CLI: `bun run ${cliScriptPath}`,
+      ACTION_CLI: cliScriptPath,
     };
 
     // Run Claude Code once
@@ -518,37 +518,44 @@ function buildExecutionPrompt(action: Action): string {
     ? "../../CLAUDE.md"
     : "../CLAUDE.md";
 
-  // Build working directory instruction based on type
+  // Build working directory instruction based on type (use absolute paths for clarity)
   let workingDirInstruction: string;
   if (action.projectPath) {
-    workingDirInstruction = `You are in the project directory: ${action.projectPath}. This project should already exist in workspace/projects/.`;
+    const absolutePath = isAbsolute(action.projectPath)
+      ? action.projectPath
+      : join(WORKSPACE_PROJECTS, action.projectPath);
+    workingDirInstruction = `Your working directory is \`${absolutePath}\`. This project should already exist.`;
   } else if (action.type === "Project") {
-    workingDirInstruction = `You are in workspace/projects/. Create a NEW project directory here.`;
+    workingDirInstruction = `Your working directory is \`${WORKSPACE_PROJECTS}/\`. Create a NEW project subdirectory here.`;
   } else if (action.type === "CodeChange") {
-    workingDirInstruction = `You are in workspace/projects/. Locate the target project directory first (it must already exist).`;
+    workingDirInstruction = `Your working directory is \`${WORKSPACE_PROJECTS}/\`. Locate the target project subdirectory first (it must already exist).`;
   } else {
-    workingDirInstruction = `You are in workspace/projects/.`;
+    workingDirInstruction = `Your working directory is \`${WORKSPACE_PROJECTS}/\`.`;
   }
 
-  // Build type-specific instruction
+  // Build type-specific instruction with skill routing
   let typeSpecificInstruction: string;
   switch (action.type) {
     case "CodeChange":
-      typeSpecificInstruction = `   - CodeChange (${action.subtype || "change"}): Work within the existing project directory. Implement the ${action.subtype || "change"}.`;
+      typeSpecificInstruction = `   - CodeChange (${action.subtype || "change"}): Work within the existing project directory. Implement the ${action.subtype || "change"}.${
+        action.projectPath === "mic-app" || action.projectPath?.includes("mic-app")
+          ? "\n   - After completing mic-app changes, push an OTA update: `cd /Users/rock/projects/mic-app && pnpm update:preview`"
+          : ""
+      }`;
       break;
     case "Project":
-      typeSpecificInstruction = "   - Project: Research, plan, and create a NEW project in workspace/projects/. Deploy if it's a web app.";
+      typeSpecificInstruction = "   - Project: Research, plan, and create a NEW project in workspace/projects/. Use /frontend-design skill if building UI. Deploy web apps to dokku.";
       break;
     case "Research":
-      typeSpecificInstruction = "   - Research: Investigate the topic thoroughly, provide comprehensive findings in the result field.";
+      typeSpecificInstruction = "   - Research: Use the /research skill for comprehensive multi-source analysis. Save findings to result with markdown formatting (Summary → Details → Sources).";
       break;
     case "Write":
-      typeSpecificInstruction = "   - Write: Create the content. For social media, use /typefully to create drafts.";
+      typeSpecificInstruction = "   - Write: For social media posts, use the /typefully skill immediately. For other content, write directly and save to result field.";
       break;
     case "UserTask":
       typeSpecificInstruction = action.prep_allowed
-        ? `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Prepare: ${action.prep_allowed}`
-        : `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Document what the user needs to do.`;
+        ? `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Maximize prep work:\n     - Research and document background info\n     - Draft templates/scripts/checklists\n     - Create any supporting materials\n     - Save everything to result field\n     Prep allowed: ${action.prep_allowed}`
+        : `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Document what the user needs to do clearly in the result field.`;
       break;
     default:
       typeSpecificInstruction = `   - ${action.type}: Complete the task`;
@@ -589,6 +596,33 @@ The user has provided feedback. Continue iterating based on their input.
     }
   }
 
+  // Build conditional safeguards (full version only for Project type)
+  let safeguards: string;
+  if (action.type === "Project") {
+    safeguards = `
+CRITICAL SAFEGUARDS - DO NOT VIOLATE:
+- DO NOT push InstantDB schema changes (no \`npx instant-cli push schema\`)
+- DO NOT push InstantDB permission changes (no \`npx instant-cli push perms\`)
+- DO NOT use or reference INSTANT_APP_ID or INSTANT_ADMIN_TOKEN environment variables from the parent mic-app
+- DO NOT reuse existing InstantDB app IDs - always create new apps with \`npx instant-cli init-without-files\`
+- DO NOT read .env files from the parent mic-app directory or voice-listener directory
+- Create standalone projects without shared database dependencies
+- If you need a database for a new project, create a fresh InstantDB app with its own credentials
+`;
+  } else {
+    safeguards = "";
+  }
+
+  // Build result formatting guidance
+  const resultFormatting = `
+RESULT FORMATTING:
+- Use markdown formatting (bold headers, bullet points)
+- Keep it scannable - key findings/links at the top
+- For Write: Include Typefully draft IDs and links
+- For Research: Structure as Summary → Details → Sources
+- For Project: Include deployment URL and key features
+`;
+
   return loadPrompt("execution", {
     ACTION_ID: action.id,
     ACTION_TYPE: action.type,
@@ -599,6 +633,8 @@ The user has provided feedback. Continue iterating based on their input.
     WORKING_DIR_INSTRUCTION: workingDirInstruction,
     WORKSPACE_CLAUDE_PATH: workspaceClaudePath,
     TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
+    SAFEGUARDS: safeguards,
+    RESULT_FORMATTING: resultFormatting,
   });
 }
 
