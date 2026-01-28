@@ -12,7 +12,6 @@ interface ActionsScreenProps {
 }
 
 type TabMode = "review" | "active" | "done";
-type ActionType = "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea" | "post";
 
 // Categorization helpers
 function needsReview(action: Action): boolean {
@@ -67,7 +66,6 @@ function categorizeAction(action: Action): TabMode {
 
 type Section = {
   title: string;
-  type?: ActionType;
   key: string;
   data: Action[];
   isRunning?: boolean;

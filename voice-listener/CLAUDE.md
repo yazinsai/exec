@@ -2,6 +2,16 @@
 
 Two-worker system for processing voice transcriptions into executable actions.
 
+## Prompts
+
+All prompts are in `prompts/*.md` files with `{{VARIABLE}}` placeholders:
+
+- `prompts/extraction.md` - Extract actions from voice transcriptions
+- `prompts/extraction-images.md` - Extract actions from transcriptions + screenshots
+- `prompts/execution.md` - Execute an action with Claude Code
+
+To iterate on prompts, edit the `.md` files directly. The prompt version hash is computed from all prompt files combined.
+
 ## Architecture
 
 ```
@@ -64,13 +74,11 @@ bun run src/action-executor.ts --dry-run --once --limit 1
 
 ## Action Types
 
-- `bug`: Reports of bugs, issues, or things broken
-- `feature`: Feature requests or enhancements
-- `todo`: Tasks to complete, reminders
-- `question`: Questions that need answers
-- `command`: Direct commands to execute
-- `idea`: Ideas for products/features
-- `post`: Social media post ideas for drafting
+- `CodeChange`: Changes to existing code (subtype: bug|feature|refactor). Requires projectPath.
+- `Project`: New standalone projects/ideas. Creates new directory in workspace/projects/.
+- `Research`: Questions needing investigation or analysis.
+- `Write`: Content creation - posts, docs, articles, emails.
+- `UserTask`: Tasks requiring human action (has task, why_user, prep_allowed, remind_at fields).
 
 ## Recovery
 

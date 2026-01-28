@@ -101,16 +101,32 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
     const actionId = id();
     const syncToken = `${recordingId}:${index}`;
 
+    // Build the update object with all fields
+    const updateData: Record<string, unknown> = {
+      type: action.type,
+      title: action.title,
+      description: action.description ?? null,
+      status: "pending",
+      extractedAt: now,
+      syncToken,
+      projectPath: action.projectPath ?? null,
+    };
+
+    // Add CodeChange subtype
+    if (action.subtype) {
+      updateData.subtype = action.subtype;
+    }
+
+    // Add UserTask-specific fields
+    if (action.type === "UserTask") {
+      if (action.task) updateData.task = action.task;
+      if (action.why_user) updateData.why_user = action.why_user;
+      if (action.prep_allowed) updateData.prep_allowed = action.prep_allowed;
+      if (action.remind_at) updateData.remind_at = action.remind_at;
+    }
+
     return db.tx.actions[actionId]
-      .update({
-        type: action.type,
-        title: action.title,
-        description: action.description ?? null,
-        status: "pending",
-        extractedAt: now,
-        syncToken,
-        projectPath: action.projectPath ?? null,
-      })
+      .update(updateData)
       .link({ recording: recordingId });
   });
 

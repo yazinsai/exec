@@ -1,12 +1,20 @@
 import { spawn } from "bun";
-import { join, resolve } from "path";
+import { existsSync, statSync } from "fs";
+import { join, resolve, isAbsolute } from "path";
+import { loadPrompt } from "./prompt-loader";
 
 export interface ExtractedAction {
-  type: "bug" | "feature" | "todo" | "question" | "command" | "idea" | "post";
+  type: "CodeChange" | "Project" | "Research" | "Write" | "UserTask";
+  subtype?: "bug" | "feature" | "refactor"; // Only for CodeChange
   title: string;
   description?: string;
   status: "pending";
   projectPath?: string;
+  // UserTask-specific fields
+  task?: string;
+  why_user?: string;
+  prep_allowed?: string;
+  remind_at?: string;
 }
 
 interface ProcessResult {
@@ -19,81 +27,13 @@ interface ProcessResult {
 const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
 const WORKSPACE_PROJECTS = join(MIC_APP_ROOT, "workspace", "projects");
 
-const PROMPT_TEMPLATE = `You are an action extractor. Analyze the following voice transcription and extract any actionable items.
-
-For each action, determine its type:
-- "bug": Reports of bugs, issues, or things that are broken
-- "feature": Feature requests or enhancements
-- "todo": Tasks to complete, reminders
-- "question": Questions that need answers
-- "command": Direct commands to execute something
-- "idea": Ideas for products, features, or projects (phrases like "I have an idea", "what if we built", "we could create")
-- "post": Social media post ideas (phrases like "here's an idea for a post", "post about", "tweet this", "LinkedIn post", "share on Twitter")
-
-Output ONLY a JSON block with the extracted actions. If no actions are found, output an empty array.
-
-Format:
-\`\`\`json
-{
-  "actions": [
-    {
-      "type": "bug|feature|todo|question|command|idea",
-      "title": "Brief title (under 80 chars)",
-      "description": "REQUIRED: Comprehensive description containing ALL context from the transcription needed to execute this action. Include: what needs to be done, specific requirements, constraints, background context, any mentioned files/features/components, user's intent, and any other relevant details. This description will be the primary source of information when executing the action, so be thorough and include everything from the transcription that would be useful.",
-      "status": "pending",
-      "projectPath": "Optional project path if mentioned"
-    }
-  ]
-}
-\`\`\`
-
-Transcription:
-"""
-{{TRANSCRIPTION}}
-"""`;
-
-const PROMPT_WITH_IMAGES_TEMPLATE = `You are an action extractor. Analyze the following voice transcription along with the attached screenshot(s) to extract actionable items.
-
-The user has shared screenshot(s) and is describing what they want done. Use both the visual context from the images AND the voice transcription to understand the full request.
-
-For each action, determine its type:
-- "bug": Reports of bugs, issues, or things that are broken (if the screenshot shows an error, broken UI, or unexpected behavior)
-- "feature": Feature requests or enhancements
-- "todo": Tasks to complete, reminders
-- "question": Questions that need answers
-- "command": Direct commands to execute something
-- "idea": Ideas for products, features, or projects
-- "post": Social media post ideas
-
-Output ONLY a JSON block with the extracted actions. If no actions are found, output an empty array.
-
-Format:
-\`\`\`json
-{
-  "actions": [
-    {
-      "type": "bug|feature|todo|question|command|idea",
-      "title": "Brief title (under 80 chars)",
-      "description": "REQUIRED: Comprehensive description containing ALL context needed to execute this action. Include: what the screenshot shows, what needs to be done, specific requirements mentioned in the voice note, any visible UI elements/errors/text from the image, and any other relevant details. Reference specific elements visible in the screenshot when applicable.",
-      "status": "pending",
-      "projectPath": "Optional project path if mentioned"
-    }
-  ]
-}
-\`\`\`
-
-Transcription:
-"""
-{{TRANSCRIPTION}}
-"""`;
-
 export async function processTranscription(
   transcription: string,
   imageUrls: string[] = []
 ): Promise<ProcessResult> {
   const hasImages = imageUrls.length > 0;
-  const promptTemplate = hasImages ? PROMPT_WITH_IMAGES_TEMPLATE : PROMPT_TEMPLATE;
-  const prompt = promptTemplate.replace("{{TRANSCRIPTION}}", transcription);
+  const promptName = hasImages ? "extraction-images" : "extraction";
+  const prompt = loadPrompt(promptName, { TRANSCRIPTION: transcription });
 
   try {
     // Build command arguments
@@ -139,7 +79,7 @@ export async function processTranscription(
     }
 
     // Extract JSON from the output
-    const actions = parseActionsFromOutput(output);
+    const actions = validateExtractedActions(parseActionsFromOutput(output));
     return { success: true, actions };
   } catch (error) {
     return {
@@ -148,6 +88,66 @@ export async function processTranscription(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+function validateExtractedActions(actions: ExtractedAction[]): ExtractedAction[] {
+  return actions.map((action) => {
+    // Only CodeChange requires projectPath validation
+    if (action.type !== "CodeChange") return action;
+
+    const projectPath = action.projectPath?.trim();
+    if (!projectPath) {
+      // Convert to Research action asking for clarification
+      return {
+        type: "Research",
+        title: `Which project for this ${action.subtype || "code change"}?`,
+        description: [
+          `Extracted a CodeChange action, but it requires an existing project in workspace/projects/.`,
+          ``,
+          `Original action:`,
+          `- title: ${action.title}`,
+          `- subtype: ${action.subtype || "(none)"}`,
+          action.description ? `- description: ${action.description}` : ``,
+          ``,
+          `Which existing project folder should this apply to?`,
+        ].filter(Boolean).join("\n"),
+        status: "pending",
+      };
+    }
+
+    const projectDir = isAbsolute(projectPath)
+      ? projectPath
+      : join(WORKSPACE_PROJECTS, projectPath);
+
+    const existsAndIsDir = (() => {
+      try {
+        return existsSync(projectDir) && statSync(projectDir).isDirectory();
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!existsAndIsDir) {
+      return {
+        type: "Research",
+        title: `Unknown project: "${projectPath}"`,
+        description: [
+          `Extracted a CodeChange action for "${projectPath}", but that folder doesn't exist in workspace/projects/.`,
+          ``,
+          `Original action:`,
+          `- title: ${action.title}`,
+          `- subtype: ${action.subtype || "(none)"}`,
+          `- projectPath: ${projectPath}`,
+          action.description ? `- description: ${action.description}` : ``,
+          ``,
+          `Which existing project folder should this apply to instead?`,
+        ].filter(Boolean).join("\n"),
+        status: "pending",
+      };
+    }
+
+    return action;
+  });
 }
 
 function parseActionsFromOutput(output: string): ExtractedAction[] {
@@ -185,13 +185,18 @@ function parseActionsFromOutput(output: string): ExtractedAction[] {
   }
 }
 
+const VALID_TYPES = ["CodeChange", "Project", "Research", "Write", "UserTask"];
+
 function isValidAction(action: unknown): action is ExtractedAction {
   if (typeof action !== "object" || action === null) return false;
   const a = action as Record<string, unknown>;
-  return (
-    typeof a.type === "string" &&
-    ["bug", "feature", "todo", "question", "command", "idea", "post"].includes(a.type) &&
-    typeof a.title === "string" &&
-    a.title.length > 0
-  );
+  
+  // Must have valid type and title
+  if (typeof a.type !== "string" || !VALID_TYPES.includes(a.type)) return false;
+  if (typeof a.title !== "string" || a.title.length === 0) return false;
+  
+  // UserTask must have task field
+  if (a.type === "UserTask" && typeof a.task !== "string") return false;
+  
+  return true;
 }

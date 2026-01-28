@@ -46,10 +46,11 @@ const _schema = i.schema({
       processingError: i.string().optional(),
     }),
     actions: i.entity({
-      type: i.string().indexed(), // "bug" | "feature" | "todo" | "note" | "question" | "command" | "idea"
+      type: i.string().indexed(), // "CodeChange" | "Project" | "Research" | "Write" | "UserTask"
+      subtype: i.string().indexed().optional(), // For CodeChange: "bug" | "feature" | "refactor"
       title: i.string(),
       description: i.string().optional(),
-      status: i.string().indexed(), // "pending" | "in_progress" | "completed" | "failed"
+      status: i.string().indexed(), // "pending" | "in_progress" | "completed" | "failed" | "cancelled"
       extractedAt: i.number().indexed(),
       startedAt: i.number().optional(),
       completedAt: i.number().optional(),
@@ -57,6 +58,12 @@ const _schema = i.schema({
       errorMessage: i.string().optional(),
       syncToken: i.string().unique().indexed(), // Idempotency: `${recordingId}:${index}`
       projectPath: i.string().indexed().optional(),
+
+      // UserTask-specific fields
+      task: i.string().optional(), // What the user needs to do
+      why_user: i.string().optional(), // Why this requires human action
+      prep_allowed: i.string().optional(), // What AI can prepare in advance
+      remind_at: i.string().optional(), // When to remind (ISO timestamp or relative)
 
       // Thread messages: JSON array of {role: "user"|"assistant", content: string, timestamp: number}
       messages: i.string().optional(),

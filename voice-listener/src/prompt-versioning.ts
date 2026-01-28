@@ -1,43 +1,22 @@
-import { createHash } from "crypto";
-import { readFile } from "fs/promises";
-import { resolve } from "path";
 import { db, id } from "./db";
-
-// Path to the main CLAUDE.md relative to voice-listener
-const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
-const CLAUDE_MD_PATH = resolve(MIC_APP_ROOT, "CLAUDE.md");
+import { hashAllPrompts, hashToVersionId } from "./prompt-loader";
 
 interface PromptVersion {
   id: string;
   version: string;
   createdAt: number;
-  claudeMdHash: string;
+  claudeMdHash: string; // Now stores hash of all prompts/*.md files
   notes?: string;
 }
 
 let cachedVersionId: string | null = null;
 
 /**
- * Compute SHA256 hash of CLAUDE.md content
- */
-export async function computeClaudeMdHash(): Promise<string> {
-  const content = await readFile(CLAUDE_MD_PATH, "utf-8");
-  return createHash("sha256").update(content).digest("hex");
-}
-
-/**
- * Get the short version ID from a full hash (first 12 chars)
- */
-export function hashToVersionId(hash: string): string {
-  return hash.slice(0, 12);
-}
-
-/**
  * Initialize prompt versioning on worker startup.
- * Computes hash of CLAUDE.md, creates version if needed, returns version ID.
+ * Computes hash of all prompts/*.md files, creates version if needed, returns version ID.
  */
 export async function initPromptVersioning(): Promise<string> {
-  const fullHash = await computeClaudeMdHash();
+  const fullHash = hashAllPrompts();
   const versionId = hashToVersionId(fullHash);
 
   // Check if this version already exists

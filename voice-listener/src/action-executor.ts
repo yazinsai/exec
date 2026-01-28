@@ -4,22 +4,23 @@ import { mkdir, appendFile } from "fs/promises";
 import { db } from "./db";
 import { initPromptVersioning, getCurrentVersionId } from "./prompt-versioning";
 import { classifyError } from "./error-categories";
+import { loadPrompt } from "./prompt-loader";
 
 interface Action {
   id: string;
   type: string;
+  subtype?: string; // For CodeChange: bug|feature|refactor
   title: string;
   description?: string;
   status: string;
   projectPath?: string;
   messages?: string;
   cancelRequested?: boolean;
-}
-
-interface ThreadMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
+  // UserTask fields
+  task?: string;
+  why_user?: string;
+  prep_allowed?: string;
+  remind_at?: string;
 }
 
 const POLL_INTERVAL = 5000; // 5 seconds
@@ -29,7 +30,6 @@ const MAX_CONCURRENCY = 15; // Maximum parallel action executions
 const SKIP_RECOVERY = process.argv.includes("--skip-recovery");
 
 // Resolve workspace paths relative to mic-app root (one level up from voice-listener)
-// voice-listener/src/action-executor.ts -> voice-listener -> mic-app root
 const MIC_APP_ROOT = resolve(import.meta.dir, "../..");
 const WORKSPACE_PROJECTS = join(MIC_APP_ROOT, "workspace", "projects");
 const LOGS_DIR = join(MIC_APP_ROOT, "workspace", "logs");
@@ -52,13 +52,30 @@ const ACTION_ID = (() => {
   }
   return null;
 })();
-// Debug logging is now enabled by default for all executions
-// Use --no-debug-log to disable if needed
 const DEBUG_LOG = !args.includes("--no-debug-log");
+const SINCE = (() => {
+  const idx = args.indexOf("--since");
+  if (idx !== -1 && args[idx + 1]) {
+    const val = args[idx + 1];
+    if (val === "today") {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    }
+    const parsed = Date.parse(val);
+    if (!isNaN(parsed)) {
+      return parsed;
+    }
+    const epoch = parseInt(val, 10);
+    if (!isNaN(epoch)) {
+      return epoch;
+    }
+    console.error(`Invalid --since value: ${val}. Use "today", ISO date, or epoch timestamp.`);
+    process.exit(1);
+  }
+  return null;
+})();
 
 async function recoverStaleActions(): Promise<void> {
-  // On startup, ALL in_progress actions are orphaned (the worker wasn't running)
-  // Reset them to pending so they can be picked up again
   const result = await db.query({
     actions: {
       $: {
@@ -69,7 +86,7 @@ async function recoverStaleActions(): Promise<void> {
     },
   });
 
-  const actions = (result.actions ?? []) as (Action & { startedAt?: number })[];
+  const actions = (result.actions ?? []) as Action[];
 
   if (actions.length > 0) {
     console.log(`Recovering ${actions.length} orphaned in_progress actions...`);
@@ -119,9 +136,7 @@ function formatStreamEvent(event: StreamEvent): { console: string; log: string }
   let consoleOut = "";
   let logOut = "";
 
-  // Handle different event types
   if (event.type === "assistant") {
-    // Full assistant message - extract content
     const content = event.message?.content || [];
     for (const block of content) {
       if (block.type === "thinking" && block.thinking) {
@@ -147,23 +162,19 @@ function formatStreamEvent(event: StreamEvent): { console: string; log: string }
     const delta = event.delta;
     if (delta?.type === "thinking_delta" && delta.thinking) {
       logOut += delta.thinking;
-      // Don't spam console with thinking deltas, just show in log
     } else if (delta?.type === "text_delta" && delta.text) {
       logOut += delta.text;
       consoleOut += delta.text;
     } else if (delta?.type === "input_json_delta") {
-      // Tool input streaming - just log it
       logOut += JSON.stringify(delta);
     }
   } else if (event.type === "content_block_stop") {
-    // Close the block
     logOut += "\n";
   } else if (event.type === "result") {
     logOut += `\n<result>\n${JSON.stringify(event.result, null, 2)}\n</result>\n`;
   } else if (event.subtype === "tool_result") {
     logOut += `\n<tool_result>\n${JSON.stringify(event, null, 2)}\n</tool_result>\n`;
   } else {
-    // Unknown event type - log the raw JSON for debugging
     logOut += `\n<!-- event: ${JSON.stringify(event)} -->\n`;
   }
 
@@ -178,7 +189,7 @@ async function claimAction(actionId: string, logFile: string | null): Promise<bo
         status: "in_progress",
         startedAt: Date.now(),
         logFile: logFile,
-        progress: null, // Clear any previous progress
+        progress: null,
         promptVersionId: promptVersionId ?? null,
       })
     );
@@ -198,7 +209,6 @@ interface ClaudeExecutionResult {
   wasCancelled: boolean;
 }
 
-// Run Claude Code and capture session ID from stream-json output
 async function runClaudeSession(
   cmd: string[],
   projectDir: string,
@@ -215,15 +225,13 @@ async function runClaudeSession(
   });
 
   console.log(`Process spawned, PID: ${proc.pid}`);
-
-  // Close stdin since we're using --resume for feedback, not stdin injection
   proc.stdin.end();
 
   let sessionId: string | undefined;
   let toolsUsedCount = 0;
   let wasCancelled = false;
 
-  // Polling function to check for cancellation requests
+  // Poll for cancellation requests
   const pollForCancellation = async () => {
     try {
       const result = await db.query({
@@ -243,10 +251,9 @@ async function runClaudeSession(
     }
   };
 
-  // Start polling interval for cancellation (every 3 seconds)
   const pollInterval = setInterval(pollForCancellation, 3000);
 
-  // Stream output and capture for log
+  // Stream output
   const decoder = new TextDecoder();
   const reader = proc.stdout.getReader();
   let buffer = "";
@@ -262,20 +269,17 @@ async function runClaudeSession(
     const chunk = decoder.decode(value);
 
     if (logFile) {
-      // Parse stream-json format line by line
       buffer += chunk;
       const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
           const event: StreamEvent = JSON.parse(line);
-          // Count tool invocations
           if (event.type === "content_block_start" && event.content_block?.type === "tool_use") {
             toolsUsedCount++;
           }
-          // Capture session ID from result event
           if (event.type === "result" && event.session_id) {
             sessionId = event.session_id;
             console.log(`Captured session ID: ${sessionId}`);
@@ -288,13 +292,11 @@ async function runClaudeSession(
             await appendFile(logFile, formatted.log);
           }
         } catch {
-          // Not valid JSON, just output as-is
           process.stdout.write(line + "\n");
           await appendFile(logFile, line + "\n");
         }
       }
     } else {
-      // Plain text mode
       process.stdout.write(chunk);
     }
   }
@@ -303,7 +305,6 @@ async function runClaudeSession(
   if (logFile && buffer.trim()) {
     try {
       const event: StreamEvent = JSON.parse(buffer);
-      // Capture session ID from result event
       if (event.type === "result" && event.session_id) {
         sessionId = event.session_id;
         console.log(`Captured session ID: ${sessionId}`);
@@ -324,7 +325,6 @@ async function runClaudeSession(
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
 
-  // Stop polling
   clearInterval(pollInterval);
 
   if (logFile) {
@@ -341,15 +341,6 @@ async function runClaudeSession(
   };
 }
 
-// Fetch the latest action state from DB
-async function fetchAction(actionId: string): Promise<Action | null> {
-  const result = await db.query({
-    actions: { $: { where: { id: actionId } } },
-  });
-  const actions = result.actions as Action[] | undefined;
-  return actions?.[0] ?? null;
-}
-
 async function executeAction(action: Action): Promise<string | null> {
   console.log(`\n${"=".repeat(60)}`);
   console.log(`Executing action: [${action.type.toUpperCase()}] ${action.title}`);
@@ -358,7 +349,7 @@ async function executeAction(action: Action): Promise<string | null> {
   }
   console.log("=".repeat(60));
 
-  // Setup debug log file if enabled
+  // Setup debug log file
   let logFile: string | null = null;
   if (DEBUG_LOG) {
     await mkdir(LOGS_DIR, { recursive: true });
@@ -382,42 +373,35 @@ ${"=".repeat(60)}
     return logFile;
   }
 
-  // Claim the action and store the log file path
+  // Claim the action
   const claimed = await claimAction(action.id, logFile);
   if (!claimed) {
     console.log(`Failed to claim action ${action.id}, skipping`);
     return logFile;
   }
 
-  // Build the prompt for Claude Code
+  // Build the prompt
   const prompt = buildExecutionPrompt(action);
 
-  // Log the prompt if debug logging
   if (logFile) {
     await appendFile(logFile, `=== PROMPT ===\n${prompt}\n\n=== OUTPUT ===\n`);
   }
 
   // Resolve project directory
-  // If projectPath is set, resolve it relative to WORKSPACE_PROJECTS (or use absolute path as-is)
-  // Otherwise, use WORKSPACE_PROJECTS as base (Claude will need to find the project)
   let projectDir = WORKSPACE_PROJECTS;
   if (action.projectPath) {
     if (isAbsolute(action.projectPath)) {
-      // Absolute path - use as-is
       projectDir = action.projectPath;
     } else {
-      // Relative path - resolve relative to workspace/projects
       projectDir = join(WORKSPACE_PROJECTS, action.projectPath);
     }
   }
 
-  // Track execution metrics
   const executionStartTime = Date.now();
   let totalToolsUsed = 0;
   let wasCancelled = false;
 
   try {
-    // Use stream-json for debug logging to capture thinking/reasoning
     const outputFormat = DEBUG_LOG ? "stream-json" : "text";
 
     const cmd = [
@@ -429,7 +413,6 @@ ${"=".repeat(60)}
       outputFormat,
     ];
 
-    // stream-json requires --verbose in print mode
     if (DEBUG_LOG) {
       cmd.push("--verbose");
     }
@@ -437,8 +420,8 @@ ${"=".repeat(60)}
     console.log(`Spawning: ${cmd.join(" ").slice(0, 100)}...`);
     console.log(`Working directory: ${projectDir}`);
 
-    // Run initial execution
-    const initialResult = await runClaudeSession(
+    // Run Claude Code once
+    const result = await runClaudeSession(
       cmd,
       projectDir,
       logFile,
@@ -446,11 +429,11 @@ ${"=".repeat(60)}
       () => { wasCancelled = true; }
     );
 
-    totalToolsUsed += initialResult.toolsUsedCount;
+    totalToolsUsed = result.toolsUsedCount;
+    const durationMs = Date.now() - executionStartTime;
 
-    if (initialResult.wasCancelled) {
+    if (result.wasCancelled) {
       console.log(`\nAction ${action.id} was cancelled`);
-      const durationMs = Date.now() - executionStartTime;
       const { category } = classifyError(0, "", true);
       await db.transact(
         db.tx.actions[action.id].update({
@@ -460,320 +443,42 @@ ${"=".repeat(60)}
           durationMs,
           toolsUsed: totalToolsUsed,
           errorCategory: category,
-          sessionId: initialResult.sessionId ?? null,
+          sessionId: result.sessionId ?? null,
         })
       );
       return logFile;
     }
 
-    if (!initialResult.success) {
-      console.error(`\nClaude exited with code ${initialResult.exitCode}`);
-      if (initialResult.stderr) console.error("stderr:", initialResult.stderr);
+    if (!result.success) {
+      console.error(`\nClaude exited with code ${result.exitCode}`);
+      if (result.stderr) console.error("stderr:", result.stderr);
 
-      const durationMs = Date.now() - executionStartTime;
-      const { category } = classifyError(initialResult.exitCode, initialResult.stderr, false);
+      const { category } = classifyError(result.exitCode, result.stderr, false);
       await db.transact(
         db.tx.actions[action.id].update({
           status: "failed",
-          errorMessage: `Exit code ${initialResult.exitCode}: ${initialResult.stderr.slice(0, 500)}`,
+          errorMessage: `Exit code ${result.exitCode}: ${result.stderr.slice(0, 500)}`,
           completedAt: Date.now(),
           durationMs,
           toolsUsed: totalToolsUsed,
           errorCategory: category,
-          sessionId: initialResult.sessionId ?? null,
+          sessionId: result.sessionId ?? null,
         })
       );
       return logFile;
     }
 
-    // Store session ID for potential feedback continuation
-    let sessionId = initialResult.sessionId;
-
-    // Save session ID to DB
-    if (sessionId) {
-      await db.transact(
-        db.tx.actions[action.id].update({
-          sessionId,
-        })
-      );
-    }
-
-    // Track user messages we've already processed
-    const initialMessages: ThreadMessage[] = action.messages ? JSON.parse(action.messages) : [];
-    let lastSeenUserMessageCount = initialMessages.filter((m) => m.role === "user").length;
-
-    // Enter feedback loop: check for new user messages and continue with --resume
-    console.log(`\nEntering feedback loop for action ${action.id}...`);
-
-    while (true) {
-      // Update status to awaiting_feedback
-      await db.transact(
-        db.tx.actions[action.id].update({
-          status: "awaiting_feedback",
-        })
-      );
-
-      // Wait a bit before checking for feedback
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Fetch latest action state
-      const currentAction = await fetchAction(action.id);
-      if (!currentAction) {
-        console.log(`Action ${action.id} not found, exiting feedback loop`);
-        break;
-      }
-
-      // Check for cancellation
-      if (currentAction.cancelRequested) {
-        console.log(`\nCancellation requested for action ${action.id}`);
-        wasCancelled = true;
-        const durationMs = Date.now() - executionStartTime;
-        const { category } = classifyError(0, "", true);
-        await db.transact(
-          db.tx.actions[action.id].update({
-            status: "cancelled",
-            cancelRequested: null,
-            completedAt: Date.now(),
-            durationMs,
-            toolsUsed: totalToolsUsed,
-            errorCategory: category,
-          })
-        );
-        return logFile;
-      }
-
-      // Check for new user messages
-      const messages: ThreadMessage[] = currentAction.messages
-        ? JSON.parse(currentAction.messages)
-        : [];
-      const userMessages = messages.filter((m) => m.role === "user");
-
-      if (userMessages.length <= lastSeenUserMessageCount) {
-        // No new feedback - wait indefinitely for user feedback
-        // Only exits when: new feedback arrives, action is completed externally, or cancelled
-        console.log(`Waiting for user feedback on action ${action.id}...`);
-        let foundFeedback = false;
-
-        while (true) {
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-
-          const refreshedAction = await fetchAction(action.id);
-          if (!refreshedAction) {
-            console.log(`Action ${action.id} not found, exiting feedback loop`);
-            break;
-          }
-
-          // Check if action was completed externally (user marked as done in UI)
-          if (refreshedAction.status === "completed") {
-            console.log(`Action ${action.id} was marked completed externally`);
-            // Just update metrics without changing status
-            const durationMs = Date.now() - executionStartTime;
-            await db.transact(
-              db.tx.actions[action.id].update({
-                durationMs,
-                toolsUsed: totalToolsUsed,
-              })
-            );
-            return logFile;
-          }
-
-          if (refreshedAction.cancelRequested) {
-            console.log(`\nCancellation requested for action ${action.id}`);
-            wasCancelled = true;
-            const durationMs = Date.now() - executionStartTime;
-            const { category } = classifyError(0, "", true);
-            await db.transact(
-              db.tx.actions[action.id].update({
-                status: "cancelled",
-                cancelRequested: null,
-                completedAt: Date.now(),
-                durationMs,
-                toolsUsed: totalToolsUsed,
-                errorCategory: category,
-              })
-            );
-            return logFile;
-          }
-
-          const refreshedMessages: ThreadMessage[] = refreshedAction.messages
-            ? JSON.parse(refreshedAction.messages)
-            : [];
-          const refreshedUserMessages = refreshedMessages.filter((m) => m.role === "user");
-
-          if (refreshedUserMessages.length > lastSeenUserMessageCount) {
-            foundFeedback = true;
-            break;
-          }
-        }
-
-        if (!foundFeedback) {
-          // Action was deleted or externally completed
-          break;
-        }
-
-        // Re-fetch action to get the new messages
-        const actionWithFeedback = await fetchAction(action.id);
-        if (!actionWithFeedback) break;
-
-        const newMessages: ThreadMessage[] = actionWithFeedback.messages
-          ? JSON.parse(actionWithFeedback.messages)
-          : [];
-        const newUserMessages = newMessages.filter((m) => m.role === "user");
-
-        if (newUserMessages.length <= lastSeenUserMessageCount) {
-          break;
-        }
-      }
-
-      // Process new feedback
-      const feedbackAction = await fetchAction(action.id);
-      if (!feedbackAction) break;
-
-      const feedbackMessages: ThreadMessage[] = feedbackAction.messages
-        ? JSON.parse(feedbackAction.messages)
-        : [];
-      const feedbackUserMessages = feedbackMessages.filter((m) => m.role === "user");
-      const newFeedback = feedbackUserMessages.slice(lastSeenUserMessageCount);
-
-      if (newFeedback.length === 0) {
-        break;
-      }
-
-      console.log(`\nProcessing ${newFeedback.length} new feedback message(s)...`);
-
-      // Update status back to in_progress
-      await db.transact(
-        db.tx.actions[action.id].update({
-          status: "in_progress",
-        })
-      );
-
-      for (const msg of newFeedback) {
-        console.log(`\nProcessing feedback: ${msg.content.slice(0, 100)}...`);
-
-        if (logFile) {
-          await appendFile(logFile, `\n\n=== USER FEEDBACK ===\n${msg.content}\n=== RESUMING SESSION ===\n`);
-        }
-
-        if (!sessionId) {
-          console.log(`No session ID available, cannot resume conversation`);
-          // Append assistant message indicating we can't continue
-          feedbackMessages.push({
-            role: "assistant",
-            content: "Unable to continue conversation: no session ID from previous execution.",
-            timestamp: Date.now(),
-          });
-          await db.transact(
-            db.tx.actions[action.id].update({
-              messages: JSON.stringify(feedbackMessages),
-            })
-          );
-          break;
-        }
-
-        // Build resume command with --resume flag
-        const resumeCmd = [
-          "claude",
-          "--resume",
-          sessionId,
-          "-p",
-          msg.content,
-          "--dangerously-skip-permissions",
-          "--output-format",
-          outputFormat,
-        ];
-
-        if (DEBUG_LOG) {
-          resumeCmd.push("--verbose");
-        }
-
-        console.log(`Resuming session: ${sessionId}`);
-
-        // Run continuation
-        const continueResult = await runClaudeSession(
-          resumeCmd,
-          projectDir,
-          logFile,
-          feedbackAction,
-          () => { wasCancelled = true; }
-        );
-
-        totalToolsUsed += continueResult.toolsUsedCount;
-
-        if (continueResult.wasCancelled) {
-          wasCancelled = true;
-          break;
-        }
-
-        // Update session ID if we got a new one
-        if (continueResult.sessionId) {
-          sessionId = continueResult.sessionId;
-          await db.transact(
-            db.tx.actions[action.id].update({
-              sessionId,
-            })
-          );
-        }
-
-        if (!continueResult.success) {
-          console.error(`Resume failed with exit code ${continueResult.exitCode}`);
-          // Don't fail the whole action, just log the error
-          feedbackMessages.push({
-            role: "assistant",
-            content: `Error processing feedback: exit code ${continueResult.exitCode}`,
-            timestamp: Date.now(),
-          });
-          await db.transact(
-            db.tx.actions[action.id].update({
-              messages: JSON.stringify(feedbackMessages),
-            })
-          );
-        }
-      }
-
-      if (wasCancelled) {
-        const durationMs = Date.now() - executionStartTime;
-        const { category } = classifyError(0, "", true);
-        await db.transact(
-          db.tx.actions[action.id].update({
-            status: "cancelled",
-            cancelRequested: null,
-            completedAt: Date.now(),
-            durationMs,
-            toolsUsed: totalToolsUsed,
-            errorCategory: category,
-          })
-        );
-        return logFile;
-      }
-
-      lastSeenUserMessageCount = feedbackUserMessages.length;
-    }
-
-    // Mark action as completed
+    // Success - mark as completed
     console.log(`\nAction ${action.id} completed successfully`);
-    const durationMs = Date.now() - executionStartTime;
-
-    // Check current status - Claude Code may have updated it
-    const finalAction = await fetchAction(action.id);
-    if (finalAction?.status === "in_progress" || finalAction?.status === "awaiting_feedback") {
-      await db.transact(
-        db.tx.actions[action.id].update({
-          status: "completed",
-          completedAt: Date.now(),
-          durationMs,
-          toolsUsed: totalToolsUsed,
-        })
-      );
-    } else {
-      // Still update metrics even if status was changed by Claude Code
-      await db.transact(
-        db.tx.actions[action.id].update({
-          durationMs,
-          toolsUsed: totalToolsUsed,
-        })
-      );
-    }
+    await db.transact(
+      db.tx.actions[action.id].update({
+        status: "completed",
+        completedAt: Date.now(),
+        durationMs,
+        toolsUsed: totalToolsUsed,
+        sessionId: result.sessionId ?? null,
+      })
+    );
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`Error executing action ${action.id}:`, errMsg);
@@ -798,90 +503,113 @@ ${"=".repeat(60)}
 }
 
 function buildExecutionPrompt(action: Action): string {
-  const messages = action.messages ? JSON.parse(action.messages) : [];
-  const hasUserFeedback = messages.some((m: { role: string }) => m.role === "user");
-
-  let prompt = `You are executing an action from the voice-to-action system.
-
-ACTION DETAILS:
-- ID: ${action.id}
-- Type: ${action.type}
-- Title: ${action.title}
-${action.description ? `- Description: ${action.description}` : ""}
-
-`;
-
-  if (hasUserFeedback) {
-    prompt += `CONVERSATION THREAD:
-${messages.map((m: { role: string; content: string }) => `[${m.role.toUpperCase()}]: ${m.content}`).join("\n\n")}
-
-The user has provided feedback. Continue iterating based on their input.
-`;
-  }
+  // CLI script path - resolve relative to this file's location
+  const cliScriptPath = join(import.meta.dir, "../scripts/update-action-cli.ts");
 
   // Calculate relative path to workspace/CLAUDE.md from projectDir
   const workspaceClaudePath = action.projectPath
-    ? "../../CLAUDE.md"  // From workspace/projects/{projectPath}/
-    : "../CLAUDE.md";    // From workspace/projects/
+    ? "../../CLAUDE.md"
+    : "../CLAUDE.md";
 
-  // CLI script path (absolute to work from any directory)
-  const cliScriptPath = "/Users/rock/projects/mic-app/voice-listener/scripts/update-action-cli.ts";
+  // Build working directory instruction based on type
+  let workingDirInstruction: string;
+  if (action.projectPath) {
+    workingDirInstruction = `You are in the project directory: ${action.projectPath}. This project should already exist in workspace/projects/.`;
+  } else if (action.type === "Project") {
+    workingDirInstruction = `You are in workspace/projects/. Create a NEW project directory here.`;
+  } else if (action.type === "CodeChange") {
+    workingDirInstruction = `You are in workspace/projects/. Locate the target project directory first (it must already exist).`;
+  } else {
+    workingDirInstruction = `You are in workspace/projects/.`;
+  }
 
-  prompt += `
-INSTRUCTIONS:
-1. **Working Directory**: ${action.projectPath ? `You are in the project directory: ${action.projectPath}. This project should already exist in workspace/projects/.` : `You are in workspace/projects/. ${action.type !== "idea" ? `For ${action.type} actions, you need to locate the target project directory first (it must already exist).` : ""}`}
-2. **Notes**: Store documentation, research, and planning notes in workspace/notes/ (use relative path from current directory).
-3. Read ${workspaceClaudePath} for detailed guidelines on handling different action types. Also check for project-specific CLAUDE.md files if present.
-4. Execute this ${action.type} action appropriately (see ${workspaceClaudePath} for type-specific guidance):
-${action.type === "idea" ? `   - idea: Research, plan, and create a NEW project in workspace/projects/` : action.type === "bug" || action.type === "feature" ? `   - ${action.type}: Work within the existing project directory. The project must already exist.` : `   - ${action.type}: Complete the task`}
-5. **Update action status via CLI** - IMPORTANT: Do NOT create .ts files for updating actions. Use these CLI commands:
+  // Build type-specific instruction
+  let typeSpecificInstruction: string;
+  switch (action.type) {
+    case "CodeChange":
+      typeSpecificInstruction = `   - CodeChange (${action.subtype || "change"}): Work within the existing project directory. Implement the ${action.subtype || "change"}.`;
+      break;
+    case "Project":
+      typeSpecificInstruction = "   - Project: Research, plan, and create a NEW project in workspace/projects/. Deploy if it's a web app.";
+      break;
+    case "Research":
+      typeSpecificInstruction = "   - Research: Investigate the topic thoroughly, provide comprehensive findings in the result field.";
+      break;
+    case "Write":
+      typeSpecificInstruction = "   - Write: Create the content. For social media, use /typefully to create drafts.";
+      break;
+    case "UserTask":
+      typeSpecificInstruction = action.prep_allowed
+        ? `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Prepare: ${action.prep_allowed}`
+        : `   - UserTask: This requires human action (${action.why_user || "user involvement needed"}). Document what the user needs to do.`;
+      break;
+    default:
+      typeSpecificInstruction = `   - ${action.type}: Complete the task`;
+  }
 
-   # Update result (simple)
-   bun run ${cliScriptPath} "${action.id}" result "Your result text here"
+  // Build description block
+  let descriptionBlock = "";
+  if (action.description) {
+    descriptionBlock = `- Description: ${action.description}`;
+  }
+  // For UserTask, include the task field
+  if (action.type === "UserTask" && action.task) {
+    descriptionBlock += `\n- Task: ${action.task}`;
+    if (action.why_user) descriptionBlock += `\n- Why user: ${action.why_user}`;
+    if (action.prep_allowed) descriptionBlock += `\n- Prep allowed: ${action.prep_allowed}`;
+    if (action.remind_at) descriptionBlock += `\n- Remind at: ${action.remind_at}`;
+  }
 
-   # Update result (multiline with heredoc)
-   bun run ${cliScriptPath} "${action.id}" result "$(cat <<'EOF'
-   ## Summary
-   Your multiline result here...
-   EOF
-   )"
+  // Build subtype line for CodeChange
+  const subtypeLine = action.type === "CodeChange" && action.subtype
+    ? `- Subtype: ${action.subtype}`
+    : "";
 
-   # Update status
-   bun run ${cliScriptPath} "${action.id}" status completed
+  // Build conversation thread if there are messages
+  let conversationThread = "";
+  if (action.messages) {
+    try {
+      const messages = JSON.parse(action.messages) as Array<{ role: string; content: string }>;
+      if (messages.length > 0) {
+        conversationThread = `CONVERSATION THREAD:
+${messages.map((m) => `[${m.role.toUpperCase()}]: ${m.content}`).join("\n\n")}
 
-   # Update deployUrl
-   bun run ${cliScriptPath} "${action.id}" deployUrl "https://your-app.whhite.com"
+The user has provided feedback. Continue iterating based on their input.
+`;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
 
-   # Update multiple fields at once (JSON)
-   bun run ${cliScriptPath} "${action.id}" json '{"status":"completed","result":"Done!","deployUrl":"https://..."}'
-
-   # Append a message to the thread
-   bun run ${cliScriptPath} "${action.id}" messages '${JSON.stringify([...messages, { role: "assistant", content: "YOUR_RESPONSE_HERE", timestamp: 0 }]).replace(/0\}]$/, "' + '\"$(date +%s)000\"}]'")}'
-
-6. When done, set status to "completed"
-
-CRITICAL SAFEGUARDS - DO NOT VIOLATE:
-- DO NOT push InstantDB schema changes (no \`npx instant-cli push schema\`)
-- DO NOT push InstantDB permission changes (no \`npx instant-cli push perms\`)
-- DO NOT use or reference INSTANT_APP_ID or INSTANT_ADMIN_TOKEN environment variables from the parent mic-app
-- DO NOT reuse existing InstantDB app IDs - always create new apps with \`npx instant-cli init-without-files\`
-- DO NOT read .env files from the parent mic-app directory or voice-listener directory
-- For "idea" projects: Create standalone projects without shared database dependencies
-- If you need a database for a new project, create a fresh InstantDB app with its own credentials
-
-Now execute this action.`;
-
-  return prompt;
+  return loadPrompt("execution", {
+    ACTION_ID: action.id,
+    ACTION_TYPE: action.type,
+    ACTION_SUBTYPE: subtypeLine,
+    ACTION_TITLE: action.title,
+    ACTION_DESCRIPTION: descriptionBlock,
+    CONVERSATION_THREAD: conversationThread,
+    WORKING_DIR_INSTRUCTION: workingDirInstruction,
+    WORKSPACE_CLAUDE_PATH: workspaceClaudePath,
+    TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
+    CLI_SCRIPT_PATH: cliScriptPath,
+  });
 }
 
 async function pollForActions(): Promise<number> {
   try {
+    const whereClause: Record<string, unknown> = {
+      status: "pending",
+    };
+
+    if (SINCE) {
+      whereClause.extractedAt = { $gte: SINCE };
+    }
+
     const result = await db.query({
       actions: {
         $: {
-          where: {
-            status: "pending",
-          },
+          where: whereClause,
         },
       },
     });
@@ -894,13 +622,12 @@ async function pollForActions(): Promise<number> {
 
     console.log(`Found ${actions.length} pending action(s)`);
 
-    // Apply limit
     if (LIMIT < actions.length) {
       console.log(`Limiting to ${LIMIT} action(s)`);
       actions = actions.slice(0, LIMIT);
     }
 
-    // Execute actions in parallel batches of MAX_CONCURRENCY
+    // Execute actions in parallel batches
     let processed = 0;
     while (processed < actions.length) {
       const batch = actions.slice(processed, processed + MAX_CONCURRENCY);
@@ -929,6 +656,8 @@ Options:
   --action-id ID    Execute a specific action by ID (for testing)
   --no-debug-log    Disable debug logging (logging is ON by default)
   --skip-recovery   Skip recovering orphaned in_progress actions on startup
+  --since DATE      Only process actions extracted on or after DATE
+                    Accepts: "today", ISO date (2026-01-28), or epoch timestamp
 
 Debug logging saves FULL Claude output including thinking/reasoning to
 workspace/logs/{action-id}-{timestamp}.log. The log file path is stored
@@ -943,6 +672,7 @@ disable this behavior.
 Examples:
   bun run src/action-executor.ts --dry-run --once --limit 1
   bun run src/action-executor.ts --once --limit 5
+  bun run src/action-executor.ts --since today
   bun run src/action-executor.ts
 
   # Execute a specific action
@@ -973,7 +703,6 @@ async function executeSpecificAction(actionId: string): Promise<void> {
   console.log(`Found action: [${action.type.toUpperCase()}] ${action.title}`);
   console.log(`Status: ${action.status}`);
 
-  // Reset status to pending if needed (so we can re-execute)
   if (action.status !== "pending" && !DRY_RUN) {
     console.log(`Resetting status from "${action.status}" to "pending"...`);
     await db.transact(
@@ -1008,6 +737,7 @@ async function main(): Promise<void> {
   if (LIMIT < Infinity) console.log(`  Limit: ${LIMIT}`);
   if (ACTION_ID) console.log(`  Action ID: ${ACTION_ID}`);
   if (DEBUG_LOG) console.log(`  Debug logging: ENABLED`);
+  if (SINCE) console.log(`  Since: ${new Date(SINCE).toLocaleString()}`);
 
   // Initialize prompt versioning
   if (!DRY_RUN) {
@@ -1019,21 +749,18 @@ async function main(): Promise<void> {
     }
   }
 
-  // If specific action ID provided, execute that and exit
   if (ACTION_ID) {
     await executeSpecificAction(ACTION_ID);
     console.log("\nDone.");
     process.exit(0);
   }
 
-  // Recover orphaned in_progress actions (they were abandoned when the worker stopped)
   if (!DRY_RUN && !SKIP_RECOVERY) {
     await recoverStaleActions();
   }
 
   console.log("\nPolling for pending actions...");
 
-  // Initial poll
   const processed = await pollForActions();
 
   if (ONCE) {
@@ -1041,7 +768,6 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Set up polling interval
   setInterval(pollForActions, POLL_INTERVAL);
 
   console.log(`\nListening for new actions (polling every ${POLL_INTERVAL / 1000}s)...`);

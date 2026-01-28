@@ -31,26 +31,30 @@ const semantic = {
 
 // Action type colors - dark theme (dark backgrounds, light text)
 export const actionTypeColorsDark = {
-  bug: { label: "BUG", color: "#fca5a5", bg: "#7f1d1d" },
-  feature: { label: "FEATURE", color: "#93c5fd", bg: "#1e3a5f" },
-  todo: { label: "TODO", color: "#86efac", bg: "#14532d" },
-  question: { label: "?", color: "#fcd34d", bg: "#78350f" },
-  command: { label: "CMD", color: "#c4b5fd", bg: "#4c1d95" },
-  idea: { label: "IDEA", color: "#fbbf24", bg: "#92400e" },
+  // New taxonomy
+  CodeChange: { label: "CODE", color: "#93c5fd", bg: "#1e3a5f" },
+  Project: { label: "PROJECT", color: "#fbbf24", bg: "#92400e" },
+  Research: { label: "RESEARCH", color: "#fcd34d", bg: "#78350f" },
+  Write: { label: "WRITE", color: "#c4b5fd", bg: "#4c1d95" },
+  UserTask: { label: "USER", color: "#86efac", bg: "#14532d" },
+  // UI states
   review: { label: "Review", color: "#fbbf24", bg: "#78350f" },
-  post: { label: "POST", color: "#3b82f6", bg: "#2563eb" },
+  // Legacy fallback
+  note: { label: "NOTE", color: "#9ca3af", bg: "#374151" },
 } as const;
 
 // Action type colors - light theme (soft tinted backgrounds, darker text)
 export const actionTypeColorsLight = {
-  bug: { label: "BUG", color: "#b91c1c", bg: "#fee2e2" }, // red-700 on red-100
-  feature: { label: "FEATURE", color: "#1d4ed8", bg: "#dbeafe" }, // blue-700 on blue-100
-  todo: { label: "TODO", color: "#15803d", bg: "#dcfce7" }, // green-700 on green-100
-  question: { label: "?", color: "#a16207", bg: "#fef3c7" }, // yellow-700 on yellow-100
-  command: { label: "CMD", color: "#6d28d9", bg: "#ede9fe" }, // violet-700 on violet-100
-  idea: { label: "IDEA", color: "#b45309", bg: "#fef3c7" }, // amber-700 on amber-100
+  // New taxonomy
+  CodeChange: { label: "CODE", color: "#1d4ed8", bg: "#dbeafe" }, // blue-700 on blue-100
+  Project: { label: "PROJECT", color: "#b45309", bg: "#fef3c7" }, // amber-700 on amber-100
+  Research: { label: "RESEARCH", color: "#a16207", bg: "#fef3c7" }, // yellow-700 on yellow-100
+  Write: { label: "WRITE", color: "#6d28d9", bg: "#ede9fe" }, // violet-700 on violet-100
+  UserTask: { label: "USER", color: "#15803d", bg: "#dcfce7" }, // green-700 on green-100
+  // UI states
   review: { label: "Review", color: "#b45309", bg: "#fef3c7" }, // amber-700 on amber-100
-  post: { label: "POST", color: "#3b82f6", bg: "#dbeafe" }, // blue-700 on blue-100
+  // Legacy fallback
+  note: { label: "NOTE", color: "#6b7280", bg: "#f3f4f6" }, // gray-500 on gray-100
 } as const;
 
 // Legacy export for backwards compatibility (uses dark theme)

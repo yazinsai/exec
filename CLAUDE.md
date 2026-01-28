@@ -77,7 +77,7 @@ bun run execute    # Execution worker
 
 1. Phone records audio → uploads to InstantDB Storage
 2. App transcribes via Groq → saves recording with transcription
-3. **Extraction worker** polls transcriptions → extracts actions (bug/feature/todo/idea/post)
+3. **Extraction worker** polls transcriptions → extracts actions (CodeChange/Project/Research/Write/UserTask)
 4. **Execution worker** picks up pending actions → spawns Claude Code to implement
 5. Results sync back to app in real-time via InstantDB
 
@@ -474,16 +474,15 @@ Fetch the URL for a topic to learn more about it.
 
 # Voice Action Processing
 
-When processing any action from InstantDB (bug, feature, todo, idea, etc.):
+When processing any action from InstantDB:
 1. Read the action's title and description
 2. Set `status: "in_progress"` to show work has started
 3. Do the work based on action type:
-   - **idea**: Run /longrun, make assumptions, build prototype
-   - **bug**: Investigate and fix
-   - **feature**: Implement the feature
-   - **todo**: Complete the task
-   - **command**: Execute the command
-   - **post**: Use /typefully to draft social media posts
+   - **CodeChange**: Fix bugs, implement features, or refactor code in an existing project (check `subtype` and `projectPath`)
+   - **Project**: Research, plan, and build a new prototype project
+   - **Research**: Investigate the topic thoroughly, provide comprehensive findings
+   - **Write**: Create content (for social media, use /typefully to draft posts)
+   - **UserTask**: Prepare what's allowed (`prep_allowed` field), document what user needs to do
 4. Write progress/results to the `result` field
 5. Set `status: "completed"` when done
 
@@ -515,14 +514,16 @@ await db.transact(db.tx.actions[actionId].update({ messages: JSON.stringify(upda
 When you see new user messages in the thread, respond by appending an assistant message. This creates a back-and-forth conversation visible in the UI.
 
 The action entity in InstantDB has:
-- `type`: "bug" | "feature" | "todo" | "question" | "command" | "idea" | "post"
+- `type`: "CodeChange" | "Project" | "Research" | "Write" | "UserTask"
+- `subtype`: For CodeChange only: "bug" | "feature" | "refactor"
 - `title`: Brief title
 - `description`: Optional longer description
-- `status`: "pending" | "in_progress" | "completed" | "failed"
+- `status`: "pending" | "in_progress" | "completed" | "failed" | "cancelled"
 - `result`: Output/notes from processing (visible in UI)
 - `messages`: JSON array of thread messages (see above)
 - `errorMessage`: If something went wrong
 - `deployUrl`: URL to deployed app (shows "Open App" button in UI)
+- UserTask-specific: `task`, `why_user`, `prep_allowed`, `remind_at`
 
 Update these fields as you work to surface progress in the UI.
 
