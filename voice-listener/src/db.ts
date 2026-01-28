@@ -1,4 +1,4 @@
-import { init, id } from "@instantdb/admin";
+import { init, id, lookup } from "@instantdb/admin";
 
 const appId = process.env.INSTANT_APP_ID;
 const adminToken = process.env.INSTANT_ADMIN_TOKEN;
@@ -8,4 +8,4 @@ if (!appId || !adminToken) {
 }
 
 export const db = init({ appId, adminToken });
-export { id };
+export { id, lookup };

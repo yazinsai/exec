@@ -1,4 +1,4 @@
-import { db, id } from "./db";
+import { db, id, lookup } from "./db";
 import { processTranscription, type ExtractedAction } from "./processor";
 
 interface RecordingImage {
@@ -17,6 +17,8 @@ interface Recording {
 
 const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
 const POLL_INTERVAL = 5000; // 5 seconds
+const HEARTBEAT_INTERVAL = 10000; // 10 seconds
+const WORKER_NAME = "extraction";
 
 // CLI args
 const args = process.argv.slice(2);
@@ -29,6 +31,21 @@ const LIMIT = (() => {
   }
   return Infinity;
 })();
+
+async function sendHeartbeat(status?: string): Promise<void> {
+  try {
+    await db.transact(
+      db.tx.workerHeartbeats[lookup("name", WORKER_NAME)].update({
+        name: WORKER_NAME,
+        lastSeen: Date.now(),
+        status: status ?? null,
+      })
+    );
+  } catch (error) {
+    // Ignore heartbeat errors - non-critical
+    console.error("Heartbeat error:", error);
+  }
+}
 
 async function recoverStaleRecordings(): Promise<void> {
   const now = Date.now();
@@ -273,6 +290,11 @@ async function main(): Promise<void> {
   if (ONCE) console.log("  Mode: ONCE (will exit after processing)");
   if (LIMIT < Infinity) console.log(`  Limit: ${LIMIT}`);
 
+  // Send initial heartbeat
+  if (!DRY_RUN) {
+    await sendHeartbeat("starting");
+  }
+
   // Recover any stale processing records (skip in dry run)
   if (!DRY_RUN) {
     await recoverStaleRecordings();
@@ -286,6 +308,13 @@ async function main(): Promise<void> {
   if (ONCE) {
     console.log(`\nDone. Processed ${processed} recording(s).`);
     process.exit(0);
+  }
+
+  // Send heartbeat on startup
+  if (!DRY_RUN) {
+    await sendHeartbeat("listening");
+    // Set up heartbeat interval
+    setInterval(() => sendHeartbeat("listening"), HEARTBEAT_INTERVAL);
   }
 
   // Set up polling interval

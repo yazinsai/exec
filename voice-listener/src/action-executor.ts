@@ -1,7 +1,7 @@
 import { spawn } from "bun";
 import { join, resolve, isAbsolute } from "path";
 import { mkdir, appendFile } from "fs/promises";
-import { db } from "./db";
+import { db, lookup } from "./db";
 import { initPromptVersioning, getCurrentVersionId } from "./prompt-versioning";
 import { classifyError } from "./error-categories";
 import { loadPrompt } from "./prompt-loader";
@@ -26,6 +26,8 @@ interface Action {
 
 const POLL_INTERVAL = 5000; // 5 seconds
 const MAX_CONCURRENCY = 15; // Maximum parallel action executions
+const HEARTBEAT_INTERVAL = 10000; // 10 seconds
+const WORKER_NAME = "execution";
 
 interface ThreadMessage {
   role: "user" | "assistant";
@@ -47,6 +49,21 @@ function hasNewUserFeedback(action: Action): boolean {
   if (messages.length === 0) return false;
   const lastMessage = messages[messages.length - 1];
   return lastMessage.role === "user";
+}
+
+async function sendHeartbeat(status?: string): Promise<void> {
+  try {
+    await db.transact(
+      db.tx.workerHeartbeats[lookup("name", WORKER_NAME)].update({
+        name: WORKER_NAME,
+        lastSeen: Date.now(),
+        status: status ?? null,
+      })
+    );
+  } catch (error) {
+    // Ignore heartbeat errors - non-critical
+    console.error("Heartbeat error:", error);
+  }
 }
 
 // CLI flag to skip immediate recovery (for testing)
@@ -855,6 +872,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Send initial heartbeat
+  if (!DRY_RUN) {
+    await sendHeartbeat("starting");
+  }
+
   if (!DRY_RUN && !SKIP_RECOVERY) {
     await recoverStaleActions();
   }
@@ -866,6 +888,12 @@ async function main(): Promise<void> {
   if (ONCE) {
     console.log(`\nDone. Processed ${processed} action(s).`);
     process.exit(0);
+  }
+
+  // Send heartbeat and set up interval
+  if (!DRY_RUN) {
+    await sendHeartbeat("listening");
+    setInterval(() => sendHeartbeat("listening"), HEARTBEAT_INTERVAL);
   }
 
   setInterval(pollForActions, POLL_INTERVAL);
