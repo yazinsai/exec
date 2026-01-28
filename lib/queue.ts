@@ -226,9 +226,21 @@ export async function retryRecording(id: string): Promise<void> {
   const recording = await getRecording(id);
   if (!recording) return;
 
-  const newStatus = RETRY_STATUS_MAP[recording.status as RecordingStatus];
+  const status = recording.status as RecordingStatus;
+  const newStatus = RETRY_STATUS_MAP[status];
+
   if (newStatus) {
     await updateStatus(id, newStatus);
+  } else if (status === "transcribed") {
+    // Reset processingStatus so extraction worker picks it up again
+    await db.transact(
+      db.tx.recordings[id].update({
+        processingStatus: null,
+        processingStartedAt: null,
+        processingCompletedAt: null,
+        processingError: null,
+      })
+    );
   }
 }
 
