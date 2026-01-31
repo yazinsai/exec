@@ -5,7 +5,7 @@ import { db, id, lookup } from "./db";
 import { initPromptVersioning, getCurrentVersionId } from "./prompt-versioning";
 import { classifyError } from "./error-categories";
 import { loadPrompt } from "./prompt-loader";
-import { notifyActionCompleted, notifyActionFailed } from "./notifications";
+import { notifyActionCompleted, notifyActionFailed, notifyActionAwaitingFeedback } from "./notifications";
 
 interface DependsOnAction {
   id: string;
@@ -600,20 +600,41 @@ Please address this feedback and continue iterating on the task.`;
       return logFile;
     }
 
-    // Success - mark as completed (goes directly to Done tab)
-    console.log(`\nAction ${action.id} completed successfully`);
-    await db.transact(
-      db.tx.actions[action.id].update({
-        status: "completed",
-        completedAt: Date.now(),
-        durationMs,
-        toolsUsed: totalToolsUsed,
-        sessionId: result.sessionId ?? null,
-      })
-    );
+    // Check if Claude set the status to awaiting_feedback during execution
+    const currentAction = await db.query({
+      actions: { $: { where: { id: action.id } } },
+    });
+    const currentStatus = currentAction.actions[0]?.status;
 
-    // Send push notification for completed action
-    await notifyActionCompleted(action.id, action.title, action.type);
+    if (currentStatus === "awaiting_feedback") {
+      // Claude requested user input - don't overwrite status, just update metadata
+      console.log(`\nAction ${action.id} is awaiting user feedback`);
+      await db.transact(
+        db.tx.actions[action.id].update({
+          durationMs,
+          toolsUsed: totalToolsUsed,
+          sessionId: result.sessionId ?? null,
+        })
+      );
+
+      // Send push notification for awaiting feedback
+      await notifyActionAwaitingFeedback(action.id, action.title, action.type);
+    } else {
+      // Success - mark as completed (goes directly to Done tab)
+      console.log(`\nAction ${action.id} completed successfully`);
+      await db.transact(
+        db.tx.actions[action.id].update({
+          status: "completed",
+          completedAt: Date.now(),
+          durationMs,
+          toolsUsed: totalToolsUsed,
+          sessionId: result.sessionId ?? null,
+        })
+      );
+
+      // Send push notification for completed action
+      await notifyActionCompleted(action.id, action.title, action.type);
+    }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`Error executing action ${action.id}:`, errMsg);
