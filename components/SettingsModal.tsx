@@ -1,4 +1,5 @@
 import { View, Text, Pressable, Modal, StyleSheet, Switch, Linking, ScrollView } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, typography, radii } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
@@ -18,6 +19,7 @@ export function SettingsModal({
   vocabularyCount,
 }: SettingsModalProps) {
   const { colors, isDark } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const {
     isEnabled: notificationsEnabled,
     isLoading: notificationsLoading,
@@ -49,27 +51,34 @@ export function SettingsModal({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
-      transparent
+      animationType="slide"
+      transparent={false}
       onRequestClose={onClose}
     >
-      <Pressable
-        style={[styles.overlay, { backgroundColor: colors.overlayLight }]}
-        onPress={onClose}
+      <View
+        style={[
+          styles.fullScreenModal,
+          {
+            backgroundColor: colors.backgroundElevated,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
+        ]}
       >
-        <Pressable
-          style={[
-            styles.modal,
-            { backgroundColor: colors.backgroundElevated },
-            !isDark && styles.modalLightBorder,
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
+        {/* Header with close button */}
+        <View style={styles.header}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>
             Settings
           </Text>
-
-          {/* Notifications Toggle */}
+          <Pressable
+            onPress={onClose}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={24} color={colors.textMuted} />
+          </Pressable>
+        </View>
+        {/* Notifications Toggle */}
           <View
             style={[
               styles.menuItem,
@@ -148,54 +157,54 @@ export function SettingsModal({
             />
           </Pressable>
 
-          {/* Debug Log */}
-          {debugLog.length > 0 && (
-            <View style={styles.debugContainer}>
-              <Text style={[styles.debugTitle, { color: colors.textMuted }]}>
-                Debug Log
-              </Text>
-              <ScrollView style={styles.debugScroll}>
-                {debugLog.map((entry, i) => (
-                  <Text
-                    key={i}
-                    style={[
-                      styles.debugEntry,
-                      { color: entry.includes("ERROR") ? "#ef4444" : colors.textMuted },
-                    ]}
-                  >
-                    {entry}
-                  </Text>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </Pressable>
-      </Pressable>
+        {/* Debug Log - takes remaining space */}
+        {debugLog.length > 0 && (
+          <View style={[styles.debugContainer, { backgroundColor: colors.backgroundPressed }]}>
+            <Text style={[styles.debugTitle, { color: colors.textMuted }]}>
+              Debug Log
+            </Text>
+            <ScrollView
+              style={styles.debugScroll}
+              contentContainerStyle={styles.debugScrollContent}
+              showsVerticalScrollIndicator
+            >
+              {debugLog.map((entry, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.debugEntry,
+                    { color: entry.includes("ERROR") ? "#ef4444" : colors.textMuted },
+                  ]}
+                >
+                  {entry}
+                </Text>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  fullScreenModal: {
     flex: 1,
-    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: spacing.xl,
-  },
-  modal: {
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    width: "100%",
-    maxWidth: 360,
-  },
-  modalLightBorder: {
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.08)",
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
   },
   title: {
     fontSize: typography.lg,
     fontWeight: "600",
-    marginBottom: spacing.lg,
+  },
+  closeButton: {
+    padding: spacing.xs,
   },
   menuItem: {
     flexDirection: "row",
@@ -223,20 +232,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   debugContainer: {
+    flex: 1,
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(128, 128, 128, 0.2)",
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
   },
   debugTitle: {
     fontSize: typography.xs,
     fontWeight: "600",
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   debugScroll: {
-    maxHeight: 120,
+    flex: 1,
+  },
+  debugScrollContent: {
+    paddingBottom: spacing.lg,
   },
   debugEntry: {
     fontSize: 10,

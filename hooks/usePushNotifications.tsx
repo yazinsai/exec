@@ -10,16 +10,6 @@ import {
   getLastNotificationResponse,
 } from "@/lib/notifications";
 
-// Configure notification handler (must be outside component)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
 interface NotificationData {
   type?: "action_completed" | "action_awaiting_feedback";
   actionId?: string;
