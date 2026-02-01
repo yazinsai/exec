@@ -1,6 +1,13 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
 import "../global.css";
 import { useFonts } from "expo-font";
+import {
+  SpaceGrotesk_300Light,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
@@ -33,6 +40,11 @@ function AppContent() {
 export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    SpaceGrotesk_Light: SpaceGrotesk_300Light,
+    SpaceGrotesk: SpaceGrotesk_400Regular,
+    SpaceGrotesk_Medium: SpaceGrotesk_500Medium,
+    SpaceGrotesk_SemiBold: SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_Bold: SpaceGrotesk_700Bold,
   });
 
   if (!loaded) {

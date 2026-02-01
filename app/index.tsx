@@ -45,7 +45,7 @@ export interface ActionWithRecording extends Action {
     title?: string | null;
   };
 }
-import { spacing, typography, radii, actionTypeColorsDark, actionTypeColorsLight, type ActionType } from "@/constants/Colors";
+import { spacing, typography, radii, fontFamily, actionTypeColorsDark, actionTypeColorsLight, type ActionType } from "@/constants/Colors";
 import { useThemeColors, type ThemeColors } from "@/hooks/useThemeColors";
 import { db } from "@/lib/db";
 
@@ -478,7 +478,7 @@ export default function HomeScreen() {
               styles.settingsButton,
               { backgroundColor: colors.backgroundElevated },
               pressed && { opacity: 0.7 },
-              !isDark && styles.settingsButtonLight,
+              !isDark && [styles.settingsButtonLight, { borderColor: colors.border }],
             ]}
           >
             <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
@@ -979,9 +979,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
+    fontFamily: fontFamily.bold,
     fontWeight: "700",
-    letterSpacing: 1,
+    letterSpacing: typography.tracking.tight,
+    textTransform: "uppercase",
   },
   headerRight: {
     flexDirection: "row",
@@ -997,7 +999,7 @@ const styles = StyleSheet.create({
   },
   settingsButtonLight: {
     borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.08)",
+    // borderColor set dynamically via colors.border
   },
   content: {
     flex: 1,

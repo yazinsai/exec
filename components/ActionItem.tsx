@@ -157,8 +157,8 @@ export function ActionItem({ action }: ActionItemProps) {
           }}
         >
           <View style={styles.resultUrlButtonContent}>
-            <Ionicons name="open-outline" size={16} color="#ffffff" style={styles.resultUrlIcon} />
-            <Text style={[styles.resultUrlButtonText, { color: "#ffffff" }]}>
+            <Ionicons name="open-outline" size={16} color={colors.white} style={styles.resultUrlIcon} />
+            <Text style={[styles.resultUrlButtonText, { color: colors.white }]}>
               {action.deployUrlLabel || "Open App"}
             </Text>
           </View>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
@@ -12,7 +12,7 @@ import { useColors } from "@/hooks/useThemeColors";
 interface WaveformProps {
   metering: number;
   isActive: boolean;
-  barCount?: number;
+  dotCount?: number;
   height?: number;
   color?: string;
 }
@@ -24,94 +24,138 @@ function normalizeMetering(metering: number): number {
   return (clamped - min) / (max - min);
 }
 
-function WaveformBar({
+/**
+ * WaveformDot - Individual animated dot that pulses with audio levels
+ * Creates the beaded/pixelated aesthetic matching the app icon
+ */
+function WaveformDot({
   metering,
   index,
-  totalBars,
+  totalDots,
   isActive,
-  height,
+  baseSize,
+  maxSize,
   color,
 }: {
   metering: number;
   index: number;
-  totalBars: number;
+  totalDots: number;
   isActive: boolean;
-  height: number;
+  baseSize: number;
+  maxSize: number;
   color: string;
 }) {
-  const barHeight = useSharedValue(0.08);
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0.3);
 
   useEffect(() => {
     if (!isActive) {
-      barHeight.value = withTiming(0.08, { duration: 300 });
+      scale.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.exp) });
+      opacity.value = withTiming(0.3, { duration: 300 });
       return;
     }
 
     const normalized = normalizeMetering(metering);
 
-    // Create variation across bars - center bars are taller, edges shorter
-    const centerDistance = Math.abs(index - totalBars / 2) / (totalBars / 2);
-    const positionFactor = 1 - centerDistance * 0.5;
+    // Create wave pattern - dots closer to center are more responsive
+    const centerIndex = totalDots / 2;
+    const distanceFromCenter = Math.abs(index - centerIndex) / centerIndex;
+    const positionFactor = 1 - distanceFromCenter * 0.6;
 
-    // Add some randomness for natural look
-    const randomFactor = 0.7 + Math.random() * 0.6;
+    // Add organic variation
+    const phase = (index / totalDots) * Math.PI * 2;
+    const waveFactor = 0.7 + Math.sin(phase + Date.now() / 200) * 0.3;
 
-    // Calculate final height
-    const targetHeight = Math.max(0.08, normalized * positionFactor * randomFactor);
+    // Calculate final scale (between 1 and maxScale based on audio level)
+    const maxScale = maxSize / baseSize;
+    const targetScale = 1 + (normalized * positionFactor * waveFactor * (maxScale - 1));
 
-    barHeight.value = withSpring(targetHeight, {
-      damping: 12,
-      stiffness: 200,
-      mass: 0.5,
+    // Higher opacity for louder sounds
+    const targetOpacity = 0.4 + normalized * positionFactor * 0.6;
+
+    scale.value = withSpring(targetScale, {
+      damping: 15,
+      stiffness: 300,
+      mass: 0.3,
     });
-  }, [metering, isActive, index, totalBars, barHeight]);
+
+    opacity.value = withSpring(targetOpacity, {
+      damping: 20,
+      stiffness: 200,
+    });
+  }, [metering, isActive, index, totalDots, baseSize, maxSize, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    height: barHeight.value * height,
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
   }));
 
   return (
     <Animated.View
       style={[
-        styles.bar,
-        { backgroundColor: color },
+        styles.dot,
+        {
+          width: baseSize,
+          height: baseSize,
+          borderRadius: baseSize / 2,
+          backgroundColor: color,
+        },
         animatedStyle,
       ]}
     />
   );
 }
 
+/**
+ * Waveform - Dotted audio visualization matching the app's beaded icon aesthetic
+ * Displays as a grid of pulsing dots that respond to audio levels
+ */
 export function Waveform({
   metering,
   isActive,
-  barCount = 40,
+  dotCount = 7,
   height = 120,
   color,
 }: WaveformProps) {
   const colors = useColors();
-  const barColor = color ?? colors.primary;
-  const bars = [];
-  for (let i = 0; i < barCount; i++) {
-    bars.push(
-      <WaveformBar
-        key={i}
-        metering={metering}
-        index={i}
-        totalBars={barCount}
-        isActive={isActive}
-        height={height}
-        color={barColor}
-      />
-    );
-  }
+  const dotColor = color ?? colors.primary;
+
+  // Configure dot sizes
+  const baseSize = 8;
+  const maxSize = 16;
+  const rows = 5;
+  const gap = 12;
 
   return (
     <View style={[styles.container, { height }]}>
-      {bars}
+      <View style={[styles.grid, { gap }]}>
+        {Array.from({ length: rows }).map((_, rowIndex) => (
+          <View key={rowIndex} style={[styles.row, { gap }]}>
+            {Array.from({ length: dotCount }).map((_, colIndex) => {
+              const dotIndex = rowIndex * dotCount + colIndex;
+              return (
+                <WaveformDot
+                  key={colIndex}
+                  metering={metering}
+                  index={dotIndex}
+                  totalDots={rows * dotCount}
+                  isActive={isActive}
+                  baseSize={baseSize}
+                  maxSize={maxSize}
+                  color={dotColor}
+                />
+              );
+            })}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
+/**
+ * MiniWaveform - Static dotted waveform for list items and compact views
+ */
 interface MiniWaveformProps {
   seed?: number;
   width?: number;
@@ -126,55 +170,73 @@ export function MiniWaveform({
   color,
 }: MiniWaveformProps) {
   const colors = useColors();
-  const barColor = color ?? colors.primary;
-  const barCount = Math.floor(width / 4);
+  const dotColor = color ?? colors.primary;
 
-  const bars = [];
-  for (let i = 0; i < barCount; i++) {
-    const pseudoRandom = Math.sin(seed * 100 + i * 0.8) * 0.5 + 0.5;
-    const barHeight = 0.2 + pseudoRandom * 0.8;
-    bars.push(
-      <View
-        key={i}
-        style={[
-          styles.miniStaticBar,
-          {
-            backgroundColor: barColor,
-            height: barHeight * height,
-            opacity: 0.7 + pseudoRandom * 0.3,
-          },
-        ]}
-      />
-    );
-  }
+  const dotSize = 4;
+  const gap = 6;
+  const dotCount = Math.floor(width / (dotSize + gap));
+
+  const dots = useMemo(() => {
+    const result: { size: number; opacity: number }[] = [];
+    for (let i = 0; i < dotCount; i++) {
+      // Pseudo-random but deterministic pattern based on seed
+      const pseudoRandom = Math.sin(seed * 100 + i * 1.3) * 0.5 + 0.5;
+      const variation = Math.sin(seed * 50 + i * 0.7) * 0.5 + 0.5;
+
+      result.push({
+        size: dotSize * (0.6 + pseudoRandom * 0.8),
+        opacity: 0.3 + variation * 0.5,
+      });
+    }
+    return result;
+  }, [seed, dotCount, dotSize]);
 
   return (
-    <View style={[styles.miniStaticContainer, { width, height }]}>
-      {bars}
+    <View style={[styles.miniContainer, { width, height }]}>
+      {dots.map((dot, i) => (
+        <View
+          key={i}
+          style={[
+            styles.miniDot,
+            {
+              width: dot.size,
+              height: dot.size,
+              borderRadius: dot.size / 2,
+              backgroundColor: dotColor,
+              opacity: dot.opacity,
+              marginHorizontal: gap / 2,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  grid: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
   },
-  bar: {
-    width: 4,
-    borderRadius: 2,
-    minHeight: 4,
+  dot: {
+    // Individual dot styling applied inline
   },
-  miniStaticContainer: {
+  miniContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    justifyContent: "center",
   },
-  miniStaticBar: {
-    width: 2,
-    borderRadius: 1,
-    minHeight: 2,
+  miniDot: {
+    // Mini dot styling applied inline
   },
 });

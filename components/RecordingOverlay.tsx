@@ -19,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Waveform } from "./Waveform";
-import { spacing, typography, radii } from "@/constants/Colors";
+import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 import { useColors } from "@/hooks/useThemeColors";
 import type { PendingImage } from "@/hooks/useShareIntent";
 
@@ -65,14 +65,14 @@ export function RecordingOverlay({
     if (isRecording && !isPaused) {
       recordingDotOpacity.value = withRepeat(
         withSequence(
-          withTiming(0.3, { duration: 500, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) })
+          withTiming(0.3, { duration: 500, easing: Easing.out(Easing.exp) }),
+          withTiming(1, { duration: 500, easing: Easing.out(Easing.exp) })
         ),
         -1,
         false
       );
     } else {
-      recordingDotOpacity.value = withTiming(1, { duration: 200 });
+      recordingDotOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.exp) });
     }
   }, [isRecording, isPaused, recordingDotOpacity]);
 
@@ -83,8 +83,8 @@ export function RecordingOverlay({
   const handlePauseResume = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     buttonScale.value = withSequence(
-      withTiming(0.9, { duration: 50 }),
-      withTiming(1, { duration: 100 })
+      withTiming(0.9, { duration: 50, easing: Easing.out(Easing.exp) }),
+      withTiming(1, { duration: 150, easing: Easing.out(Easing.exp) })
     );
     onPauseResume();
   };
@@ -149,7 +149,7 @@ export function RecordingOverlay({
         <Waveform
           metering={metering}
           isActive={isRecording && !isPaused}
-          barCount={50}
+          dotCount={9}
           height={140}
           color={colors.primary}
         />
@@ -229,8 +229,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   speechText: {
-    fontSize: typography.base,
-    fontWeight: typography.medium,
+    fontSize: typography.xs,
+    fontFamily: fontFamily.semibold,
+    fontWeight: typography.semibold,
+    letterSpacing: typography.tracking.wider,
+    textTransform: "uppercase",
   },
   imageContextContainer: {
     alignItems: "center",
@@ -322,9 +325,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   durationText: {
-    fontSize: 32,
-    fontWeight: typography.medium,
+    fontSize: 36,
+    fontFamily: fontFamily.light,
+    fontWeight: typography.light,
     fontVariant: ["tabular-nums"],
+    letterSpacing: typography.tracking.wide,
   },
   controls: {
     flexDirection: "row",

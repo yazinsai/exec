@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { View, Text, SectionList, StyleSheet, Pressable, Alert, TextInput, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ActionItem, type Action } from "./ActionItem";
-import { spacing, typography, radii, actionTypeColorsDark, actionTypeColorsLight } from "@/constants/Colors";
+import { DotPattern } from "./DotPattern";
+import { spacing, typography, radii, fontFamily, actionTypeColorsDark, actionTypeColorsLight } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { db } from "@/lib/db";
 
@@ -150,7 +151,7 @@ function ActionCard({ action, onPress, onDismiss }: { action: Action; onPress?: 
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: colors.backgroundElevated },
-        !isDark && styles.cardLightShadow,
+        !isDark && [styles.cardLightShadow, { borderColor: colors.border }],
         pressed && styles.cardPressed,
       ]}
       onPress={onPress}
@@ -470,10 +471,21 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
   if (actions.length === 0) {
     return (
       <View style={styles.empty}>
-        <View style={[styles.emptyIcon, { backgroundColor: colors.backgroundElevated }]}>
-          <Ionicons name="flash-outline" size={48} color={colors.textTertiary} />
+        <View style={styles.emptyIconContainer}>
+          <DotPattern
+            width={120}
+            height={120}
+            dotSize={3}
+            gap={10}
+            color={colors.primary}
+            opacity={0.15}
+            variant="radial"
+          />
+          <View style={[styles.emptyIcon, { backgroundColor: colors.backgroundElevated }]}>
+            <Ionicons name="flash-outline" size={40} color={colors.primary} />
+          </View>
         </View>
-        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No actions yet</Text>
+        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>NO ACTIONS YET</Text>
         <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
           Record a voice note and actions{"\n"}will be extracted automatically
         </Text>
@@ -524,15 +536,26 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
         </View>
       ) : sections.length === 0 ? (
         <View style={styles.emptyTab}>
-          <View style={[styles.emptyTabIcon, { backgroundColor: colors.backgroundElevated }]}>
-            <Ionicons
-              name={tabMode === "review" ? "checkmark-done-outline" : tabMode === "active" ? "hourglass-outline" : "archive-outline"}
-              size={40}
-              color={colors.textTertiary}
+          <View style={styles.emptyTabIconContainer}>
+            <DotPattern
+              width={100}
+              height={100}
+              dotSize={2}
+              gap={8}
+              color={colors.primary}
+              opacity={0.12}
+              variant="radial"
             />
+            <View style={[styles.emptyTabIcon, { backgroundColor: colors.backgroundElevated }]}>
+              <Ionicons
+                name={tabMode === "review" ? "checkmark-done-outline" : tabMode === "active" ? "hourglass-outline" : "archive-outline"}
+                size={32}
+                color={colors.primary}
+              />
+            </View>
           </View>
           <Text style={[styles.emptyTabTitle, { color: colors.textSecondary }]}>
-            {tabMode === "review" ? "Nothing to review" : tabMode === "active" ? "No active actions" : "No completed actions"}
+            {tabMode === "review" ? "NOTHING TO REVIEW" : tabMode === "active" ? "NO ACTIVE ACTIONS" : "NO COMPLETED ACTIONS"}
           </Text>
           <Text style={[styles.emptyTabSubtitle, { color: colors.textTertiary }]}>
             {tabMode === "review"
@@ -665,6 +688,7 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 160,
+    paddingHorizontal: spacing.lg,
   },
   sectionHeader: {
     paddingTop: spacing.lg,
@@ -678,9 +702,11 @@ const styles = StyleSheet.create({
     // Running section has subtle highlight
   },
   sectionHeaderText: {
-    fontSize: typography.sm,
+    fontSize: typography.xs,
+    fontFamily: fontFamily.semibold,
     fontWeight: typography.semibold,
-    letterSpacing: 0.3,
+    letterSpacing: typography.tracking.wider,
+    textTransform: "uppercase",
   },
   runningIndicator: {
     width: 8,
@@ -720,7 +746,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.04)",
+    // Note: borderColor is set dynamically in component via colors.border
   },
   cardPressed: {
     opacity: 0.8,
@@ -756,17 +782,26 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     paddingBottom: 120,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.lg,
   },
+  emptyIcon: {
+    position: "absolute",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyTitle: {
-    fontSize: typography.lg,
-    fontWeight: typography.medium,
+    fontSize: typography.sm,
+    fontFamily: fontFamily.semibold,
+    fontWeight: typography.semibold,
+    letterSpacing: typography.tracking.label,
     marginBottom: spacing.sm,
   },
   emptySubtitle: {
@@ -792,17 +827,26 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     paddingBottom: 120,
   },
-  emptyTabIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  emptyTabIconContainer: {
+    width: 100,
+    height: 100,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md,
   },
+  emptyTabIcon: {
+    position: "absolute",
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyTabTitle: {
-    fontSize: typography.base,
-    fontWeight: "500",
+    fontSize: typography.xs,
+    fontFamily: fontFamily.semibold,
+    fontWeight: typography.semibold,
+    letterSpacing: typography.tracking.label,
     marginBottom: spacing.xs,
   },
   emptyTabSubtitle: {

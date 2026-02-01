@@ -11,7 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useRecorder } from "@/hooks/useRecorder";
-import { spacing, typography, shadows, radii } from "@/constants/Colors";
+import { spacing, typography, shadows, radii, fontFamily } from "@/constants/Colors";
 import { useColors } from "@/hooks/useThemeColors";
 
 interface RecordButtonProps {
@@ -46,17 +46,17 @@ export function RecordButton({ onRecordingComplete }: RecordButtonProps) {
     if (isRecording) {
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.15, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+          withTiming(1.15, { duration: 1000, easing: Easing.out(Easing.exp) }),
+          withTiming(1, { duration: 1000, easing: Easing.out(Easing.exp) })
         ),
         -1,
         false
       );
-      pulseOpacity.value = withTiming(0.4, { duration: 300 });
+      pulseOpacity.value = withTiming(0.4, { duration: 300, easing: Easing.out(Easing.exp) });
     } else {
       cancelAnimation(pulseScale);
-      pulseScale.value = withTiming(1, { duration: 200 });
-      pulseOpacity.value = withTiming(0, { duration: 200 });
+      pulseScale.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.exp) });
+      pulseOpacity.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.exp) });
     }
   }, [isRecording, pulseScale, pulseOpacity]);
 
@@ -215,15 +215,18 @@ const styles = StyleSheet.create({
   },
   durationText: {
     fontSize: typography.display,
+    fontFamily: fontFamily.light,
     fontWeight: typography.light,
     marginBottom: spacing.sm,
     fontVariant: ["tabular-nums"],
+    letterSpacing: typography.tracking.wide,
   },
   pausedLabel: {
-    fontSize: typography.sm,
+    fontSize: typography.xs,
+    fontFamily: fontFamily.semibold,
     fontWeight: typography.semibold,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: typography.tracking.label,
     marginBottom: spacing.xl,
   },
   controlsContainer: {

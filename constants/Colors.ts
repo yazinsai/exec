@@ -176,6 +176,18 @@ export const radii = {
   full: 9999,
 };
 
+// Font families - Premium Space Grotesk
+export const fontFamily = {
+  // Primary font - Space Grotesk for headings and UI
+  light: "SpaceGrotesk_Light",
+  regular: "SpaceGrotesk",
+  medium: "SpaceGrotesk_Medium",
+  semibold: "SpaceGrotesk_SemiBold",
+  bold: "SpaceGrotesk_Bold",
+  // Mono font for code/technical
+  mono: "SpaceMono",
+};
+
 // Typography - confident sizing
 export const typography = {
   // Font sizes
@@ -188,7 +200,7 @@ export const typography = {
   xxl: 24,
   display: 48,
 
-  // Font weights
+  // Font weights (for StyleSheet compatibility)
   light: "300" as const,
   normal: "400" as const,
   medium: "500" as const,
@@ -202,6 +214,7 @@ export const typography = {
     wide: 0.5,
     wider: 1,
     widest: 2,
+    label: 1.5, // For uppercase labels
   },
 };
 

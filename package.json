@@ -14,6 +14,7 @@
     "update:production": "eas update --channel production --auto"
   },
   "dependencies": {
+    "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@instantdb/admin": "latest",
     "@instantdb/react-native": "latest",

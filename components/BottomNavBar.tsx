@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { spacing, shadows, radii } from "@/constants/Colors";
+import { spacing, shadows, typography, fontFamily } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
 
 type TabKey = "actions" | "recordings";
@@ -162,8 +162,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: "500",
+    fontSize: 10,
+    fontWeight: "600",
+    fontFamily: fontFamily.medium,
+    letterSpacing: typography.tracking.wider,
+    textTransform: "uppercase",
     marginTop: 4,
   },
   iconContainer: {
