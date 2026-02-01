@@ -178,12 +178,12 @@ export function RecordingOverlay({
               disabled={isSaving}
               style={({ pressed }) => [
                 styles.mainButton,
-                { backgroundColor: colors.backgroundElevated, borderColor: colors.borderLight },
+                { backgroundColor: colors.backgroundElevated, borderColor: colors.primary },
                 pressed && styles.buttonPressed,
                 isSaving && styles.buttonDisabled,
               ]}
             >
-              <View style={[styles.mainButtonInner, { backgroundColor: colors.error }]}>
+              <View style={[styles.mainButtonInner, { backgroundColor: colors.primary }]}>
                 {isSaving ? (
                   <ActivityIndicator color={colors.white} size="small" />
                 ) : isPaused ? (

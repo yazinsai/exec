@@ -155,25 +155,25 @@ export function RecordButton({ onRecordingComplete }: RecordButtonProps) {
     );
   }
 
-  // Idle state - show record button
+  // Idle state - show record button (premium gold aesthetic)
   return (
     <View style={styles.container}>
       <View style={styles.buttonContainer}>
-        <Animated.View style={[styles.pulseRing, { backgroundColor: colors.error }, pulseAnimatedStyle]} />
+        <Animated.View style={[styles.pulseRing, { backgroundColor: colors.primary }, pulseAnimatedStyle]} />
 
         <Pressable
           onPress={handleStartRecording}
           style={({ pressed }) => [
             styles.recordButton,
-            { backgroundColor: colors.backgroundElevated, borderColor: colors.border },
-            pressed && [styles.recordButtonPressed, { borderColor: colors.error }],
+            { backgroundColor: colors.backgroundElevated, borderColor: colors.primary },
+            pressed && [styles.recordButtonPressed, { borderColor: colors.primaryLight }],
           ]}
         >
-          <View style={[styles.innerCircle, { backgroundColor: colors.error }]} />
+          <View style={[styles.innerCircle, { backgroundColor: colors.primary }]} />
         </Pressable>
       </View>
 
-      <Text style={[styles.instructionText, { color: colors.textTertiary }]}>Tap to record</Text>
+      <Text style={[styles.instructionText, { color: colors.textSecondary }]}>Tap to record</Text>
     </View>
   );
 }

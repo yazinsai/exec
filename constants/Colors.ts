@@ -1,159 +1,159 @@
 /**
- * Design tokens for the mic-app
- * All colors follow the Tailwind gray palette with semantic naming
+ * Exec Design System
+ * Premium black aesthetic with gold accents
+ * James Bond meets Silicon Valley
  */
 
-// Base palette (Tailwind Gray)
-const gray = {
-  50: "#f9fafb",
-  100: "#f3f4f6",
-  200: "#e5e7eb",
-  300: "#d1d5db",
-  400: "#9ca3af",
-  500: "#6b7280",
-  600: "#4b5563",
-  700: "#374151",
-  800: "#1f2937",
-  900: "#111827",
-  950: "#030712",
+// Base palette - True blacks and golds
+const black = {
+  pure: "#000000",
+  soft: "#0a0a0a",
+  elevated: "#111111",
+  surface: "#1a1a1a",
+  muted: "#2a2a2a",
 };
 
-// Semantic colors
+const gold = {
+  pure: "#d4af37",      // Classic gold
+  bright: "#f59e0b",    // Amber
+  muted: "#b8860b",     // Dark goldenrod
+  light: "#fbbf24",     // Light amber
+  subtle: "rgba(212, 175, 55, 0.15)", // Gold tint
+};
+
+const mono = {
+  white: "#ffffff",
+  cream: "#fafaf9",
+  silver: "#a1a1aa",
+  gray: "#71717a",
+  darkGray: "#3f3f46",
+};
+
+// Semantic colors - minimal, status only
 const semantic = {
-  primary: "#3b82f6", // blue-500
-  primaryDark: "#2563eb", // blue-600
-  error: "#ef4444", // red-500
-  errorLight: "#f87171", // red-400
-  errorDark: "#dc2626", // red-600
-  success: "#22c55e", // green-500
-  warning: "#f59e0b", // amber-500
+  success: "#22c55e",
+  error: "#ef4444",
+  warning: gold.bright,
 };
 
-// Action type colors - dark theme (dark backgrounds, light text)
+// Action type colors - dark theme (premium black aesthetic)
 export const actionTypeColorsDark = {
-  // New taxonomy
-  CodeChange: { label: "CODE", color: "#93c5fd", bg: "#1e3a5f" },
-  Project: { label: "PROJECT", color: "#fbbf24", bg: "#92400e" },
-  Research: { label: "RESEARCH", color: "#fcd34d", bg: "#78350f" },
-  Write: { label: "WRITE", color: "#c4b5fd", bg: "#4c1d95" },
-  UserTask: { label: "USER", color: "#86efac", bg: "#14532d" },
-  // UI states
-  review: { label: "Review", color: "#fbbf24", bg: "#78350f" },
-  // Legacy fallback
-  note: { label: "NOTE", color: "#9ca3af", bg: "#374151" },
+  CodeChange: { label: "CODE", color: "#60a5fa", bg: "#172554" },
+  Project: { label: "PROJECT", color: gold.light, bg: "#422006" },
+  Research: { label: "RESEARCH", color: "#fde047", bg: "#3f3f00" },
+  Write: { label: "WRITE", color: "#c4b5fd", bg: "#2e1065" },
+  UserTask: { label: "USER", color: "#86efac", bg: "#052e16" },
+  review: { label: "Review", color: gold.light, bg: "#422006" },
+  note: { label: "NOTE", color: mono.silver, bg: black.muted },
 } as const;
 
-// Action type colors - light theme (soft tinted backgrounds, darker text)
+// Action type colors - light theme (keeping for compatibility, but app is dark-first)
 export const actionTypeColorsLight = {
-  // New taxonomy
-  CodeChange: { label: "CODE", color: "#1d4ed8", bg: "#dbeafe" }, // blue-700 on blue-100
-  Project: { label: "PROJECT", color: "#b45309", bg: "#fef3c7" }, // amber-700 on amber-100
-  Research: { label: "RESEARCH", color: "#a16207", bg: "#fef3c7" }, // yellow-700 on yellow-100
-  Write: { label: "WRITE", color: "#6d28d9", bg: "#ede9fe" }, // violet-700 on violet-100
-  UserTask: { label: "USER", color: "#15803d", bg: "#dcfce7" }, // green-700 on green-100
-  // UI states
-  review: { label: "Review", color: "#b45309", bg: "#fef3c7" }, // amber-700 on amber-100
-  // Legacy fallback
-  note: { label: "NOTE", color: "#6b7280", bg: "#f3f4f6" }, // gray-500 on gray-100
+  CodeChange: { label: "CODE", color: "#1d4ed8", bg: "#dbeafe" },
+  Project: { label: "PROJECT", color: "#b45309", bg: "#fef3c7" },
+  Research: { label: "RESEARCH", color: "#a16207", bg: "#fef3c7" },
+  Write: { label: "WRITE", color: "#6d28d9", bg: "#ede9fe" },
+  UserTask: { label: "USER", color: "#15803d", bg: "#dcfce7" },
+  review: { label: "Review", color: "#b45309", bg: "#fef3c7" },
+  note: { label: "NOTE", color: "#6b7280", bg: "#f3f4f6" },
 } as const;
 
-// Legacy export for backwards compatibility (uses dark theme)
 export const actionTypeColors = actionTypeColorsDark;
-
 export type ActionType = keyof typeof actionTypeColors;
 
-// Dark theme tokens
+// Dark theme - Premium black aesthetic (PRIMARY)
 const darkColors = {
-  // Backgrounds
-  background: gray[900],
-  backgroundElevated: gray[800],
-  backgroundPressed: gray[700],
+  // Backgrounds - true black
+  background: black.pure,
+  backgroundElevated: black.elevated,
+  backgroundPressed: black.surface,
+  backgroundSubtle: black.soft,
 
-  // Borders
-  border: gray[700],
-  borderLight: gray[600],
-  borderFocused: semantic.primary,
+  // Borders - subtle
+  border: black.muted,
+  borderLight: black.surface,
+  borderFocused: gold.pure,
 
-  // Text
-  textPrimary: gray[50],
-  textSecondary: gray[300],
-  textTertiary: gray[400],
-  textMuted: gray[500],
+  // Text - high contrast
+  textPrimary: mono.white,
+  textSecondary: mono.silver,
+  textTertiary: mono.gray,
+  textMuted: mono.darkGray,
 
-  // Interactive
-  primary: semantic.primary,
-  primaryDark: semantic.primaryDark,
+  // Gold accent - the signature
+  primary: gold.pure,
+  primaryDark: gold.muted,
+  primaryLight: gold.light,
+  accent: gold.pure,
+  accentSubtle: gold.subtle,
 
   // Status
   error: semantic.error,
-  errorLight: semantic.errorLight,
-  errorDark: semantic.errorDark,
+  errorLight: "#f87171",
+  errorDark: "#dc2626",
   success: semantic.success,
   warning: semantic.warning,
 
   // Overlays
-  overlay: "rgba(0, 0, 0, 0.7)",
-  overlayLight: "rgba(0, 0, 0, 0.6)",
+  overlay: "rgba(0, 0, 0, 0.85)",
+  overlayLight: "rgba(0, 0, 0, 0.7)",
   errorBgAlpha: "rgba(239, 68, 68, 0.12)",
 
   // Shadows
   shadow: "#000",
 
-  // Constant
-  white: "#fff",
+  // Constants
+  white: mono.white,
+  black: black.pure,
+  gold: gold.pure,
 };
 
-// Light theme tokens
+// Light theme - Clean and minimal (SECONDARY)
 const lightColors = {
-  // Backgrounds - softer than pure white for reduced harshness
-  background: gray[100],
-  backgroundElevated: "#fafafa", // Softer than #fff, reduces visual "holes"
-  backgroundPressed: gray[200],
+  background: mono.cream,
+  backgroundElevated: mono.white,
+  backgroundPressed: "#f4f4f5",
+  backgroundSubtle: "#fafafa",
 
-  // Borders - stronger for better definition
-  border: gray[300], // Upgraded from gray[200] for visibility
-  borderLight: gray[200],
-  borderFocused: semantic.primary,
+  border: "#e4e4e7",
+  borderLight: "#f4f4f5",
+  borderFocused: gold.muted,
 
-  // Text - softer black for elegance
-  textPrimary: "#1e293b", // slate-800, softer than gray-900
-  textSecondary: gray[600],
-  textTertiary: gray[500],
-  textMuted: gray[500], // Upgraded from gray[400] for better contrast
+  textPrimary: black.soft,
+  textSecondary: mono.gray,
+  textTertiary: mono.silver,
+  textMuted: "#a1a1aa",
 
-  // Interactive
-  primary: semantic.primary,
-  primaryDark: semantic.primaryDark,
+  primary: gold.muted,
+  primaryDark: "#996515",
+  primaryLight: gold.bright,
+  accent: gold.muted,
+  accentSubtle: "rgba(212, 175, 55, 0.1)",
 
-  // Status
   error: semantic.error,
-  errorLight: semantic.errorLight,
-  errorDark: semantic.errorDark,
+  errorLight: "#f87171",
+  errorDark: "#dc2626",
   success: semantic.success,
   warning: semantic.warning,
 
-  // Overlays
   overlay: "rgba(0, 0, 0, 0.5)",
-  overlayLight: "rgba(0, 0, 0, 0.4)",
-  errorBgAlpha: "rgba(239, 68, 68, 0.15)",
+  overlayLight: "rgba(0, 0, 0, 0.3)",
+  errorBgAlpha: "rgba(239, 68, 68, 0.1)",
 
-  // Shadows
-  shadow: gray[400],
+  shadow: "#a1a1aa",
 
-  // Constant
-  white: "#fff",
+  white: mono.white,
+  black: black.pure,
+  gold: gold.muted,
 };
 
-// Theme type
 export type ThemeColors = typeof darkColors;
 
-// Export themes
 export const themes = {
   dark: darkColors,
   light: lightColors,
 };
 
-// Default export for backwards compatibility during migration
 export const colors = darkColors;
 
 // Spacing scale (4px base)
@@ -166,8 +166,9 @@ export const spacing = {
   xxl: 32,
 };
 
-// Border radius scale
+// Border radius - slightly sharper for premium feel
 export const radii = {
+  xs: 4,
   sm: 6,
   md: 8,
   lg: 12,
@@ -175,40 +176,56 @@ export const radii = {
   full: 9999,
 };
 
-// Typography
+// Typography - confident sizing
 export const typography = {
   // Font sizes
-  xs: 12,
+  xs: 11,
   sm: 13,
-  base: 14,
-  md: 15,
-  lg: 16,
-  xl: 18,
-  xxl: 20,
+  base: 15,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
   display: 48,
 
   // Font weights
-  light: "200" as const,
+  light: "300" as const,
   normal: "400" as const,
   medium: "500" as const,
   semibold: "600" as const,
   bold: "700" as const,
+
+  // Letter spacing for that premium feel
+  tracking: {
+    tight: -0.5,
+    normal: 0,
+    wide: 0.5,
+    wider: 1,
+    widest: 2,
+  },
 };
 
-// Shadow presets
+// Shadow presets - subtle, premium
 export const shadows = {
   sm: {
-    shadowColor: colors.shadow,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
   md: {
-    shadowColor: colors.shadow,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
+    elevation: 8,
+  },
+  gold: {
+    shadowColor: gold.pure,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
     elevation: 8,
   },
 };

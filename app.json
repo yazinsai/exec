@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0B0B0C"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.yazinsai.micapp",
@@ -36,19 +36,19 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#FF6B35"
+          "color": "#d4af37"
         }
       ],
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 120,
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0B0B0C",
+          "backgroundColor": "#000000",
           "dark": {
             "image": "./assets/images/splash-icon.png",
-            "backgroundColor": "#0B0B0C"
+            "backgroundColor": "#000000"
           }
         }
       ],

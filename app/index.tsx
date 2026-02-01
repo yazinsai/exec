@@ -981,6 +981,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
+    letterSpacing: 1,
   },
   headerRight: {
     flexDirection: "row",
