@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Exec",
-    "slug": "exec",
+    "slug": "mic-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
