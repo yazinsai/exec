@@ -1,163 +1,106 @@
-# mic-app
+<p align="center">
+  <img src="assets/images/hero-banner.png" alt="Exec" width="100%" />
+</p>
 
-mic-app is a voice-to-action app that captures audio, transcribes it, extracts actionable items, and **executes them with Claude Code**. Record a voice note on your phone describing a bug, feature, or idea—and watch it get implemented automatically.
+<h1 align="center">Exec</h1>
 
-## How it works
+<p align="center">
+  <strong>Voice → Done.</strong><br/>
+  <em>Your AI executive that handles whatever you throw at it.</em>
+</p>
+
+<p align="center">
+  <a href="#what-exec-does">What It Does</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#quick-start">Quick Start</a>
+</p>
+
+---
+
+## Your Ideas Deserve Better Than a Notes App
+
+You're walking the dog when the perfect marketing angle hits you.
+
+You're driving when you remember that email you've been putting off.
+
+You're half-asleep when you finally figure out how to fix that bug.
+
+What happens next? You either forget it, or you scramble to type a note that sits unread for weeks.
+
+**Exec is different.** Talk. Exec listens, figures out what needs to happen, and makes it happen.
+
+---
+
+## What Exec Does
+
+| You Say | Exec Does |
+|---------|-----------|
+| "Draft a tweet about our new feature launch" | ✍️ Writes it, ready for your review |
+| "Fix the bug where login fails on slow networks" | 🔧 Ships the fix via Claude Code |
+| "Research how Stripe handles subscription upgrades" | 🔍 Deep dive, returns a summary |
+| "Build me a prototype for a habit tracker app" | 🚀 Designs, builds, and deploys it |
+| "Remind me to call the accountant about Q4 taxes" | 📋 Preps what's possible, notes the rest |
+
+**One interface. Voice in, done out.**
+
+---
+
+## How It Works
 
 ```
-Phone (mic-app)                        Mac (voice-listener)
-      │                                       │
-      ├─ Record audio                         │
-      ├─ Upload to cloud                      │
-      ├─ Transcribe via Groq                  │
-      ├─ Write to InstantDB ─────────────────>│
-      │                                       │
-      │                              ┌────────┴────────┐
-      │                              │                 │
-      │                         [Extractor]      [Executor]
-      │                              │                 │
-      │                         Extract &         Spawn Claude
-      │                         classify          Code to implement
-      │                              │                 │
-      │                              └────────┬────────┘
-      │                                       │
-      │<────────── Real-time sync ────────────│
-      │                                       │
-      ├─ Display actions in UI                │
-      ├─ View results & deployed apps         │
-      └─ Provide feedback via thread          │
+📱 You                              💻 Exec
+   │                                    │
+   ├─ "Hey Exec, [thing]"               │
+   │                                    │
+   │ ──────────────────────────────────>│
+   │                                    │
+   │                               Transcribe
+   │                               Understand
+   │                               Execute
+   │                                    │
+   │<────────── Done. ─────────────────│
 ```
 
-## Features
+No app switching. No formatting. No follow-up required.
 
-- **Voice recording** with pause/resume
-- **Auto-transcription** via Groq Whisper
-- **Action extraction** via Claude (bugs, features, todos, notes, questions, commands, ideas)
-- **Automatic execution** via Claude Code
-- **Thread-based feedback** - iterate on any action with back-and-forth conversation
-- **Deploy URLs** - tap to open deployed prototypes
-- **Real-time sync** between phone and Mac via InstantDB
+Just talk like you're delegating to a human — Exec handles the rest.
 
-## Voice Listener (Mac)
+---
 
-The `voice-listener/` directory contains two workers:
+## Quick Start
 
-1. **Extractor** - Polls for transcriptions, extracts & classifies actions
-2. **Executor** - Picks up pending actions, spawns Claude Code to implement them
-
-### Setup
+### Phone App
 
 ```bash
-cd voice-listener
-bun install
+pnpm install && pnpm start
 ```
 
-Create `voice-listener/.env`:
-```
-INSTANT_APP_ID=your-app-id
-INSTANT_ADMIN_TOKEN=your-admin-token
-```
-
-### Running
+### Mac Workers
 
 ```bash
-# Start both workers (recommended)
+cd voice-listener && bun install
 ./start.sh
-
-# One-shot mode (process once and exit)
-./start.sh --once
-
-# Or run workers individually:
-bun run extract    # Extraction only
-bun run execute    # Execution only
 ```
 
-### CLI Options
+That's it. Record a voice note. Watch Exec work.
 
-Both workers support:
-- `--dry-run` - Preview without making changes
-- `--once` - Process once and exit
-- `--limit N` - Only process N items
+---
 
-```bash
-# Test extraction
-bun run src/index.ts --dry-run --once --limit 1
+## Tech
 
-# Test execution
-bun run src/action-executor.ts --dry-run --once --limit 1
-```
+- **App**: React Native + Expo
+- **Sync**: InstantDB (real-time)
+- **Transcription**: Groq Whisper
+- **Execution**: Claude Code
 
-## Development
+---
 
-```bash
-# Start the Expo dev server
-npm run start
+<p align="center">
+  <img src="assets/images/icon.png" alt="Exec" width="60" />
+</p>
 
-# Push schema changes
-npx instant-cli push schema --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
-
-# Push permission changes
-npx instant-cli push perms --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
-```
-
-## First-time setup
-
-1. Install deps:
-```bash
-npm install
-```
-
-2. Initialize InstantDB for this project:
-```bash
-npx instant-cli init
-```
-
-3. Create a `.env` file from the example and fill in the values:
-```bash
-cp .env.example .env
-```
-
-Required env vars:
-- `EXPO_PUBLIC_INSTANT_APP_ID` (InstantDB app id)
-- `EXPO_PUBLIC_GROQ_API_KEY` (Groq API key for transcription)
-- `INSTANT_APP_ADMIN_TOKEN` (InstantDB admin token, for CLI commands)
-
-## Build an Android APK (EAS)
-
-This project uses Expo Application Services (EAS) to build APKs in the cloud.
-
-1. Install and log in to EAS:
-```bash
-npm i -g eas-cli
-eas login
-```
-
-2. Build an APK (internal distribution):
-```bash
-eas build -p android --profile preview
-```
-
-3. When the build finishes, download the APK from the build page link.
-
-## Install on iOS (EAS)
-
-Build an internal .ipa:
-```bash
-eas build -p ios --profile preview
-```
-
-For TestFlight distribution:
-```bash
-eas build -p ios --profile production
-eas submit -p ios --latest
-```
-
-Notes:
-- You'll need an Apple Developer account for iOS builds.
-- `app.json` includes the iOS bundle ID: `com.yazinsai.micapp`.
-
-## App configuration
-
-Icons, splash, and adaptive icons live in `assets/images/` and are referenced from `app.json`.
-
-Got any feedback or questions? Join our [Discord](https://discord.gg/hgVf9R6SBm)
+<p align="center">
+  <strong>Stop capturing ideas. Start finishing them.</strong><br/><br/>
+  <a href="https://discord.gg/hgVf9R6SBm">Discord</a> •
+  <a href="https://github.com/yazinsai/exec/issues">Issues</a>
+</p>
