@@ -693,6 +693,27 @@ export default function HomeScreen() {
                 )}
               </View>
 
+              {/* Skills Used (shown for all statuses when skills data exists) */}
+              {(() => {
+                const progress = parseProgress(selectedAction.progress);
+                if (!progress?.skills || progress.skills.length === 0) return null;
+                return (
+                  <View style={[styles.skillsUsedSection, { backgroundColor: colors.backgroundElevated, borderColor: colors.border }]}>
+                    <View style={styles.skillsUsedHeader}>
+                      <Text style={styles.skillsUsedIcon}>✨</Text>
+                      <Text style={[styles.skillsUsedLabel, { color: colors.textPrimary }]}>Skills Used</Text>
+                    </View>
+                    <View style={styles.skillsUsedBadges}>
+                      {progress.skills.map((skill, idx) => (
+                        <View key={idx} style={[styles.skillUsedBadge, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
+                          <Text style={[styles.skillUsedBadgeText, { color: colors.primary }]}>/{skill}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })()}
+
               {/* Live Progress (for running actions) */}
               {selectedAction.status === "in_progress" && (() => {
                 const progress = parseProgress(selectedAction.progress);
@@ -786,15 +807,6 @@ export default function HomeScreen() {
                   <View style={[styles.activityHistorySection, { borderColor: colors.border }]}>
                     <View style={styles.historyHeader}>
                       <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Activity Log</Text>
-                      {progress.skills && progress.skills.length > 0 && (
-                        <View style={styles.skillsBadgesSmall}>
-                          {progress.skills.map((skill, idx) => (
-                            <View key={idx} style={[styles.skillBadgeSmall, { backgroundColor: colors.primary + "15" }]}>
-                              <Text style={[styles.skillBadgeTextSmall, { color: colors.primary }]}>✨ {skill}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
                     </View>
                     <View style={styles.activityFeed}>
                       {progress.activities.slice(-15).reverse().map((activity) => {
@@ -1167,6 +1179,42 @@ const styles = StyleSheet.create({
   },
   timestampText: {
     fontSize: typography.xs,
+  },
+  // Skills Used section
+  skillsUsedSection: {
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+  },
+  skillsUsedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  skillsUsedIcon: {
+    fontSize: 16,
+  },
+  skillsUsedLabel: {
+    fontSize: typography.sm,
+    fontWeight: "600",
+  },
+  skillsUsedBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  skillUsedBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  skillUsedBadgeText: {
+    fontSize: typography.sm,
+    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   // Progress section styles
   progressSection: {

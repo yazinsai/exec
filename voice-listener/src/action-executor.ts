@@ -290,6 +290,7 @@ interface ClaudeExecutionResult {
   stderr: string;
   toolsUsedCount: number;
   wasCancelled: boolean;
+  textOutput: string; // Captured text output from Claude (for fallback result)
 }
 
 async function runClaudeSession(
@@ -315,6 +316,7 @@ async function runClaudeSession(
   let sessionId: string | undefined;
   let toolsUsedCount = 0;
   let wasCancelled = false;
+  let textOutput = ""; // Capture Claude's text output for fallback result
 
   // Poll for cancellation requests
   const pollForCancellation = async () => {
@@ -368,6 +370,14 @@ async function runClaudeSession(
           if (event.type === "result" && event.session_id) {
             sessionId = event.session_id;
             console.log(`Captured session ID: ${sessionId}`);
+          }
+          // Capture text output for fallback result
+          if (event.type === "assistant") {
+            for (const block of event.message?.content || []) {
+              if (block.type === "text" && block.text) textOutput += block.text;
+            }
+          } else if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+            textOutput += event.delta.text;
           }
           const formatted = formatStreamEvent(event);
           if (formatted.console) {
@@ -423,6 +433,7 @@ async function runClaudeSession(
     stderr,
     toolsUsedCount,
     wasCancelled,
+    textOutput,
   };
 }
 
@@ -600,11 +611,17 @@ Please address this feedback and continue iterating on the task.`;
       return logFile;
     }
 
-    // Check if Claude set the status to awaiting_feedback during execution
+    // Wait briefly for any $ACTION_CLI writes to propagate through InstantDB
+    // (Claude's last tool call may have set result/deployUrl just before exiting)
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Read back the current action state to preserve fields Claude set during execution
+    // (e.g. result, deployUrl, deployUrlLabel set via $ACTION_CLI)
     const currentAction = await db.query({
       actions: { $: { where: { id: action.id } } },
     });
-    const currentStatus = currentAction.actions[0]?.status;
+    const currentActionData = currentAction.actions[0];
+    const currentStatus = currentActionData?.status;
 
     if (currentStatus === "awaiting_feedback") {
       // Claude requested user input - don't overwrite status, just update metadata
@@ -622,14 +639,30 @@ Please address this feedback and continue iterating on the task.`;
     } else {
       // Success - mark as completed (goes directly to Done tab)
       console.log(`\nAction ${action.id} completed successfully`);
+
+      const updateFields: Record<string, unknown> = {
+        status: "completed",
+        completedAt: Date.now(),
+        durationMs,
+        toolsUsed: totalToolsUsed,
+        sessionId: result.sessionId ?? null,
+      };
+
+      // If Claude didn't set the result via $ACTION_CLI, use captured text output as fallback
+      if (currentActionData?.result) {
+        console.log(`  Result field was set (${currentActionData.result.length} chars)`);
+      } else if (result.textOutput.trim()) {
+        console.log(`  Result field was NOT set - using captured text output as fallback (${result.textOutput.length} chars)`);
+        // Use the last portion of text output (most likely contains the summary/conclusion)
+        const maxLen = 10000;
+        const text = result.textOutput.trim();
+        updateFields.result = text.length > maxLen ? text.slice(-maxLen) : text;
+      } else {
+        console.log(`  WARNING: No result field was set and no text output captured`);
+      }
+
       await db.transact(
-        db.tx.actions[action.id].update({
-          status: "completed",
-          completedAt: Date.now(),
-          durationMs,
-          toolsUsed: totalToolsUsed,
-          sessionId: result.sessionId ?? null,
-        })
+        db.tx.actions[action.id].update(updateFields)
       );
 
       // Send push notification for completed action
@@ -696,7 +729,7 @@ function buildExecutionPrompt(action: Action): string {
       typeSpecificInstruction = "   - Project: Research, plan, and create a NEW project in workspace/projects/. Use /frontend-design skill if building UI. Deploy web apps to dokku.";
       break;
     case "Research":
-      typeSpecificInstruction = "   - Research: Use the /research skill for comprehensive multi-source analysis. Save findings to result with markdown formatting (Summary → Details → Sources).";
+      typeSpecificInstruction = '   - Research: Use the /research skill for comprehensive multi-source analysis. CRITICAL: You MUST call `"$ACTION_CLI" result "your full research report here"` to save findings. Use markdown formatting (Summary → Details → Sources).';
       break;
     case "Write":
       typeSpecificInstruction = "   - Write: For social media posts, use the /typefully skill immediately. For other content, write directly and save to result field.";

@@ -16,6 +16,10 @@ import { ShareIntentProvider } from "expo-share-intent";
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
 import { ShareIntentHandler } from "@/hooks/useShareIntent";
 import { PushNotificationsProvider } from "@/hooks/usePushNotifications";
+import { initBackgroundQueue } from "@/lib/backgroundQueue";
+
+// Initialize background queue processing (runs AppState listener for Android)
+initBackgroundQueue();
 
 function AppContent() {
   const { colors, isDark } = useThemeColors();
