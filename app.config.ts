@@ -1,4 +1,14 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
+import fs from "node:fs";
+
+function resolveGoogleServicesFile(): string | undefined {
+  const candidate = process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json";
+  try {
+    return fs.existsSync(candidate) ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -25,9 +35,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: "com.yazinsai.micapp",
-    // Use EAS secret if available, fallback to local file for dev
-    googleServicesFile:
-      process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
+    // Only set this when the file is available (CI/EAS secrets or local dev file)
+    ...(resolveGoogleServicesFile()
+      ? { googleServicesFile: resolveGoogleServicesFile() }
+      : {}),
   },
   web: {
     bundler: "metro",
