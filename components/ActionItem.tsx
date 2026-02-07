@@ -4,6 +4,7 @@ import type { InstaQLEntity } from "@instantdb/react-native";
 import type { AppSchema } from "@/instant.schema";
 import { spacing, typography, radii, actionTypeColorsDark, actionTypeColorsLight, type ActionType } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import { getProjectLabel } from "@/lib/actionTimeline";
 
 // Base action type from schema
 type BaseAction = InstaQLEntity<AppSchema, "actions">;
@@ -100,6 +101,14 @@ export function ActionItem({ action }: ActionItemProps) {
             <View style={[styles.subtypeBadge, { backgroundColor: colors.textMuted + "20" }]}>
               <Text style={[styles.subtypeBadgeText, { color: colors.textSecondary }]}>
                 {action.subtype}
+              </Text>
+            </View>
+          )}
+          {action.projectPath && (
+            <View style={[styles.projectBadge, { backgroundColor: colors.primary + "15" }]}> 
+              <Ionicons name="folder-outline" size={11} color={colors.primary} />
+              <Text style={[styles.projectBadgeText, { color: colors.primary }]} numberOfLines={1}>
+                {getProjectLabel(action.projectPath)}
               </Text>
             </View>
           )}
@@ -208,6 +217,19 @@ const styles = StyleSheet.create({
     fontSize: typography.xs,
     fontWeight: typography.medium,
     textTransform: "capitalize",
+  },
+  projectBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 140,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  projectBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,

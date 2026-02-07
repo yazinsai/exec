@@ -48,6 +48,7 @@ export interface ActionWithRecording extends Action {
 import { spacing, typography, radii, fontFamily, actionTypeColorsDark, actionTypeColorsLight, type ActionType } from "@/constants/Colors";
 import { useThemeColors, type ThemeColors } from "@/hooks/useThemeColors";
 import { db } from "@/lib/db";
+import { buildTimelineTurns, getProjectLabel, parseMessages, type Activity, type ThreadMessage } from "@/lib/actionTimeline";
 
 type TabKey = "actions" | "recordings";
 type ActionStatus = "pending" | "in_progress" | "awaiting_feedback" | "completed" | "failed" | "cancelled";
@@ -125,34 +126,6 @@ function formatDuration(ms: number | undefined, startedAt?: number): string {
   return `${seconds}s`;
 }
 
-interface ThreadMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
-
-function parseMessages(json: string | undefined | null): ThreadMessage[] {
-  if (!json) return [];
-  try {
-    return JSON.parse(json) as ThreadMessage[];
-  } catch {
-    return [];
-  }
-}
-
-// Activity types for the whimsical timeline
-type ActivityType = "skill" | "tool" | "agent" | "message" | "milestone";
-
-interface Activity {
-  id: string;
-  type: ActivityType;
-  icon: string; // Emoji
-  label: string;
-  detail?: string;
-  timestamp: number;
-  duration?: number;
-  status: "active" | "done" | "error";
-}
 
 interface Progress {
   currentActivity?: string;
@@ -276,6 +249,16 @@ export default function HomeScreen() {
   const selectedAction: ActionWithRecording | null = selectedActionId
     ? allActions.find((a) => a.id === selectedActionId) ?? null
     : null;
+
+  const selectedActionMessages = useMemo(
+    () => parseMessages(selectedAction?.messages),
+    [selectedAction?.messages]
+  );
+
+  const selectedActionTimelineTurns = useMemo(() => {
+    const activities = parseProgress(selectedAction?.progress)?.activities ?? [];
+    return buildTimelineTurns(selectedActionMessages, activities);
+  }, [selectedAction?.progress, selectedActionMessages]);
 
   const handleActionPress = async (action: ActionWithRecording) => {
     setSelectedActionId(action.id);
@@ -639,6 +622,21 @@ export default function HomeScreen() {
                 <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{selectedAction.description}</Text>
               )}
 
+              <View style={[styles.projectAssociationBox, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+                <Ionicons name="folder-open-outline" size={16} color={colors.primary} />
+                <View style={styles.projectAssociationTextWrap}>
+                  <Text style={[styles.projectAssociationLabel, { color: colors.textTertiary }]}>Project</Text>
+                  <Text style={[styles.projectAssociationValue, { color: colors.textPrimary }]}>
+                    {getProjectLabel(selectedAction.projectPath)}
+                  </Text>
+                  {selectedAction.projectPath && (
+                    <Text style={[styles.projectAssociationPath, { color: colors.textMuted }]} numberOfLines={1}>
+                      {selectedAction.projectPath}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
               {/* Dependency Info */}
               {selectedAction.dependsOn && selectedAction.dependsOn.length > 0 && (
                 <View style={[styles.dependencySection, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "30" }]}>
@@ -799,44 +797,55 @@ export default function HomeScreen() {
                 );
               })()}
 
-              {/* Activity History (for completed/failed/cancelled actions) */}
-              {selectedAction.status !== "in_progress" && (() => {
-                const progress = parseProgress(selectedAction.progress);
-                if (!progress?.activities || progress.activities.length === 0) return null;
-                return (
-                  <View style={[styles.activityHistorySection, { borderColor: colors.border }]}>
-                    <View style={styles.historyHeader}>
-                      <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Activity Log</Text>
-                    </View>
-                    <View style={styles.activityFeed}>
-                      {progress.activities.slice(-15).reverse().map((activity) => {
-                        const isError = activity.status === "error";
-                        return (
-                          <View key={activity.id} style={styles.activityRow}>
-                            <Text style={styles.activityIcon}>{activity.icon}</Text>
-                            <View style={styles.activityContent}>
-                              <Text
-                                style={[
-                                  styles.activityLabel,
-                                  { color: isError ? colors.error : colors.textSecondary },
-                                ]}
-                                numberOfLines={2}
-                              >
-                                {activity.detail ? `${activity.label}: ${activity.detail}` : activity.label}
-                              </Text>
+              {selectedActionTimelineTurns.length > 0 && (
+                <View style={[styles.threadedTimelineSection, { borderColor: colors.border }]}>
+                  <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Action Timeline</Text>
+                  {selectedActionTimelineTurns.map((turn, turnIdx) => (
+                    <View key={turn.id} style={[styles.turnCard, { backgroundColor: colors.backgroundElevated, borderColor: colors.border }]}>
+                      <View style={styles.turnHeader}>
+                        <Text style={[styles.turnTitle, { color: colors.textPrimary }]}>Turn {turnIdx + 1}</Text>
+                        <Text style={[styles.turnTime, { color: colors.textMuted }]}>{formatRelativeTime(turn.startedAt)}</Text>
+                      </View>
+
+                      {turn.userMessage && (
+                        <View style={[styles.messageBubble, styles.userBubble, { backgroundColor: colors.primary + "20" }]}>
+                          <Text style={[styles.messageRole, { color: colors.textTertiary }]}>You</Text>
+                          <Text style={[styles.messageContent, { color: colors.textPrimary }]}>{turn.userMessage.content}</Text>
+                        </View>
+                      )}
+
+                      {turn.assistantMessages.map((msg, idx) => (
+                        <View key={`${turn.id}-assistant-${idx}`} style={[styles.messageBubble, styles.assistantBubble, { backgroundColor: colors.background }]}>
+                          <Text style={[styles.messageRole, { color: colors.textTertiary }]}>Claude</Text>
+                          <Text style={[styles.messageContent, { color: colors.textPrimary }]}>{msg.content}</Text>
+                        </View>
+                      ))}
+
+                      {turn.toolActivities.length > 0 && (
+                        <View style={styles.turnToolsContainer}>
+                          <Text style={[styles.turnToolsLabel, { color: colors.textSecondary }]}>Tool calls</Text>
+                          {turn.toolActivities.map((activity) => (
+                            <View key={activity.id} style={styles.activityRow}>
+                              <Text style={styles.activityIcon}>{activity.icon}</Text>
+                              <View style={styles.activityContent}>
+                                <Text
+                                  style={[
+                                    styles.activityLabel,
+                                    { color: activity.status === "error" ? colors.error : colors.textSecondary },
+                                  ]}
+                                  numberOfLines={2}
+                                >
+                                  {activity.detail ? `${activity.label}: ${activity.detail}` : activity.label}
+                                </Text>
+                              </View>
                             </View>
-                            {activity.duration && (
-                              <Text style={[styles.activityDuration, { color: colors.textMuted }]}>
-                                {formatDuration(activity.duration)}
-                              </Text>
-                            )}
-                          </View>
-                        );
-                      })}
+                          ))}
+                        </View>
+                      )}
                     </View>
-                  </View>
-                );
-              })()}
+                  ))}
+                </View>
+              )}
 
               {/* Original Voice Note */}
               {selectedAction._recording?.audioUrl && (
@@ -886,36 +895,10 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* Thread Messages */}
-              {parseMessages(selectedAction.messages).length > 0 && (
-                <View style={styles.threadSection}>
-                  <Text style={[styles.threadLabel, { color: colors.textPrimary }]}>Thread</Text>
-                  {parseMessages(selectedAction.messages).map((msg, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.messageBubble,
-                        msg.role === "user"
-                          ? [styles.userBubble, { backgroundColor: colors.primary + "20" }]
-                          : [styles.assistantBubble, { backgroundColor: colors.backgroundElevated }],
-                      ]}
-                    >
-                      <Text style={[styles.messageRole, { color: colors.textTertiary }]}>
-                        {msg.role === "user" ? "You" : "Claude"}
-                      </Text>
-                      <Text style={[styles.messageContent, { color: colors.textPrimary }]}>{msg.content}</Text>
-                      <Text style={[styles.messageTime, { color: colors.textMuted }]}>
-                        {new Date(msg.timestamp).toLocaleString()}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
               {/* Input for new message */}
               <View style={styles.feedbackSection}>
                 <Text style={[styles.feedbackLabel, { color: colors.textPrimary }]}>
-                  {parseMessages(selectedAction.messages).length > 0 ? "Reply" : "Start a thread"}
+                  {selectedActionMessages.length > 0 ? "Reply" : "Start a thread"}
                 </Text>
                 <TextInput
                   style={[styles.feedbackInput, { backgroundColor: colors.backgroundElevated, color: colors.textPrimary }]}
@@ -1126,6 +1109,30 @@ const styles = StyleSheet.create({
     lineHeight: typography.base * 1.5,
     marginBottom: spacing.md,
   },
+  projectAssociationBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  projectAssociationTextWrap: {
+    flex: 1,
+  },
+  projectAssociationLabel: {
+    fontSize: typography.xs,
+    marginBottom: 2,
+  },
+  projectAssociationValue: {
+    fontSize: typography.sm,
+    fontWeight: "700",
+  },
+  projectAssociationPath: {
+    fontSize: typography.xs,
+    marginTop: 2,
+  },
   dependencySection: {
     marginBottom: spacing.lg,
     padding: spacing.md,
@@ -1321,19 +1328,38 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginTop: 6,
   },
-  // Activity history section
-  activityHistorySection: {
+  threadedTimelineSection: {
     marginBottom: spacing.lg,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
   },
-  historyHeader: {
+  turnCard: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  turnHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  turnTitle: {
+    fontSize: typography.xs,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  turnTime: {
+    fontSize: typography.xs,
+  },
+  turnToolsContainer: {
+    marginTop: spacing.xs,
+  },
+  turnToolsLabel: {
+    fontSize: typography.xs,
+    fontWeight: "600",
+    marginBottom: spacing.xs,
   },
   // Legacy styles kept for backward compat
   thinkingBox: {

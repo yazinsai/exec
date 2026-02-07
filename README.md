@@ -86,6 +86,14 @@ That's it. Record a voice note. Watch Exec work.
 
 ---
 
+## Action UX highlights
+
+- Action details now render a **threaded timeline** by turn: each user comment is grouped with subsequent Claude replies and tool/activity events.
+- Actions now show **project association** prominently in cards and detail view.
+- Actions tab includes **project-aware browsing**:
+  - filter chips by project
+  - grouping toggle between status and project sections
+
 ## Tech
 
 - **App**: React Native + Expo

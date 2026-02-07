@@ -7,6 +7,7 @@ import { spacing, typography, radii, fontFamily, actionTypeColorsDark, actionTyp
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useActionsScreenState } from "@/hooks/useActionsScreenState";
 import { db } from "@/lib/db";
+import { getProjectLabel } from "@/lib/actionTimeline";
 
 // Action types and subtypes
 const ACTION_TYPES = ["CodeChange", "Project", "Research", "Write", "UserTask"] as const;
@@ -54,7 +55,9 @@ type Section = {
   isRunning?: boolean;
 };
 
-function groupActionsForTab(actions: Action[], tab: TabMode): Section[] {
+type GroupMode = "status" | "project";
+
+function groupActionsForTab(actions: Action[], tab: TabMode, groupMode: GroupMode): Section[] {
   // Filter actions by tab category
   const filtered = actions.filter((action) => categorizeAction(action) === tab);
 
@@ -73,6 +76,27 @@ function groupActionsForTab(actions: Action[], tab: TabMode): Section[] {
   });
 
   if (sorted.length === 0) return [];
+
+  if (groupMode === "project") {
+    const grouped = sorted.reduce<Record<string, Action[]>>((acc, action) => {
+      const key = action.projectPath || "__none";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(action);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .sort((a, b) => {
+        if (a[0] === "__none") return 1;
+        if (b[0] === "__none") return -1;
+        return getProjectLabel(a[0]).localeCompare(getProjectLabel(b[0]));
+      })
+      .map(([projectPath, projectActions]) => ({
+        title: getProjectLabel(projectPath === "__none" ? undefined : projectPath),
+        key: `project-${projectPath}`,
+        data: projectActions,
+      }));
+  }
 
   // For Active tab, split running and pending
   if (tab === "active") {
@@ -355,12 +379,64 @@ function TypeFilter({ selectedType, selectedSubtype, onTypeChange, onSubtypeChan
   );
 }
 
+interface ProjectControlsProps {
+  groupMode: GroupMode;
+  onGroupModeChange: (mode: GroupMode) => void;
+  projectFilter: string;
+  onProjectFilterChange: (project: string) => void;
+  projectOptions: { key: string; label: string; count: number }[];
+}
+
+function ProjectControls({ groupMode, onGroupModeChange, projectFilter, onProjectFilterChange, projectOptions }: ProjectControlsProps) {
+  const { colors, isDark } = useThemeColors();
+
+  return (
+    <View style={styles.projectControlsContainer}>
+      <View style={[styles.groupModeRow, { backgroundColor: colors.backgroundElevated }, !isDark && [styles.tabBarLightBorder, { borderColor: colors.border }]]}>
+        {(["status", "project"] as GroupMode[]).map((mode) => {
+          const selected = groupMode === mode;
+          return (
+            <Pressable key={mode} style={[styles.groupModePill, selected && { backgroundColor: colors.primary + "20" }]} onPress={() => onGroupModeChange(mode)}>
+              <Text style={[styles.groupModeText, { color: selected ? colors.primary : colors.textTertiary }]}>
+                {mode === "status" ? "By Status" : "By Project"}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsRow}>
+        {projectOptions.map((project) => {
+          const selected = projectFilter === project.key;
+          return (
+            <Pressable
+              key={project.key}
+              style={[
+                styles.projectChip,
+                { backgroundColor: selected ? colors.primary + "20" : colors.backgroundElevated },
+                !isDark && !selected && { borderWidth: 1, borderColor: colors.border },
+              ]}
+              onPress={() => onProjectFilterChange(project.key)}
+            >
+              <Text style={[styles.projectChipText, { color: selected ? colors.primary : colors.textTertiary }]} numberOfLines={1}>
+                {project.label}
+              </Text>
+              <Text style={[styles.projectChipCount, { color: selected ? colors.primary : colors.textMuted }]}>{project.count}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
   const { colors, isDark } = useThemeColors();
   const { tabMode, setTabMode, scrollPosition, setScrollPosition, isLoaded } = useActionsScreenState();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<ActionTypeFilter>("all");
   const [subtypeFilter, setSubtypeFilter] = useState<CodeChangeSubtype>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [groupMode, setGroupMode] = useState<GroupMode>("status");
 
   // Ref for SectionList to restore scroll position
   const sectionListRef = useRef<SectionList<Action>>(null);
@@ -423,7 +499,31 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
     return counts;
   }, [actions, tabMode]);
 
-  // Filter actions by search query and type/subtype
+  const projectOptions = useMemo(() => {
+    const tabFiltered = actions.filter((a) => categorizeAction(a) === tabMode);
+    const counts = tabFiltered.reduce<Record<string, number>>((acc, action) => {
+      const key = action.projectPath || "__none";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    return [
+      { key: "all", label: "All Projects", count: tabFiltered.length },
+      ...Object.entries(counts)
+        .sort((a, b) => {
+          if (a[0] === "__none") return 1;
+          if (b[0] === "__none") return -1;
+          return getProjectLabel(a[0]).localeCompare(getProjectLabel(b[0]));
+        })
+        .map(([key, count]) => ({
+          key,
+          label: key === "__none" ? "No Project" : getProjectLabel(key),
+          count,
+        })),
+    ];
+  }, [actions, tabMode]);
+
+  // Filter actions by search query and type/subtype/project
   const filteredActions = useMemo(() => {
     let result = actions;
 
@@ -450,12 +550,16 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
       result = result.filter((action) => action.subtype === subtypeFilter);
     }
 
+    if (projectFilter !== "all") {
+      result = result.filter((action) => (projectFilter === "__none" ? !action.projectPath : action.projectPath === projectFilter));
+    }
+
     return result;
-  }, [actions, searchQuery, typeFilter, subtypeFilter]);
+  }, [actions, searchQuery, typeFilter, subtypeFilter, projectFilter]);
 
   const sections = useMemo(() => {
-    return groupActionsForTab(filteredActions, tabMode);
-  }, [tabMode, filteredActions]);
+    return groupActionsForTab(filteredActions, tabMode, groupMode);
+  }, [tabMode, filteredActions, groupMode]);
 
   // Reset subtype filter when type changes away from CodeChange
   const handleTypeChange = (type: ActionTypeFilter) => {
@@ -560,6 +664,14 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
         onSubtypeChange={setSubtypeFilter}
         typeCounts={typeCounts}
         subtypeCounts={subtypeCounts}
+      />
+
+      <ProjectControls
+        groupMode={groupMode}
+        onGroupModeChange={setGroupMode}
+        projectFilter={projectFilter}
+        onProjectFilterChange={setProjectFilter}
+        projectOptions={projectOptions}
       />
 
       {searchQuery.trim() && filteredActions.length === 0 ? (
@@ -950,5 +1062,44 @@ const styles = StyleSheet.create({
   subtypeChipCount: {
     fontSize: 10,
     fontWeight: typography.medium,
+  },
+  projectControlsContainer: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  groupModeRow: {
+    marginHorizontal: spacing.lg,
+    borderRadius: radii.lg,
+    padding: 4,
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  groupModePill: {
+    flex: 1,
+    borderRadius: radii.md,
+    alignItems: "center",
+    paddingVertical: spacing.xs + 2,
+  },
+  groupModeText: {
+    fontSize: typography.xs,
+    fontWeight: "600",
+  },
+  projectChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    maxWidth: 180,
+  },
+  projectChipText: {
+    fontSize: typography.xs,
+    fontWeight: "500",
+  },
+  projectChipCount: {
+    fontSize: 10,
+    fontWeight: "600",
   },
 });
