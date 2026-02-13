@@ -152,7 +152,6 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
       description: action.description ?? null,
       status: "pending",
       extractedAt: now,
-      syncToken,
       projectPath: action.projectPath ?? null,
       // Clear stale fields from previous failed/cancelled runs
       errorMessage: null,
