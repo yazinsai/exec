@@ -14,6 +14,8 @@ interface DependsOnAction {
   title: string;
   type?: string;
   result?: string;
+  errorCategory?: string;
+  retryCount?: number;
 }
 
 interface Action {
@@ -28,6 +30,7 @@ interface Action {
   cancelRequested?: boolean;
   sessionId?: string; // Claude session ID for resuming conversations
   sequenceIndex?: number; // Position in sequence (1-based)
+  retryCount?: number; // Auto-retry count for recoverable failures
   dependsOn?: DependsOnAction[]; // Action this depends on (from link)
   // UserTask fields
   task?: string;
@@ -63,14 +66,31 @@ function hasNewUserFeedback(action: Action): boolean {
   return lastMessage.role === "user";
 }
 
+const MAX_DEPENDENCY_RETRIES = 2;
+
+// Error categories that are worth retrying (transient/environmental)
+const RETRYABLE_ERRORS = new Set([
+  "timeout",
+  "rate_limit",
+  "dependency_error", // e.g. ENOENT from bad path, missing binary
+  "oom",
+  "crash",
+]);
+
 function isDependencyComplete(action: Action): boolean {
-  // No dependency means it's ready to run
   if (!action.dependsOn || action.dependsOn.length === 0) {
     return true;
   }
-
   const dependency = action.dependsOn[0]; // We only support one dependency (has: "one")
   return dependency.status === "completed";
+}
+
+function isDependencyFailed(action: Action): boolean {
+  if (!action.dependsOn || action.dependsOn.length === 0) {
+    return false;
+  }
+  const dep = action.dependsOn[0];
+  return dep.status === "failed" || dep.status === "cancelled";
 }
 
 function getDependencyStatus(action: Action): string | null {
@@ -78,6 +98,49 @@ function getDependencyStatus(action: Action): string | null {
     return null;
   }
   return action.dependsOn[0].status;
+}
+
+/**
+ * Handle a failed dependency: retry if recoverable, cancel child if not.
+ * Returns true if the dependency was retried (child should keep waiting).
+ */
+async function handleFailedDependency(action: Action): Promise<"retried" | "cancelled"> {
+  const dep = action.dependsOn![0];
+  const retries = dep.retryCount ?? 0;
+  const isRetryable = dep.status === "failed" && RETRYABLE_ERRORS.has(dep.errorCategory ?? "");
+
+  if (isRetryable && retries < MAX_DEPENDENCY_RETRIES) {
+    // Reset the failed dependency to pending for retry
+    await db.transact(
+      db.tx.actions[dep.id].update({
+        status: "pending",
+        errorMessage: null,
+        errorCategory: null,
+        completedAt: null,
+        startedAt: null,
+        retryCount: retries + 1,
+      })
+    );
+    console.log(`  Auto-retrying dependency "${dep.title}" (attempt ${retries + 2}, error: ${dep.errorCategory})`);
+    return "retried";
+  }
+
+  // Non-recoverable or max retries exceeded — cancel the child
+  const reason = dep.status === "cancelled"
+    ? `Dependency "${dep.title}" was cancelled`
+    : retries >= MAX_DEPENDENCY_RETRIES
+      ? `Dependency "${dep.title}" failed ${retries + 1} times (${dep.errorCategory})`
+      : `Dependency "${dep.title}" failed with non-retryable error: ${dep.errorCategory}`;
+
+  await db.transact(
+    db.tx.actions[action.id].update({
+      status: "cancelled",
+      errorMessage: reason,
+      completedAt: Date.now(),
+    })
+  );
+  console.log(`  Cancelled "${action.title}": ${reason}`);
+  return "cancelled";
 }
 
 async function sendHeartbeat(status?: string): Promise<void> {
@@ -116,7 +179,7 @@ async function sendHeartbeat(status?: string): Promise<void> {
 const SKIP_RECOVERY = process.argv.includes("--skip-recovery");
 
 // Resolve paths: projects and logs live under ~/ai/
-const AI_ROOT = resolve(import.meta.dir, "../../..");
+const AI_ROOT = resolve(import.meta.dir, "../../../..");
 const PROJECTS_DIR = join(AI_ROOT, "projects");
 const LOGS_DIR = join(AI_ROOT, "logs");
 
@@ -888,6 +951,9 @@ async function pollForActions(): Promise<number> {
     for (const action of actions) {
       if (isDependencyComplete(action)) {
         readyActions.push(action);
+      } else if (isDependencyFailed(action)) {
+        // Dependency failed — retry it or cancel this action
+        await handleFailedDependency(action);
       } else {
         waitingActions.push(action);
       }

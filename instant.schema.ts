@@ -110,6 +110,9 @@ const _schema = i.schema({
 
       // Timestamp when user viewed this action (for unread indicators)
       readAt: i.number().optional(),
+
+      // Retry count for auto-retry on recoverable failures
+      retryCount: i.number().optional(),
     }),
     promptVersions: i.entity({
       version: i.string().unique().indexed(), // Hash-based version ID (first 12 chars of SHA256)

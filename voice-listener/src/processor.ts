@@ -29,7 +29,7 @@ interface ProcessResult {
 }
 
 // Resolve paths: projects live under ~/ai/
-const AI_ROOT = resolve(import.meta.dir, "../../..");
+const AI_ROOT = resolve(import.meta.dir, "../../../..");
 const PROJECTS_DIR = join(AI_ROOT, "projects");
 
 async function downloadImages(imageUrls: string[]): Promise<string[]> {
