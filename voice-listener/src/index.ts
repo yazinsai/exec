@@ -132,19 +132,17 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
 
   const now = Date.now();
 
-  // First pass: generate IDs and build a map of sequenceIndex -> actionId
-  const actionIds: string[] = actions.map(() => id());
-  const sequenceIndexToId: Map<number, string> = new Map();
-
+  // Build a map of sequenceIndex (1-based) -> array index (0-based) for dependency linking
+  const sequenceIndexToArrayIndex: Map<number, number> = new Map();
   actions.forEach((action, index) => {
     if (action.sequenceIndex !== undefined && action.sequenceIndex !== null) {
-      sequenceIndexToId.set(action.sequenceIndex, actionIds[index]);
+      sequenceIndexToArrayIndex.set(action.sequenceIndex, index);
     }
   });
 
   // Second pass: build transactions with dependency links
+  // Use lookup("syncToken", ...) so reprocessing upserts instead of colliding
   const txs = actions.map((action, index) => {
-    const actionId = actionIds[index];
     const syncToken = `${recordingId}:${index}`;
 
     // Build the update object with all fields
@@ -156,6 +154,14 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
       extractedAt: now,
       syncToken,
       projectPath: action.projectPath ?? null,
+      // Clear stale fields from previous failed/cancelled runs
+      errorMessage: null,
+      errorCategory: null,
+      result: null,
+      completedAt: null,
+      startedAt: null,
+      retryCount: null,
+      sessionId: null,
     };
 
     // Add CodeChange subtype
@@ -176,16 +182,19 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
       updateData.sequenceIndex = action.sequenceIndex;
     }
 
-    // Start building the transaction
-    let tx = db.tx.actions[actionId]
+    // Use lookup to upsert — if syncToken already exists, reset the existing action
+    const entityRef = lookup("syncToken", syncToken);
+    let tx = db.tx.actions[entityRef]
       .update(updateData)
       .link({ recording: recordingId });
 
     // Link dependency if specified
     if (action.dependsOnIndex !== undefined && action.dependsOnIndex !== null) {
-      const dependsOnActionId = sequenceIndexToId.get(action.dependsOnIndex);
-      if (dependsOnActionId) {
-        tx = tx.link({ dependsOn: dependsOnActionId });
+      const depArrayIndex = sequenceIndexToArrayIndex.get(action.dependsOnIndex);
+      if (depArrayIndex !== undefined) {
+        const depSyncToken = `${recordingId}:${depArrayIndex}`;
+        const depRef = lookup("syncToken", depSyncToken);
+        tx = tx.link({ dependsOn: depRef });
         console.log(`  → Action "${action.title}" depends on sequenceIndex ${action.dependsOnIndex}`);
       }
     }
