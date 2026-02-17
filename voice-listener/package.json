@@ -11,7 +11,10 @@
     "test": "bun test",
     "dev:extract": "bun --watch src/index.ts",
     "dev:execute": "bun --watch src/action-executor.ts",
-    "dev:logwatch": "bun --watch src/log-watcher.ts"
+    "dev:logwatch": "bun --watch src/log-watcher.ts",
+    "learn": "bun run src/episode-recorder.ts",
+    "dev:learn": "bun --watch src/episode-recorder.ts",
+    "distill": "bun run src/distillation-engine.ts --once"
   },
   "dependencies": {
     "@instantdb/admin": "^0.18.7"

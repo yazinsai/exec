@@ -7,6 +7,7 @@ import { classifyError } from "./error-categories";
 import { loadPrompt } from "./prompt-loader";
 import { notifyActionCompleted, notifyActionFailed, notifyActionAwaitingFeedback } from "./notifications";
 import { allocateProjectDirectory } from "./project-generation";
+import { selectRelevantRules, formatRulesForPrompt } from "./rule-selector";
 
 interface DependsOnAction {
   id: string;
@@ -594,7 +595,7 @@ ${"=".repeat(60)}
   }
 
   // Build the prompt after project directory resolution so instructions include concrete path.
-  const prompt = buildExecutionPrompt(action);
+  const prompt = await buildExecutionPrompt(action);
 
   if (logFile) {
     await appendFile(logFile, `=== PROMPT ===\n${prompt}\n\n=== OUTPUT ===\n`);
@@ -799,7 +800,7 @@ Please address this feedback and continue iterating on the task.`;
   return logFile;
 }
 
-function buildExecutionPrompt(action: Action): string {
+async function buildExecutionPrompt(action: Action): Promise<string> {
   // Calculate relative path to ~/ai/CLAUDE.md from projectDir
   const aiClaudePath = action.projectPath
     ? "../../CLAUDE.md"
@@ -927,6 +928,26 @@ ${dep.result}
     }
   }
 
+  // Inject learned rules from the learning system
+  let learnedRules = "";
+  try {
+    const ruleResult = await selectRelevantRules(
+      action.type,
+      action.title,
+      action.description,
+      action.projectPath
+    );
+    learnedRules = formatRulesForPrompt(ruleResult);
+    if (learnedRules) {
+      console.log(`Injecting ${ruleResult.rules.length} learned rules into prompt`);
+      if (ruleResult.conflicts.length > 0) {
+        console.log(`  ${ruleResult.conflicts.length} conflict(s) detected`);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load learned rules (continuing without):", error);
+  }
+
   return loadPrompt("execution", {
     ACTION_ID: action.id,
     ACTION_TYPE: action.type,
@@ -939,6 +960,7 @@ ${dep.result}
     WORKSPACE_CLAUDE_PATH: aiClaudePath,
     TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
     SAFEGUARDS: safeguards,
+    LEARNED_RULES: learnedRules,
     RESULT_FORMATTING: resultFormatting,
   });
 }

@@ -58,6 +58,22 @@ const rules = {
       delete: "true",
     },
   },
+  episodes: {
+    allow: {
+      view: "true",
+      create: "true",
+      update: "true",
+      delete: "true",
+    },
+  },
+  rules: {
+    allow: {
+      view: "true",
+      create: "true",
+      update: "true",
+      delete: "true",
+    },
+  },
 } satisfies InstantRules;
 
 export default rules;

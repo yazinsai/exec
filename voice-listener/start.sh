@@ -28,10 +28,11 @@ show_help() {
   echo "  --help, -h Show this help message"
   echo ""
   echo "Description:"
-  echo "  Starts three workers for voice action processing:"
+  echo "  Starts four workers for voice action processing:"
   echo "  1. Extraction worker - extracts actions from transcriptions"
   echo "  2. Execution worker - executes actions with Claude Code"
   echo "  3. Log watcher - tails execution logs and updates progress in UI"
+  echo "  4. Learning worker - records episodes from feedback and distills rules"
   echo ""
   echo "  Workers run continuously until interrupted (Ctrl+C) unless --once is used."
   exit 0
@@ -45,8 +46,8 @@ fi
 # Trap to kill all processes on exit
 cleanup() {
   echo -e "\n${YELLOW}Shutting down workers...${NC}"
-  kill $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID 2>/dev/null
-  wait $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID 2>/dev/null
+  kill $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID $LEARNING_PID 2>/dev/null
+  wait $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID $LEARNING_PID 2>/dev/null
   echo -e "${GREEN}Done.${NC}"
   exit 0
 }
@@ -66,7 +67,7 @@ if [[ "$1" == "--once" ]]; then
 fi
 
 # Start extraction worker
-echo -e "${GREEN}[1/3] Starting extraction worker...${NC}"
+echo -e "${GREEN}[1/4] Starting extraction worker...${NC}"
 bun run src/index.ts $ONCE_FLAG 2>&1 | sed 's/^/[extract] /' &
 EXTRACT_PID=$!
 
@@ -74,7 +75,7 @@ EXTRACT_PID=$!
 sleep 1
 
 # Start execution worker
-echo -e "${GREEN}[2/3] Starting execution worker...${NC}"
+echo -e "${GREEN}[2/4] Starting execution worker...${NC}"
 bun run src/action-executor.ts $ONCE_FLAG 2>&1 | sed 's/^/[execute] /' &
 EXECUTE_PID=$!
 
@@ -82,13 +83,21 @@ EXECUTE_PID=$!
 sleep 0.5
 
 # Start log watcher
-echo -e "${CYAN}[3/3] Starting log watcher...${NC}"
+echo -e "${CYAN}[3/4] Starting log watcher...${NC}"
 bun run src/log-watcher.ts $ONCE_FLAG 2>&1 | sed 's/^/[logwatch] /' &
 LOGWATCH_PID=$!
+
+# Small delay
+sleep 0.5
+
+# Start learning worker (episode recording + distillation)
+echo -e "${CYAN}[4/4] Starting learning worker...${NC}"
+bun run src/episode-recorder.ts $ONCE_FLAG 2>&1 | sed 's/^/[learning] /' &
+LEARNING_PID=$!
 
 echo ""
 echo -e "${BLUE}All workers running. Press Ctrl+C to stop.${NC}"
 echo ""
 
 # Wait for all processes
-wait $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID
+wait $EXTRACT_PID $EXECUTE_PID $LOGWATCH_PID $LEARNING_PID

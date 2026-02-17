@@ -26,5 +26,6 @@ INSTRUCTIONS:
 
 5. Status is set automatically when you finish. Use `"$ACTION_CLI" status failed` only if the task cannot be completed.
 {{SAFEGUARDS}}
+{{LEARNED_RULES}}
 {{RESULT_FORMATTING}}
 Now execute this action.

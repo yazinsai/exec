@@ -113,6 +113,9 @@ const _schema = i.schema({
 
       // Retry count for auto-retry on recoverable failures
       retryCount: i.number().optional(),
+
+      // Learning system: tracks whether episodes have been extracted from this action's feedback
+      episodesGenerated: i.boolean().optional(),
     }),
     promptVersions: i.entity({
       version: i.string().unique().indexed(), // Hash-based version ID (first 12 chars of SHA256)
@@ -128,6 +131,35 @@ const _schema = i.schema({
     vocabularyTerms: i.entity({
       term: i.string().indexed(), // The correct spelling
       createdAt: i.number().indexed(),
+    }),
+    episodes: i.entity({
+      narrative: i.string(), // "On project X, user said..."
+      feedbackType: i.string().indexed(), // "correction" | "approval" | "rejection"
+      projectType: i.string().optional(), // "landing-page" | "dashboard" | "api" | etc.
+      projectPath: i.string().indexed().optional(),
+      workContext: i.string().optional(), // "hero section design"
+      userInput: i.string(), // raw user words
+      changeDescription: i.string().optional(),
+      tags: i.string().optional(), // JSON array: ["design", "color"]
+      distilled: i.boolean().indexed().optional(), // false = not yet processed
+      createdAt: i.number().indexed(),
+      sourceType: i.string().indexed(), // "rating" | "thread"
+      sourceActionId: i.string().indexed().optional(),
+    }),
+    rules: i.entity({
+      content: i.string(), // "For marketing pages, prefer earth tones"
+      scope: i.string().indexed(), // "global" | "project-type" | "project-specific"
+      scopeQualifier: i.string().indexed().optional(), // e.g. "landing-page"
+      category: i.string().indexed(), // "design" | "tooling" | "architecture" | "workflow" | "content"
+      tags: i.string().optional(), // JSON array
+      confidence: i.number().indexed(), // 0.0–1.0
+      sourceEpisodeIds: i.string(), // JSON array of episode IDs
+      supportCount: i.number(),
+      active: i.boolean().indexed(),
+      crossProjectConfirmed: i.boolean().optional(),
+      conflictsWith: i.string().optional(), // JSON array of rule IDs
+      createdAt: i.number().indexed(),
+      updatedAt: i.number().indexed(),
     }),
     workerHeartbeats: i.entity({
       name: i.string().unique().indexed(), // "extraction" | "execution"
@@ -203,6 +235,18 @@ const _schema = i.schema({
         on: "actions",
         has: "many",
         label: "blockedActions",
+      },
+    },
+    episodeAction: {
+      forward: {
+        on: "episodes",
+        has: "one",
+        label: "action",
+      },
+      reverse: {
+        on: "actions",
+        has: "many",
+        label: "episodes",
       },
     },
   },
