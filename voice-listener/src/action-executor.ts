@@ -8,6 +8,7 @@ import { loadPrompt } from "./prompt-loader";
 import { notifyActionCompleted, notifyActionFailed, notifyActionAwaitingFeedback } from "./notifications";
 import { allocateProjectDirectory } from "./project-generation";
 import { selectRelevantRules, formatRulesForPrompt } from "./rule-selector";
+import { analyzeScope } from "./scope-analyzer";
 
 interface DependsOnAction {
   id: string;
@@ -980,6 +981,16 @@ ${dep.result}
     console.error("Failed to load learned rules (continuing without):", error);
   }
 
+  // Analyze scope and load orchestration + error recovery prompts
+  const scope = analyzeScope(action.type, action.subtype, action.title, action.description);
+  console.log(`Scope analysis: ${scope} (type=${action.type}, subtype=${action.subtype ?? "none"})`);
+
+  const orchestrationMode = loadPrompt(
+    scope === "complex" ? "orchestration-complex" : "orchestration-simple",
+    {},
+  );
+  const errorRecoveryGuidance = loadPrompt("error-recovery", {});
+
   return loadPrompt("execution", {
     ACTION_ID: action.id,
     ACTION_TYPE: action.type,
@@ -992,6 +1003,8 @@ ${dep.result}
     WORKSPACE_CLAUDE_PATH: aiClaudePath,
     TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
     SAFEGUARDS: safeguards,
+    ORCHESTRATION_MODE: orchestrationMode,
+    ERROR_RECOVERY_GUIDANCE: errorRecoveryGuidance,
     LEARNED_RULES: learnedRules,
     RESULT_FORMATTING: resultFormatting,
   });
