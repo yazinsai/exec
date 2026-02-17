@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { join } from "path";
 
 const PROMPTS_DIR = join(import.meta.dir, "../prompts");
-const AI_ROOT = join(import.meta.dir, "../../..");
+const AI_ROOT = join(import.meta.dir, "../../../..");
 const PROJECTS_DIR = join(AI_ROOT, "projects");
 
 // CLAUDE.md files that affect execution behavior and should be versioned
@@ -13,8 +13,49 @@ const AI_CLAUDE_FILES = [
 ];
 
 /**
+ * Extract a brief description for a project directory.
+ * Checks package.json description, then first line of CLAUDE.md or README.md.
+ */
+function getProjectDescription(projectDir: string): string | null {
+  // 1. Try package.json "description" field
+  const pkgPath = join(projectDir, "package.json");
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      if (pkg.description && typeof pkg.description === "string") {
+        return pkg.description.slice(0, 120);
+      }
+    } catch {}
+  }
+
+  // 2. Try first meaningful line of CLAUDE.md or README.md (skip headings and boilerplate)
+  const BOILERPLATE = [
+    "this file provides guidance to claude",
+    "contents of",
+  ];
+  for (const readme of ["CLAUDE.md", "README.md"]) {
+    const readmePath = join(projectDir, readme);
+    if (existsSync(readmePath)) {
+      try {
+        const lines = readFileSync(readmePath, "utf-8").split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#") || trimmed.length <= 10) continue;
+          if (trimmed.startsWith("-") || trimmed.startsWith("*")) continue;
+          const lower = trimmed.toLowerCase();
+          if (BOILERPLATE.some((b) => lower.includes(b))) continue;
+          return trimmed.slice(0, 120);
+        }
+      } catch {}
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get list of project directories in ~/ai/projects/
- * Returns actual folder names, following symlinks to get the real project
+ * Returns folder names with descriptions for better voice-to-project matching
  */
 export function getProjectList(): string[] {
   if (!existsSync(PROJECTS_DIR)) return [];
@@ -32,7 +73,11 @@ export function getProjectList(): string[] {
         return false;
       }
     })
-    .sort();
+    .sort()
+    .map((name) => {
+      const desc = getProjectDescription(join(PROJECTS_DIR, name));
+      return desc ? `${name} — ${desc}` : name;
+    });
 }
 
 /**

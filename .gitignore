@@ -45,3 +45,6 @@ app-example
 # Firebase notifications
 mic-app-aa004-firebase-adminsdk-fbsvc-96beef3c75.json
 google-services.json
+
+# DB backups
+db-backups/

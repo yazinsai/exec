@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import * as Speech from "expo-speech";
+import { Audio } from "expo-av";
 import { AppState, Platform } from "react-native";
 
 type TTSStatus = "idle" | "playing" | "paused";
@@ -72,7 +73,7 @@ export function useTTS() {
     };
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback(async (text: string) => {
     if (!text?.trim()) return;
 
     const cleanText = stripMarkdown(text);

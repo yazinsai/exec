@@ -25,12 +25,17 @@ For each action, determine its type:
 ROUTING RULES:
 - Prefer "CodeChange" when an existing project plausibly fits the request
 - For "CodeChange", you MUST set "projectPath" to an EXISTING directory from the list below
-  - Use the EXACT folder name as shown (e.g., "app.coldcannon.com" NOT "cold-cannon")
+  - Use the EXACT folder name (the part before " — "), e.g. "app.coldcannon.com" NOT "cold-cannon"
   - Domain-style names like "app.example.com" are valid folder names - use them as-is
   - If no existing project clearly matches, ask which project via description
 - "Project" creates NEW projects - only use when nothing existing fits
+- VOICE MATCHING: Transcriptions come from speech-to-text, so spoken names may differ from folder names.
+  Match phonetically and contextually, e.g. "meme api" → "meem-api", "cold cannon" → "app.coldcannon.com".
+  Use the descriptions after " — " to help identify the right project.
+- When a voice note mentions an existing project AND describes new work on it, prefer CodeChange (feature)
+  over Project. Only use Project when the user explicitly wants a brand new standalone project.
 
-AVAILABLE PROJECTS (use exact folder names):
+AVAILABLE PROJECTS (folder name — description):
 {{PROJECT_LIST}}
 
 SEQUENCING:
