@@ -10,13 +10,14 @@
 
 import { basename } from "path";
 import { stat, open } from "fs/promises";
-import { db } from "./db";
+import { db, id } from "./db";
 
 interface Action {
   id: string;
   status: string;
   logFile?: string;
   progress?: string;
+  projectPath?: string;
 }
 
 // Activity types for the timeline
@@ -51,10 +52,12 @@ interface Progress {
 
 interface WatchedFile {
   actionId: string;
+  projectPath?: string;
   path: string;
   position: number;
   progress: Progress;
   buffer: string; // Accumulate partial lines
+  writtenEventIds: Set<string>; // Dedup: activity IDs already written to events entity
 }
 
 const POLL_INTERVAL = 2000;
@@ -191,6 +194,59 @@ function completeActivity(progress: Progress, id: string, status: "done" | "erro
     return true;
   }
   return false;
+}
+
+// Pending events to write (batched with progress updates)
+const pendingEvents = new Map<string, { actionId: string; projectPath?: string; activities: Activity[] }>();
+
+function queueEventWrite(actionId: string, projectPath: string | undefined, activity: Activity, writtenIds: Set<string>) {
+  if (writtenIds.has(activity.id)) return;
+  writtenIds.add(activity.id);
+
+  let batch = pendingEvents.get(actionId);
+  if (!batch) {
+    batch = { actionId, projectPath, activities: [] };
+    pendingEvents.set(actionId, batch);
+  }
+  batch.activities.push(activity);
+}
+
+async function flushEvents(actionId: string) {
+  const batch = pendingEvents.get(actionId);
+  if (!batch || batch.activities.length === 0) return;
+
+  const activities = batch.activities.splice(0);
+  pendingEvents.delete(actionId);
+
+  try {
+    const txs: any[] = [];
+    let lastTimestamp = 0;
+    for (const activity of activities) {
+      const eventId = id();
+      txs.push(
+        db.tx.events[eventId].update({
+          actionId: batch.actionId,
+          projectPath: batch.projectPath ?? null,
+          type: activity.type,
+          icon: activity.icon,
+          label: activity.label,
+          detail: activity.detail ?? null,
+          status: activity.status,
+          duration: activity.duration ?? null,
+          createdAt: activity.timestamp,
+        }),
+        db.tx.events[eventId].link({ action: batch.actionId }),
+      );
+      if (activity.timestamp > lastTimestamp) lastTimestamp = activity.timestamp;
+    }
+    if (lastTimestamp > 0) {
+      txs.push(db.tx.actions[batch.actionId].update({ lastEventAt: lastTimestamp }));
+    }
+    await db.transact(txs);
+    debug(`Wrote ${activities.length} events for ${actionId}`);
+  } catch (error) {
+    console.error(`Failed to write events for ${actionId}:`, error);
+  }
 }
 
 /**
@@ -383,7 +439,18 @@ async function tailFile(watched: WatchedFile): Promise<boolean> {
     watched.position = stats.size;
     watched.progress.lastUpdate = Date.now();
 
-    return parseContent(newContent, watched.progress);
+    const prevCount = watched.progress.activities.length;
+    const changed = parseContent(newContent, watched.progress);
+
+    // Queue new activities for persistent event writes
+    if (watched.progress.activities.length > prevCount) {
+      const newActivities = watched.progress.activities.slice(prevCount);
+      for (const activity of newActivities) {
+        queueEventWrite(watched.actionId, watched.projectPath, activity, watched.writtenEventIds);
+      }
+    }
+
+    return changed;
   } catch (error) {
     debug(`Error tailing ${watched.path}: ${error}`);
     return false;
@@ -406,6 +473,8 @@ function scheduleUpdate(actionId: string, progress: Progress) {
     } catch (error) {
       console.error(`Failed to update progress for ${actionId}:`, error);
     }
+    // Flush persistent events alongside progress update
+    await flushEvents(actionId);
   }, UPDATE_DEBOUNCE);
 
   pendingUpdates.set(actionId, timeout);
@@ -427,6 +496,7 @@ async function pollForActions(): Promise<number> {
         log(`Watching: ${basename(action.logFile)}`);
         watchedFiles.set(action.id, {
           actionId: action.id,
+          projectPath: action.projectPath,
           path: action.logFile,
           position: 0,
           progress: {
@@ -435,6 +505,7 @@ async function pollForActions(): Promise<number> {
             lastUpdate: Date.now(),
           },
           buffer: "",
+          writtenEventIds: new Set(),
         });
         newWatches++;
       }
@@ -451,6 +522,8 @@ async function pollForActions(): Promise<number> {
           clearTimeout(pending);
           pendingUpdates.delete(actionId);
         }
+        // Flush any remaining events
+        await flushEvents(actionId);
       }
     }
 

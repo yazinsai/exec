@@ -1,8 +1,56 @@
 // Docs: https://www.instantdb.com/docs/permissions
 
-import type { InstantRules } from "@instantdb/react-native";
+import type { InstantRules } from "@instantdb/admin";
 
 const rules = {
+  episodes: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
+  pushTokens: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
+  rules: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
+  recordings: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
+  events: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
+  vocabularyTerms: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
   $files: {
     allow: {
       view: "true",
@@ -10,68 +58,28 @@ const rules = {
       delete: "true",
     },
   },
-  recordings: {
-    allow: {
-      view: "true",
-      create: "true",
-      update: "true",
-      delete: "true",
-    },
-  },
-  actions: {
-    allow: {
-      view: "true",
-      create: "true",
-      update: "true",
-      delete: "true",
-    },
-  },
-  vocabularyTerms: {
-    allow: {
-      view: "true",
-      create: "true",
-      update: "true",
-      delete: "true",
-    },
-  },
-  pushTokens: {
-    allow: {
-      view: "true",
-      create: "true",
-      update: "true",
-      delete: "true",
-    },
-  },
   workerHeartbeats: {
     allow: {
       view: "true",
       create: "true",
-      update: "true",
       delete: "true",
+      update: "true",
     },
   },
   promptVersions: {
     allow: {
       view: "true",
       create: "true",
-      update: "true",
       delete: "true",
+      update: "true",
     },
   },
-  episodes: {
+  actions: {
     allow: {
       view: "true",
       create: "true",
-      update: "true",
       delete: "true",
-    },
-  },
-  rules: {
-    allow: {
-      view: "true",
-      create: "true",
       update: "true",
-      delete: "true",
     },
   },
 } satisfies InstantRules;

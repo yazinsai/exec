@@ -20,6 +20,7 @@ INSTRUCTIONS:
    ```bash
    "$ACTION_CLI" result "Brief summary of what was done"
    "$ACTION_CLI" deployUrl "https://your-app.whhite.com"  # if deployed
+   "$ACTION_CLI" event "Deploying to production"  # optional: emit progress milestone
    ```
 
    This is REQUIRED for ALL action types, especially Research and Write actions where the result IS the deliverable.

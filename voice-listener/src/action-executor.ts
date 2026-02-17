@@ -40,6 +40,30 @@ interface Action {
   remind_at?: string;
 }
 
+async function emitLifecycleEvent(actionId: string, projectPath: string | undefined, icon: string, label: string) {
+  try {
+    const now = Date.now();
+    const eventId = id();
+    await db.transact([
+      db.tx.events[eventId].update({
+        actionId,
+        projectPath: projectPath ?? null,
+        type: "status_change",
+        icon,
+        label,
+        detail: null,
+        status: "done",
+        duration: null,
+        createdAt: now,
+      }),
+      db.tx.events[eventId].link({ action: actionId }),
+      db.tx.actions[actionId].update({ lastEventAt: now }),
+    ]);
+  } catch (error) {
+    console.error(`Failed to emit lifecycle event for ${actionId}:`, error);
+  }
+}
+
 const POLL_INTERVAL = 5000; // 5 seconds
 const MAX_CONCURRENCY = 15; // Maximum parallel action executions
 const HEARTBEAT_INTERVAL = 10000; // 10 seconds
@@ -569,6 +593,9 @@ ${"=".repeat(60)}
     return logFile;
   }
 
+  // Emit started event
+  await emitLifecycleEvent(action.id, action.projectPath, "▶️", "Started execution");
+
   // Resolve project directory
   let projectDir = PROJECTS_DIR;
 
@@ -691,6 +718,7 @@ Please address this feedback and continue iterating on the task.`;
           sessionId: result.sessionId ?? null,
         })
       );
+      await emitLifecycleEvent(action.id, action.projectPath, "⛔", "Cancelled");
       return logFile;
     }
 
@@ -711,6 +739,7 @@ Please address this feedback and continue iterating on the task.`;
           sessionId: result.sessionId ?? null,
         })
       );
+      await emitLifecycleEvent(action.id, action.projectPath, "❌", `Failed: ${category}`);
 
       // Send push notification for failed action
       await notifyActionFailed(action.id, action.title, errorMsg);
@@ -739,6 +768,7 @@ Please address this feedback and continue iterating on the task.`;
           sessionId: result.sessionId ?? null,
         })
       );
+      await emitLifecycleEvent(action.id, action.projectPath, "💬", "Waiting for input");
 
       // Send push notification for awaiting feedback
       await notifyActionAwaitingFeedback(action.id, action.title, action.type);
@@ -770,6 +800,7 @@ Please address this feedback and continue iterating on the task.`;
       await db.transact(
         db.tx.actions[action.id].update(updateFields)
       );
+      await emitLifecycleEvent(action.id, action.projectPath, "✅", "Completed");
 
       // Send push notification for completed action
       await notifyActionCompleted(action.id, action.title, action.type);
@@ -792,6 +823,7 @@ Please address this feedback and continue iterating on the task.`;
         errorCategory: category,
       })
     );
+    await emitLifecycleEvent(action.id, action.projectPath, "❌", `Failed: ${category}`);
 
     // Send push notification for failed action
     await notifyActionFailed(action.id, action.title, errMsg);

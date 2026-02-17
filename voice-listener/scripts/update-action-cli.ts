@@ -9,7 +9,7 @@
  * Progress updates are handled by log-watcher.
  */
 
-import { db } from "../src/db";
+import { db, id } from "../src/db";
 
 const args = process.argv.slice(2);
 
@@ -18,7 +18,7 @@ let actionId: string;
 let field: string;
 let value: string;
 
-const VALID_FIELDS = ["status", "result", "deployUrl", "deployUrlLabel"];
+const VALID_FIELDS = ["status", "result", "deployUrl", "deployUrlLabel", "event"];
 
 if (args.length >= 2 && !VALID_FIELDS.includes(args[0])) {
   // First arg is not a field name, so it's an action ID
@@ -40,12 +40,14 @@ if (!actionId || !field) {
   console.error("  result         - Set final result summary");
   console.error("  deployUrl      - Set deployment URL");
   console.error("  deployUrlLabel - Set custom button text (e.g., 'Download APK')");
+  console.error("  event          - Emit a progress milestone event");
   console.error("");
   console.error("Examples:");
   console.error('  $ACTION_CLI status completed');
   console.error('  $ACTION_CLI result "Task completed successfully"');
   console.error('  $ACTION_CLI deployUrl "https://my-app.whhite.com"');
   console.error('  $ACTION_CLI deployUrlLabel "Download APK"');
+  console.error('  $ACTION_CLI event "Deploying to production"');
   process.exit(1);
 }
 
@@ -56,6 +58,28 @@ if (!VALID_FIELDS.includes(field)) {
 }
 
 async function update() {
+  if (field === "event") {
+    const now = Date.now();
+    const eventId = id();
+    await db.transact([
+      db.tx.events[eventId].update({
+        actionId,
+        projectPath: null,
+        type: "milestone",
+        icon: "📌",
+        label: value,
+        detail: null,
+        status: "done",
+        duration: null,
+        createdAt: now,
+      }),
+      db.tx.events[eventId].link({ action: actionId }),
+      db.tx.actions[actionId].update({ lastEventAt: now }),
+    ]);
+    console.log(`Emitted event for action ${actionId}: ${value}`);
+    process.exit(0);
+  }
+
   const updateObj: Record<string, string> = { [field]: value };
 
   // Add completedAt timestamp when marking as complete/failed
