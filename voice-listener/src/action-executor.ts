@@ -1052,6 +1052,12 @@ ${dep.result}
   );
   const errorRecoveryGuidance = loadPrompt("error-recovery", {});
 
+  // Inject browser testing prompt for action types that produce deployments
+  let browserTesting = "";
+  if (action.type === "Project" || action.type === "CodeChange") {
+    browserTesting = loadPrompt("browser-testing", {});
+  }
+
   // Build image context if images were attached to the original voice note
   let imageContext = "";
   if (imagePaths.length > 0) {
@@ -1076,6 +1082,7 @@ These images provide important context for this action. Read them before startin
     WORKSPACE_CLAUDE_PATH: aiClaudePath,
     TYPE_SPECIFIC_INSTRUCTION: typeSpecificInstruction,
     SAFEGUARDS: safeguards,
+    BROWSER_TESTING: browserTesting,
     ORCHESTRATION_MODE: orchestrationMode,
     ERROR_RECOVERY_GUIDANCE: errorRecoveryGuidance,
     LEARNED_RULES: learnedRules,

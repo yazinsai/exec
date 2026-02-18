@@ -231,10 +231,10 @@ The thing that makes this feel genuinely different.
 3. Integrate with browser automation for autonomous service signup
 4. Add per-project credential scoping
 
-### Phase 6: Browser Automation Hardening
-1. Upgrade browser automation reliability (anti-detection, CAPTCHA handling)
-2. Add self-testing: after deploy, agent browses the live app and verifies functionality
-3. Integrate with completion criteria (deployed + auto-tested = done)
+### Phase 6: Browser Automation Hardening — COMPLETE
+1. ~~Upgrade browser automation reliability (anti-detection, CAPTCHA handling)~~ — Done. Prompt-driven approach: Claude Code uses `/dev-browser` skill during execution. No separate worker needed.
+2. ~~Add self-testing: after deploy, agent browses the live app and verifies functionality~~ — Done. `browser-testing.md` prompt injected for Project and CodeChange actions. Full E2E testing: health check, functional testing of all described features, evidence collection via screenshots, fix-retest loop.
+3. ~~Integrate with completion criteria (deployed + auto-tested = done)~~ — Done. Actions with deployments only marked complete after browser tests pass. Orchestration complex mode explicitly gates completion on browser testing.
 
 ---
 
