@@ -1,6 +1,7 @@
 import { db, id } from "./db";
 import { loadPrompt } from "./prompt-loader";
 import { runDistillation } from "./distillation-engine";
+import { callClaude } from "./claude-call";
 
 interface Action {
   id: string;
@@ -56,15 +57,9 @@ function extractUserFeedback(messagesJson: string | undefined): string {
 }
 
 /**
- * Call Claude API to generate an episode from feedback.
+ * Call Claude via CLI to generate an episode from feedback.
  */
 async function generateEpisode(action: Action): Promise<EpisodeFromClaude | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.error("Episode recorder: ANTHROPIC_API_KEY not set");
-    return null;
-  }
-
   const threadMessages = extractUserFeedback(action.messages);
 
   const prompt = loadPrompt("episode-generation", {
@@ -80,34 +75,20 @@ async function generateEpisode(action: Action): Promise<EpisodeFromClaude | null
   });
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 2048,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(`Episode recorder: Claude API error ${response.status}:`, text.slice(0, 300));
+    const text = await callClaude(prompt, { model: "haiku" });
+    if (!text) {
+      console.error("Episode recorder: Claude returned no output");
       return null;
     }
 
-    const data = (await response.json()) as {
-      content: Array<{ type: string; text?: string }>;
-    };
+    // Extract JSON from response (Claude may wrap it in markdown code blocks)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("Episode recorder: no JSON found in response:", text.slice(0, 300));
+      return null;
+    }
 
-    const textBlock = data.content.find((b) => b.type === "text");
-    if (!textBlock?.text) return null;
-
-    return JSON.parse(textBlock.text) as EpisodeFromClaude;
+    return JSON.parse(jsonMatch[0]) as EpisodeFromClaude;
   } catch (error) {
     console.error("Episode recorder: failed to generate episode:", error);
     return null;

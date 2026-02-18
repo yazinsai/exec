@@ -1,5 +1,6 @@
 import { db, id } from "./db";
 import { loadPrompt } from "./prompt-loader";
+import { callClaude } from "./claude-call";
 
 interface Episode {
   id: string;
@@ -133,7 +134,7 @@ export async function runDistillation(): Promise<number> {
     EXISTING_RULES: existingRulesText,
   });
 
-  const response = await callClaude(prompt);
+  const response = await callClaudeForDistillation(prompt);
   if (!response) {
     console.error("Distillation: Claude returned no response");
     return 0;
@@ -242,46 +243,16 @@ export async function runDistillation(): Promise<number> {
 }
 
 /**
- * Call Claude API for distillation.
+ * Call Claude via CLI for distillation.
+ * Uses the shared callClaude helper (claude -p) — no API key needed.
  */
-async function callClaude(prompt: string): Promise<string | null> {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.error("Distillation: ANTHROPIC_API_KEY not set");
-      return null;
-    }
+async function callClaudeForDistillation(prompt: string): Promise<string | null> {
+  const text = await callClaude(prompt, { model: "sonnet" });
+  if (!text) return null;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(`Distillation: Claude API error ${response.status}:`, text.slice(0, 300));
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      content: Array<{ type: string; text?: string }>;
-    };
-
-    const textBlock = data.content.find((b) => b.type === "text");
-    return textBlock?.text ?? null;
-  } catch (error) {
-    console.error("Distillation: Claude API call failed:", error);
-    return null;
-  }
+  // Extract JSON from response (Claude may wrap it in markdown code blocks)
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return jsonMatch?.[0] ?? text;
 }
 
 // CLI mode: run once
