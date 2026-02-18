@@ -23,9 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { QueueStatus } from "@/components/QueueStatus";
 import { RecordingsList } from "@/components/RecordingsList";
-import { ActionsScreen } from "@/components/ActionsScreen";
 import { ActivityFeed } from "@/components/ActivityFeed";
-import { ProjectTimeline } from "@/components/ProjectTimeline";
 import { BottomNavBar } from "@/components/BottomNavBar";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { VersionBadge } from "@/components/VersionBadge";
@@ -438,9 +436,6 @@ export default function HomeScreen() {
     }
   }, [showRecordingOverlay, pendingImages.length, isActive]);
 
-  // Project timeline state
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-
   // Action detail/feedback modal state - store ID for real-time updates
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
@@ -586,7 +581,7 @@ export default function HomeScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     startRecording(
       withPendingImages ? pendingImages : undefined,
-      selectedProject,
+      null,
     );
   };
 
@@ -602,7 +597,6 @@ export default function HomeScreen() {
   const tts = useTTS();
 
   const headerTitle = activeTab === "actions" ? "Actions" : "Recordings";
-  const showHeader = !(activeTab === "actions" && selectedProject);
 
   // Create markdown styles dynamically based on current theme
   const markdownStyles = {
@@ -690,45 +684,34 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-      {showHeader && (
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{headerTitle}</Text>
-          <View style={styles.headerRight}>
-            {(pendingCount > 0 || failedCount > 0) && (
-              <QueueStatus pendingCount={pendingCount} failedCount={failedCount} />
-            )}
-            <WorkerStatusBadge />
-            <VersionBadge />
-            <Pressable
-              onPress={() => setShowSettings(true)}
-              style={({ pressed }) => [
-                styles.settingsButton,
-                { backgroundColor: colors.backgroundElevated },
-                pressed && { opacity: 0.7 },
-                !isDark && [styles.settingsButtonLight, { borderColor: colors.border }],
-              ]}
-            >
-              <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
-            </Pressable>
-          </View>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{headerTitle}</Text>
+        <View style={styles.headerRight}>
+          {(pendingCount > 0 || failedCount > 0) && (
+            <QueueStatus pendingCount={pendingCount} failedCount={failedCount} />
+          )}
+          <WorkerStatusBadge />
+          <VersionBadge />
+          <Pressable
+            onPress={() => setShowSettings(true)}
+            style={({ pressed }) => [
+              styles.settingsButton,
+              { backgroundColor: colors.backgroundElevated },
+              pressed && { opacity: 0.7 },
+              !isDark && [styles.settingsButtonLight, { borderColor: colors.border }],
+            ]}
+          >
+            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
         </View>
-      )}
+      </View>
 
       <View style={styles.content}>
         {activeTab === "actions" ? (
-          selectedProject ? (
-            <ProjectTimeline
-              projectPath={selectedProject}
-              onBack={() => setSelectedProject(null)}
-              onActionPress={handleActionPress}
-            />
-          ) : (
-            <ActivityFeed
-              actions={allActions}
-              onActionPress={handleActionPress}
-              onProjectPress={(projectPath) => setSelectedProject(projectPath)}
-            />
-          )
+          <ActivityFeed
+            actions={allActions}
+            onActionPress={handleActionPress}
+          />
         ) : (
           <RecordingsList
             recordings={recordings}
@@ -742,10 +725,7 @@ export default function HomeScreen() {
 
       <BottomNavBar
         activeTab={activeTab}
-        onTabPress={(tab) => {
-          setActiveTab(tab);
-          setSelectedProject(null);
-        }}
+        onTabPress={setActiveTab}
         onRecordPress={handleStartRecording}
         recordDisabled={hasPermission === false}
         runningCount={runningActionsCount}
@@ -765,7 +745,7 @@ export default function HomeScreen() {
           clearPendingImages();
         }}
         pendingImages={pendingImages}
-        projectContext={selectedProject}
+        projectContext={null}
       />
 
       {/* Settings Modal */}

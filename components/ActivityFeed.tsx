@@ -6,32 +6,17 @@ import {
   Pressable,
   FlatList,
   Animated,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { ActionsScreen } from "./ActionsScreen";
-import { ActionItem, type Action } from "./ActionItem";
+import { type Action } from "./ActionItem";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { getProjectLabel } from "@/lib/actionTimeline";
 
-type ViewMode = "feed" | "list";
-
-interface ActivityFeedProps {
-  actions: Action[];
-  onActionPress?: (action: Action) => void;
-  onProjectPress?: (projectPath: string) => void;
-}
-
-interface ProjectGroup {
-  projectPath: string;
-  label: string;
-  actions: Action[];
-  lastActivity: number;
-  runningCount: number;
-  pendingCount: number;
-  activeCount: number;
-  latestAction: Action;
-}
+// ---------------------------------------------------------------------------
+// Shared helpers (kept from original)
+// ---------------------------------------------------------------------------
 
 function formatRelativeTime(timestamp: number): string {
   const now = Date.now();
@@ -89,7 +74,7 @@ function getStatusLabel(status: string): string {
 }
 
 // Pulsing dot for running actions
-function PulsingDot({ color }: { color: string }) {
+function PulsingDot({ color, size = 8 }: { color: string; size?: number }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -113,7 +98,15 @@ function PulsingDot({ color }: { color: string }) {
 
   return (
     <Animated.View
-      style={[styles.pulsingDot, { backgroundColor: color, opacity: pulseAnim }]}
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+          opacity: pulseAnim,
+        },
+      ]}
     />
   );
 }
@@ -129,501 +122,285 @@ function parseProgress(json: string | undefined | null): {
   }
 }
 
-// Running action row in the top section
-function RunningActionRow({
-  action,
-  onPress,
-}: {
-  action: Action;
-  onPress?: () => void;
-}) {
-  const { colors } = useThemeColors();
-  const progress = parseProgress(action.progress);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.runningRow,
-        { backgroundColor: colors.backgroundElevated },
-        pressed && styles.pressed,
-      ]}
-      onPress={onPress}
-    >
-      <PulsingDot color={colors.primary} />
-      <View style={styles.runningContent}>
-        <Text
-          style={[styles.runningTitle, { color: colors.primary }]}
-          numberOfLines={1}
-        >
-          {action.title}
-        </Text>
-        {progress?.currentActivity && (
-          <Text
-            style={[styles.runningActivity, { color: colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {progress.currentActivity}
-          </Text>
-        )}
-      </View>
-      <Ionicons
-        name="chevron-forward"
-        size={16}
-        color={colors.textMuted}
-      />
-    </Pressable>
-  );
+function getActionTimestamp(action: Action): number {
+  return action.lastEventAt ?? action.completedAt ?? action.startedAt ?? action.extractedAt;
 }
 
-// Project card in the main section
-function ProjectCard({
-  group,
-  onPress,
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ActivityFeedProps {
+  actions: Action[];
+  onActionPress?: (action: Action) => void;
+}
+
+interface ProjectChip {
+  projectPath: string;
+  label: string;
+  lastActivity: number;
+  hasRunning: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// ProjectFilterBar
+// ---------------------------------------------------------------------------
+
+function ProjectFilterBar({
+  chips,
+  selectedProject,
+  onSelect,
 }: {
-  group: ProjectGroup;
-  onPress?: () => void;
+  chips: ProjectChip[];
+  selectedProject: string | null;
+  onSelect: (projectPath: string | null) => void;
 }) {
   const { colors } = useThemeColors();
-  const statusColor = getStatusColor(group.latestAction.status, colors);
-  const statusLabel = getStatusLabel(group.latestAction.status);
 
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.projectCard,
-        { backgroundColor: colors.backgroundElevated },
-        pressed && styles.pressed,
-      ]}
-      onPress={onPress}
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chipBar}
     >
-      <View style={styles.projectCardHeader}>
-        <View style={styles.projectNameRow}>
-          <Ionicons
-            name="folder-outline"
-            size={16}
-            color={colors.primary}
-          />
-          <Text
-            style={[styles.projectName, { color: colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {group.label}
-          </Text>
-        </View>
-        <Text style={[styles.projectTime, { color: colors.textMuted }]}>
-          {formatRelativeTime(group.lastActivity)}
-        </Text>
-      </View>
-
-      <Text
-        style={[styles.projectLastAction, { color: colors.textSecondary }]}
-        numberOfLines={1}
+      {/* "All" chip */}
+      <Pressable
+        style={[
+          styles.chip,
+          {
+            backgroundColor:
+              selectedProject === null
+                ? colors.primary
+                : colors.backgroundElevated,
+          },
+        ]}
+        onPress={() => onSelect(null)}
       >
-        {group.latestAction.title}
-      </Text>
-
-      <View style={styles.projectCardFooter}>
-        <View style={styles.projectBadges}>
-          {/* Status badge for latest action */}
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusColor + "20" },
-            ]}
-          >
-            {group.latestAction.status === "in_progress" && (
-              <PulsingDot color={statusColor} />
-            )}
-            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-              {statusLabel}
-            </Text>
-          </View>
-        </View>
-
-        {/* Counts */}
-        <View style={styles.projectCounts}>
-          {group.runningCount > 0 && (
-            <View
-              style={[
-                styles.countBadge,
-                { backgroundColor: colors.primary + "20" },
-              ]}
-            >
-              <Text
-                style={[styles.countBadgeText, { color: colors.primary }]}
-              >
-                {group.runningCount} running
-              </Text>
-            </View>
-          )}
-          {group.pendingCount > 0 && (
-            <View
-              style={[
-                styles.countBadge,
-                { backgroundColor: colors.textMuted + "20" },
-              ]}
-            >
-              <Text
-                style={[styles.countBadgeText, { color: colors.textTertiary }]}
-              >
-                {group.pendingCount} queued
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-// Ungrouped action card (no project)
-function UngroupedActionCard({
-  action,
-  onPress,
-}: {
-  action: Action;
-  onPress?: () => void;
-}) {
-  const { colors } = useThemeColors();
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.ungroupedCard,
-        { backgroundColor: colors.backgroundElevated },
-        pressed && styles.pressed,
-      ]}
-      onPress={onPress}
-    >
-      <ActionItem action={action} />
-      <View style={styles.ungroupedFooter}>
-        <Text style={[styles.ungroupedTime, { color: colors.textMuted }]}>
-          {formatRelativeTime(
-            action.completedAt ?? action.startedAt ?? action.extractedAt
-          )}
+        <Text
+          style={[
+            styles.chipText,
+            {
+              color:
+                selectedProject === null
+                  ? colors.black
+                  : colors.textSecondary,
+            },
+          ]}
+        >
+          All
         </Text>
-      </View>
-    </Pressable>
-  );
-}
+      </Pressable>
 
-// View mode toggle pill
-function ViewModeToggle({
-  value,
-  onChange,
-}: {
-  value: ViewMode;
-  onChange: (mode: ViewMode) => void;
-}) {
-  const { colors } = useThemeColors();
-
-  return (
-    <View
-      style={[
-        styles.viewModeToggle,
-        { backgroundColor: colors.backgroundElevated },
-      ]}
-    >
-      {(["feed", "list"] as ViewMode[]).map((mode) => {
-        const isSelected = value === mode;
+      {/* Project chips */}
+      {chips.map((chip) => {
+        const isSelected = selectedProject === chip.projectPath;
         return (
           <Pressable
-            key={mode}
+            key={chip.projectPath}
             style={[
-              styles.viewModePill,
-              isSelected && { backgroundColor: colors.primary + "20" },
+              styles.chip,
+              {
+                backgroundColor: isSelected
+                  ? colors.primary
+                  : colors.backgroundElevated,
+              },
             ]}
-            onPress={() => onChange(mode)}
+            onPress={() =>
+              onSelect(isSelected ? null : chip.projectPath)
+            }
           >
-            <Ionicons
-              name={mode === "feed" ? "grid-outline" : "list-outline"}
-              size={14}
-              color={isSelected ? colors.primary : colors.textTertiary}
-            />
-            <Text
-              style={[
-                styles.viewModeText,
-                { color: isSelected ? colors.primary : colors.textTertiary },
-              ]}
-            >
-              {mode === "feed" ? "Feed" : "List"}
-            </Text>
+            <View style={styles.chipContent}>
+              {chip.hasRunning && !isSelected && (
+                <PulsingDot color={colors.primary} size={6} />
+              )}
+              <Text
+                style={[
+                  styles.chipText,
+                  {
+                    color: isSelected
+                      ? colors.black
+                      : colors.textSecondary,
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {chip.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
+
+// ---------------------------------------------------------------------------
+// FeedCard
+// ---------------------------------------------------------------------------
+
+function getSubtitle(action: Action): string | null {
+  if (action.status === "in_progress") {
+    const progress = parseProgress(action.progress);
+    if (progress?.currentActivity) return progress.currentActivity;
+  }
+  if (action.status === "failed" && action.errorMessage) {
+    return action.errorMessage;
+  }
+  if (action.status === "completed" && action.result) {
+    // Strip markdown and take first line
+    const firstLine = action.result
+      .replace(/^#+\s*/gm, "")
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "")
+      .replace(/`/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .split("\n")
+      .find((line) => line.trim().length > 0);
+    return firstLine?.trim() || null;
+  }
+  return action.description || null;
+}
+
+function FeedCard({
+  action,
+  onPress,
+}: {
+  action: Action;
+  onPress?: () => void;
+}) {
+  const { colors } = useThemeColors();
+  const statusColor = getStatusColor(action.status, colors);
+  const statusLabel = getStatusLabel(action.status);
+  const projectLabel = action.projectPath
+    ? getProjectLabel(action.projectPath)
+    : null;
+  const timestamp = getActionTimestamp(action);
+  const subtitle = getSubtitle(action);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.feedCard,
+        { backgroundColor: colors.backgroundElevated },
+        pressed && styles.pressed,
+      ]}
+      onPress={onPress}
+    >
+      {/* Row 1: Status + project + time */}
+      <View style={styles.feedCardRow1}>
+        <View style={styles.feedCardStatusRow}>
+          {action.status === "in_progress" ? (
+            <PulsingDot color={statusColor} size={8} />
+          ) : (
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: statusColor },
+              ]}
+            />
+          )}
+          <Text style={[styles.feedCardStatus, { color: statusColor }]}>
+            {statusLabel}
+          </Text>
+          {projectLabel && (
+            <>
+              <Text style={[styles.feedCardSeparator, { color: colors.textMuted }]}>
+                |
+              </Text>
+              <Text
+                style={[styles.feedCardProject, { color: colors.textTertiary }]}
+                numberOfLines={1}
+              >
+                {projectLabel}
+              </Text>
+            </>
+          )}
+        </View>
+        <Text style={[styles.feedCardTime, { color: colors.textMuted }]}>
+          {formatRelativeTime(timestamp)}
+        </Text>
+      </View>
+
+      {/* Row 2: Title */}
+      <Text
+        style={[styles.feedCardTitle, { color: colors.textPrimary }]}
+        numberOfLines={1}
+      >
+        {action.title}
+      </Text>
+
+      {/* Row 3: Subtitle */}
+      {subtitle && (
+        <Text
+          style={[styles.feedCardSubtitle, { color: colors.textTertiary }]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main ActivityFeed
+// ---------------------------------------------------------------------------
 
 export function ActivityFeed({
   actions,
   onActionPress,
-  onProjectPress,
 }: ActivityFeedProps) {
   const { colors } = useThemeColors();
-  const [viewMode, setViewMode] = useState<ViewMode>("feed");
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
-  // Separate running actions
-  const runningActions = useMemo(
-    () => actions.filter((a) => a.status === "in_progress"),
-    [actions]
-  );
+  // Compute project chips from actions
+  const projectChips = useMemo(() => {
+    const chipMap = new Map<
+      string,
+      { lastActivity: number; hasRunning: boolean }
+    >();
 
-  // Group actions by project
-  const { projectGroups, ungroupedActions } = useMemo(() => {
-    const nonCancelled = actions.filter((a) => a.status !== "cancelled");
-
-    const grouped: Record<string, Action[]> = {};
-    const ungrouped: Action[] = [];
-
-    for (const action of nonCancelled) {
-      if (action.projectPath) {
-        if (!grouped[action.projectPath]) {
-          grouped[action.projectPath] = [];
-        }
-        grouped[action.projectPath].push(action);
+    for (const action of actions) {
+      if (!action.projectPath || action.status === "cancelled") continue;
+      const ts = getActionTimestamp(action);
+      const existing = chipMap.get(action.projectPath);
+      if (existing) {
+        if (ts > existing.lastActivity) existing.lastActivity = ts;
+        if (action.status === "in_progress") existing.hasRunning = true;
       } else {
-        ungrouped.push(action);
+        chipMap.set(action.projectPath, {
+          lastActivity: ts,
+          hasRunning: action.status === "in_progress",
+        });
       }
     }
 
-    const groups: ProjectGroup[] = Object.entries(grouped).map(
-      ([projectPath, projectActions]) => {
-        const sorted = [...projectActions].sort((a, b) => {
-          const aTime =
-            a.lastEventAt ?? a.completedAt ?? a.startedAt ?? a.extractedAt;
-          const bTime =
-            b.lastEventAt ?? b.completedAt ?? b.startedAt ?? b.extractedAt;
-          return bTime - aTime;
-        });
+    const chips: ProjectChip[] = [];
+    for (const [projectPath, data] of chipMap) {
+      chips.push({
+        projectPath,
+        label: getProjectLabel(projectPath),
+        lastActivity: data.lastActivity,
+        hasRunning: data.hasRunning,
+      });
+    }
 
-        const latestAction = sorted[0];
-        const lastActivity =
-          latestAction.lastEventAt ??
-          latestAction.completedAt ??
-          latestAction.startedAt ??
-          latestAction.extractedAt;
-
-        return {
-          projectPath,
-          label: getProjectLabel(projectPath),
-          actions: sorted,
-          lastActivity,
-          runningCount: projectActions.filter(
-            (a) => a.status === "in_progress"
-          ).length,
-          pendingCount: projectActions.filter((a) => a.status === "pending")
-            .length,
-          activeCount: projectActions.filter(
-            (a) => a.status === "in_progress" || a.status === "pending"
-          ).length,
-          latestAction,
-        };
-      }
-    );
-
-    // Sort projects by most recent activity
-    groups.sort((a, b) => b.lastActivity - a.lastActivity);
-
-    // Sort ungrouped by most recent activity
-    ungrouped.sort((a, b) => {
-      const aTime = a.completedAt ?? a.startedAt ?? a.extractedAt;
-      const bTime = b.completedAt ?? b.startedAt ?? b.extractedAt;
-      return bTime - aTime;
-    });
-
-    return { projectGroups: groups, ungroupedActions: ungrouped };
+    // Sort by most recent activity
+    chips.sort((a, b) => b.lastActivity - a.lastActivity);
+    return chips;
   }, [actions]);
 
-  // If list mode, delegate to ActionsScreen
-  if (viewMode === "list") {
-    return (
-      <View style={styles.container}>
-        <View style={styles.toggleRow}>
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
-        </View>
-        <ActionsScreen actions={actions} onActionPress={onActionPress} />
-      </View>
-    );
-  }
+  // Filter + sort actions for the feed
+  const feedActions = useMemo(() => {
+    return actions
+      .filter((a) => a.status !== "cancelled")
+      .filter((a) =>
+        selectedProject ? a.projectPath === selectedProject : true
+      )
+      .sort((a, b) => getActionTimestamp(b) - getActionTimestamp(a));
+  }, [actions, selectedProject]);
 
-  // Build flat list data
-  type FeedItem =
-    | { type: "toggle"; key: string }
-    | { type: "runningHeader"; key: string }
-    | { type: "running"; key: string; action: Action }
-    | { type: "projectsHeader"; key: string }
-    | { type: "project"; key: string; group: ProjectGroup }
-    | { type: "ungroupedHeader"; key: string }
-    | { type: "ungrouped"; key: string; action: Action };
-
-  const feedData: FeedItem[] = [];
-
-  // Toggle row
-  feedData.push({ type: "toggle", key: "toggle" });
-
-  // Running section
-  if (runningActions.length > 0) {
-    feedData.push({ type: "runningHeader", key: "running-header" });
-    for (const action of runningActions) {
-      feedData.push({ type: "running", key: `running-${action.id}`, action });
-    }
-  }
-
-  // Projects section
-  if (projectGroups.length > 0) {
-    feedData.push({ type: "projectsHeader", key: "projects-header" });
-    for (const group of projectGroups) {
-      feedData.push({
-        type: "project",
-        key: `project-${group.projectPath}`,
-        group,
-      });
-    }
-  }
-
-  // Ungrouped section
-  if (ungroupedActions.length > 0) {
-    feedData.push({ type: "ungroupedHeader", key: "ungrouped-header" });
-    for (const action of ungroupedActions) {
-      feedData.push({
-        type: "ungrouped",
-        key: `ungrouped-${action.id}`,
-        action,
-      });
-    }
-  }
-
-  const renderItem = ({ item }: { item: FeedItem }) => {
-    switch (item.type) {
-      case "toggle":
-        return (
-          <View style={styles.toggleRow}>
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          </View>
-        );
-
-      case "runningHeader":
-        return (
-          <View style={styles.sectionHeader}>
-            <PulsingDot color={colors.primary} />
-            <Text
-              style={[styles.sectionHeaderText, { color: colors.primary }]}
-            >
-              RUNNING
-            </Text>
-            <View
-              style={[
-                styles.sectionBadge,
-                { backgroundColor: colors.primary + "20" },
-              ]}
-            >
-              <Text
-                style={[styles.sectionBadgeText, { color: colors.primary }]}
-              >
-                {runningActions.length}
-              </Text>
-            </View>
-          </View>
-        );
-
-      case "running":
-        return (
-          <RunningActionRow
-            action={item.action}
-            onPress={() => onActionPress?.(item.action)}
-          />
-        );
-
-      case "projectsHeader":
-        return (
-          <View style={styles.sectionHeader}>
-            <Ionicons
-              name="folder-outline"
-              size={14}
-              color={colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.sectionHeaderText,
-                { color: colors.textSecondary },
-              ]}
-            >
-              PROJECTS
-            </Text>
-            <View
-              style={[
-                styles.sectionBadge,
-                { backgroundColor: colors.backgroundElevated },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sectionBadgeText,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                {projectGroups.length}
-              </Text>
-            </View>
-          </View>
-        );
-
-      case "project":
-        return (
-          <ProjectCard
-            group={item.group}
-            onPress={() => onProjectPress?.(item.group.projectPath)}
-          />
-        );
-
-      case "ungroupedHeader":
-        return (
-          <View style={styles.sectionHeader}>
-            <Ionicons
-              name="document-outline"
-              size={14}
-              color={colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.sectionHeaderText,
-                { color: colors.textSecondary },
-              ]}
-            >
-              OTHER
-            </Text>
-            <View
-              style={[
-                styles.sectionBadge,
-                { backgroundColor: colors.backgroundElevated },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sectionBadgeText,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                {ungroupedActions.length}
-              </Text>
-            </View>
-          </View>
-        );
-
-      case "ungrouped":
-        return (
-          <UngroupedActionCard
-            action={item.action}
-            onPress={() => onActionPress?.(item.action)}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
+  // Empty state
   if (actions.length === 0) {
     return (
       <View style={styles.empty}>
@@ -641,15 +418,40 @@ export function ActivityFeed({
   return (
     <View style={styles.container}>
       <FlatList
-        data={feedData}
-        keyExtractor={(item) => item.key}
-        renderItem={renderItem}
+        data={feedActions}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <FeedCard
+            action={item}
+            onPress={() => onActionPress?.(item)}
+          />
+        )}
+        ListHeaderComponent={
+          projectChips.length > 0 ? (
+            <ProjectFilterBar
+              chips={projectChips}
+              selectedProject={selectedProject}
+              onSelect={setSelectedProject}
+            />
+          ) : null
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyFilter}>
+            <Text style={[styles.emptyFilterText, { color: colors.textTertiary }]}>
+              No actions for this project
+            </Text>
+          </View>
+        }
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -658,164 +460,79 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: 160,
   },
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+
+  // Chip bar
+  chipBar: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
-  viewModeToggle: {
-    flexDirection: "row",
-    borderRadius: radii.full,
-    padding: 2,
-  },
-  viewModePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radii.full,
   },
-  viewModeText: {
-    fontSize: typography.xs,
-    fontWeight: "600",
-  },
-
-  // Section headers
-  sectionHeader: {
+  chipContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    gap: 6,
   },
-  sectionHeaderText: {
+  chipText: {
     fontSize: typography.xs,
+    fontWeight: "600",
     fontFamily: fontFamily.semibold,
-    fontWeight: "600",
-    letterSpacing: typography.tracking.wider,
-  },
-  sectionBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  sectionBadgeText: {
-    fontSize: typography.xs,
-    fontWeight: "500",
   },
 
-  // Running action row
-  runningRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+  // Feed card
+  feedCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.lg,
   },
-  runningContent: {
+  feedCardRow1: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  feedCardStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     flex: 1,
+    marginRight: spacing.sm,
   },
-  runningTitle: {
-    fontSize: typography.sm,
-    fontWeight: "600",
-  },
-  runningActivity: {
-    fontSize: typography.xs,
-    marginTop: 2,
-  },
-  pulsingDot: {
+  statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-
-  // Project card
-  projectCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.lg,
+  feedCardStatus: {
+    fontSize: typography.xs,
+    fontWeight: "600",
+    fontFamily: fontFamily.semibold,
   },
-  projectCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
+  feedCardSeparator: {
+    fontSize: typography.xs,
+    marginHorizontal: 2,
   },
-  projectNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+  feedCardProject: {
+    fontSize: typography.xs,
     flex: 1,
-    marginRight: spacing.sm,
   },
-  projectName: {
-    fontSize: typography.base,
+  feedCardTime: {
+    fontSize: typography.xs,
+  },
+  feedCardTitle: {
+    fontSize: typography.sm,
     fontFamily: fontFamily.semibold,
     fontWeight: "600",
-    flex: 1,
+    marginBottom: 2,
   },
-  projectTime: {
+  feedCardSubtitle: {
     fontSize: typography.xs,
-  },
-  projectLastAction: {
-    fontSize: typography.sm,
-    marginBottom: spacing.sm,
-  },
-  projectCardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  projectBadges: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  statusBadgeText: {
-    fontSize: typography.xs,
-    fontWeight: "500",
-  },
-  projectCounts: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  countBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  countBadgeText: {
-    fontSize: typography.xs,
-    fontWeight: "500",
-  },
-
-  // Ungrouped action card
-  ungroupedCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    borderRadius: radii.lg,
-    overflow: "hidden",
-  },
-  ungroupedFooter: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    marginTop: -spacing.xs,
-  },
-  ungroupedTime: {
-    fontSize: typography.xs,
+    lineHeight: typography.xs * 1.4,
   },
 
   pressed: {
@@ -842,5 +559,14 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     textAlign: "center",
     lineHeight: typography.base * 1.5,
+  },
+
+  // Filtered empty state
+  emptyFilter: {
+    alignItems: "center",
+    paddingVertical: spacing.xxl,
+  },
+  emptyFilterText: {
+    fontSize: typography.sm,
   },
 });
