@@ -79,7 +79,8 @@ function cleanupImages(localPaths: string[]): void {
 
 export async function processTranscription(
   transcription: string,
-  imageUrls: string[] = []
+  imageUrls: string[] = [],
+  projectContext?: string,
 ): Promise<ProcessResult> {
   const hasImages = imageUrls.length > 0;
   let localImagePaths: string[] = [];
@@ -100,6 +101,17 @@ export async function processTranscription(
     const promptVars: Record<string, string> = { TRANSCRIPTION: transcription };
     if (useImagesPrompt) {
       promptVars.IMAGE_PATHS = localImagePaths.join("\n");
+    }
+    if (projectContext) {
+      const folderName = projectContext.split("/").filter(Boolean).pop() ?? projectContext;
+      promptVars.PROJECT_CONTEXT = [
+        `The user was viewing project "${folderName}" when they recorded this.`,
+        `- Default to routing CodeChange actions to this project (projectPath: "${folderName}")`,
+        `- Only route elsewhere if the transcription clearly refers to a different project`,
+        `- If the request is general with no specific project reference, route to "${folderName}"`,
+      ].join("\n");
+    } else {
+      promptVars.PROJECT_CONTEXT = "No project context — the user recorded from the main screen.";
     }
 
     const prompt = loadPrompt(promptName, promptVars);

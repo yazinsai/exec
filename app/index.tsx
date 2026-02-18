@@ -584,7 +584,10 @@ export default function HomeScreen() {
   const handleStartRecording = async (withPendingImages?: boolean) => {
     if (hasPermission === false) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    startRecording(withPendingImages ? pendingImages : undefined);
+    startRecording(
+      withPendingImages ? pendingImages : undefined,
+      selectedProject,
+    );
   };
 
   const handlePauseResume = () => {
@@ -762,6 +765,7 @@ export default function HomeScreen() {
           clearPendingImages();
         }}
         pendingImages={pendingImages}
+        projectContext={selectedProject}
       />
 
       {/* Settings Modal */}

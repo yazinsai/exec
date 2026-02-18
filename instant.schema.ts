@@ -106,6 +106,7 @@ const _schema = i.schema({
       processingError: i.string().optional(),
       processingStartedAt: i.number().optional(),
       processingStatus: i.string().indexed().optional(),
+      projectContext: i.string().indexed().optional(),
       retryCount: i.number(),
       sourceFingerprint: i.string().unique().indexed().optional(),
       status: i.string().indexed(),

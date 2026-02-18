@@ -28,17 +28,19 @@ export function useRecorder(onRecordingComplete?: () => void) {
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingImagesRef = useRef<PendingImage[]>([]);
+  const projectContextRef = useRef<string | null>(null);
 
   useEffect(() => {
     requestAudioPermissions().then(setHasPermission);
   }, []);
 
-  const startRecording = useCallback(async (pendingImages?: PendingImage[]) => {
+  const startRecording = useCallback(async (pendingImages?: PendingImage[], projectContext?: string | null) => {
     if (state !== "idle" || hasPermission === false) {
       return;
     }
 
     pendingImagesRef.current = pendingImages ?? [];
+    projectContextRef.current = projectContext ?? null;
 
     try {
       await configureAudioMode();
@@ -131,6 +133,8 @@ export function useRecorder(onRecordingComplete?: () => void) {
     recordingRef.current = null;
     const imagesToUpload = [...pendingImagesRef.current];
     pendingImagesRef.current = [];
+    const projectContext = projectContextRef.current;
+    projectContextRef.current = null;
 
     setState("saving");
 
@@ -165,6 +169,7 @@ export function useRecorder(onRecordingComplete?: () => void) {
           createdAt: Date.now(),
           status: "recorded",
           retryCount: 0,
+          ...(projectContext ? { projectContext } : {}),
         })
       );
 
@@ -196,6 +201,7 @@ export function useRecorder(onRecordingComplete?: () => void) {
     }
 
     pendingImagesRef.current = [];
+    projectContextRef.current = null;
 
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);

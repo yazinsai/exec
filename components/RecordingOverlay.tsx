@@ -18,9 +18,11 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import { Waveform } from "./Waveform";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 import { useColors } from "@/hooks/useThemeColors";
+import { getProjectLabel } from "@/lib/actionTimeline";
 import type { PendingImage } from "@/hooks/useShareIntent";
 
 interface RecordingOverlayProps {
@@ -34,6 +36,7 @@ interface RecordingOverlayProps {
   onStop: () => void;
   onDelete: () => void;
   pendingImages?: PendingImage[];
+  projectContext?: string | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -54,6 +57,7 @@ export function RecordingOverlay({
   onStop,
   onDelete,
   pendingImages,
+  projectContext,
 }: RecordingOverlayProps) {
   const colors = useColors();
   const recordingDotOpacity = useSharedValue(1);
@@ -110,6 +114,14 @@ export function RecordingOverlay({
       style={[styles.overlay, { backgroundColor: colors.background }]}
     >
       <View style={styles.topSection}>
+        {projectContext && (
+          <View style={[styles.projectContextPill, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
+            <Ionicons name="folder-open-outline" size={14} color={colors.primary} />
+            <Text style={[styles.projectContextText, { color: colors.primary }]} numberOfLines={1}>
+              {getProjectLabel(projectContext)}
+            </Text>
+          </View>
+        )}
         {hasImages ? (
           <View style={styles.imageContextContainer}>
             <View style={styles.thumbnailRow}>
@@ -139,7 +151,7 @@ export function RecordingOverlay({
         ) : (
           <View style={styles.speechIndicator}>
             <Text style={[styles.speechText, { color: colors.primary }]}>
-              {isPaused ? "Paused" : "Audio"}
+              {isPaused ? "Paused" : projectContext ? getProjectLabel(projectContext) : "Audio"}
             </Text>
           </View>
         )}
@@ -222,6 +234,22 @@ const styles = StyleSheet.create({
   topSection: {
     alignItems: "center",
     paddingHorizontal: spacing.xl,
+  },
+  projectContextPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  projectContextText: {
+    fontSize: typography.sm,
+    fontFamily: fontFamily.semibold,
+    fontWeight: typography.semibold,
+    maxWidth: 200,
   },
   speechIndicator: {
     paddingHorizontal: spacing.lg,

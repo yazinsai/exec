@@ -38,6 +38,9 @@ ROUTING RULES:
 AVAILABLE PROJECTS (folder name — description):
 {{PROJECT_LIST}}
 
+ACTIVE PROJECT CONTEXT (from the app):
+{{PROJECT_CONTEXT}}
+
 SEQUENCING:
 When actions have logical dependencies (e.g., "research X then build Y"), use sequenceIndex to define order:
 - Actions with lower sequenceIndex run first

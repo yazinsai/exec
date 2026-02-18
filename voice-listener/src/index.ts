@@ -13,6 +13,7 @@ interface Recording {
   processingStatus?: string;
   processingStartedAt?: number;
   images?: RecordingImage[];
+  projectContext?: string;
 }
 
 const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
@@ -205,7 +206,7 @@ async function saveActions(recordingId: string, actions: ExtractedAction[]): Pro
 }
 
 async function processRecording(recording: Recording): Promise<void> {
-  const { id: recordingId, transcription, images } = recording;
+  const { id: recordingId, transcription, images, projectContext } = recording;
 
   if (!transcription) {
     console.log(`Recording ${recordingId} has no transcription, skipping`);
@@ -215,6 +216,9 @@ async function processRecording(recording: Recording): Promise<void> {
   console.log(`\n${"=".repeat(60)}`);
   console.log(`Processing recording ${recordingId}`);
   console.log(`Transcription: "${transcription.slice(0, 200)}${transcription.length > 200 ? "..." : ""}"`);
+  if (projectContext) {
+    console.log(`Project context: ${projectContext}`);
+  }
 
   // Get image URLs if available
   const imageUrls = (images ?? [])
@@ -236,7 +240,7 @@ async function processRecording(recording: Recording): Promise<void> {
   }
 
   // Process with Claude
-  const result = await processTranscription(transcription, imageUrls);
+  const result = await processTranscription(transcription, imageUrls, projectContext);
 
   if (!result.success) {
     console.error(`Failed to process recording ${recordingId}:`, result.error);
