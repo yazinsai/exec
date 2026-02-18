@@ -1,6 +1,7 @@
 import { spawn } from "bun";
 import { join, resolve, isAbsolute } from "path";
 import { mkdir, appendFile } from "fs/promises";
+import { existsSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { db, id, lookup } from "./db";
 import { initPromptVersioning, getCurrentVersionId } from "./prompt-versioning";
 import { classifyError } from "./error-categories";
@@ -9,6 +10,8 @@ import { notifyActionCompleted, notifyActionFailed, notifyActionAwaitingFeedback
 import { allocateProjectDirectory } from "./project-generation";
 import { selectRelevantRules, formatRulesForPrompt } from "./rule-selector";
 import { analyzeScope } from "./scope-analyzer";
+
+const IMAGE_TEMP_DIR = join(import.meta.dir, "..", ".temp-exec-images");
 
 interface DependsOnAction {
   id: string;
@@ -34,11 +37,63 @@ interface Action {
   sequenceIndex?: number; // Position in sequence (1-based)
   retryCount?: number; // Auto-retry count for recoverable failures
   dependsOn?: DependsOnAction[]; // Action this depends on (from link)
+  recording?: Array<{ id: string; images?: Array<{ id: string; url?: string }> }>; // Linked recording with images
   // UserTask fields
   task?: string;
   why_user?: string;
   prep_allowed?: string;
   remind_at?: string;
+}
+
+async function downloadActionImages(action: Action): Promise<string[]> {
+  const recording = action.recording?.[0]; // has-one link comes as single-element array
+  const images = recording?.images;
+  if (!images || images.length === 0) return [];
+
+  const imageUrls = images.filter((img) => img.url).map((img) => img.url as string);
+  if (imageUrls.length === 0) return [];
+
+  if (!existsSync(IMAGE_TEMP_DIR)) {
+    mkdirSync(IMAGE_TEMP_DIR, { recursive: true });
+  }
+
+  const localPaths: string[] = [];
+  for (let i = 0; i < imageUrls.length; i++) {
+    const url = imageUrls[i];
+    const ext = url.includes(".png") ? ".png" : url.includes(".jpg") || url.includes(".jpeg") ? ".jpg" : ".png";
+    const filename = `${action.id}-${i}${ext}`;
+    const localPath = join(IMAGE_TEMP_DIR, filename);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to download image ${url}: ${response.status}`);
+        continue;
+      }
+      const buffer = await response.arrayBuffer();
+      writeFileSync(localPath, Buffer.from(buffer));
+      localPaths.push(localPath);
+    } catch (error) {
+      console.error(`Error downloading image ${url}:`, error);
+    }
+  }
+
+  if (localPaths.length > 0) {
+    console.log(`Downloaded ${localPaths.length} image(s) for action ${action.id}`);
+  }
+  return localPaths;
+}
+
+function cleanupActionImages(localPaths: string[]): void {
+  for (const path of localPaths) {
+    try {
+      if (existsSync(path)) {
+        rmSync(path);
+      }
+    } catch (error) {
+      console.error(`Failed to cleanup image ${path}:`, error);
+    }
+  }
 }
 
 async function emitLifecycleEvent(actionId: string, projectPath: string | undefined, icon: string, label: string) {
@@ -622,8 +677,11 @@ ${"=".repeat(60)}
     }
   }
 
+  // Download any images attached to the recording
+  const imagePaths = await downloadActionImages(action);
+
   // Build the prompt after project directory resolution so instructions include concrete path.
-  const prompt = await buildExecutionPrompt(action);
+  const prompt = await buildExecutionPrompt(action, imagePaths);
 
   if (logFile) {
     await appendFile(logFile, `=== PROMPT ===\n${prompt}\n\n=== OUTPUT ===\n`);
@@ -828,12 +886,15 @@ Please address this feedback and continue iterating on the task.`;
 
     // Send push notification for failed action
     await notifyActionFailed(action.id, action.title, errMsg);
+  } finally {
+    // Clean up downloaded images
+    cleanupActionImages(imagePaths);
   }
 
   return logFile;
 }
 
-async function buildExecutionPrompt(action: Action): Promise<string> {
+async function buildExecutionPrompt(action: Action, imagePaths: string[] = []): Promise<string> {
   // Calculate relative path to ~/ai/CLAUDE.md from projectDir
   const aiClaudePath = action.projectPath
     ? "../../CLAUDE.md"
@@ -991,6 +1052,17 @@ ${dep.result}
   );
   const errorRecoveryGuidance = loadPrompt("error-recovery", {});
 
+  // Build image context if images were attached to the original voice note
+  let imageContext = "";
+  if (imagePaths.length > 0) {
+    imageContext = `ATTACHED IMAGES:
+The user shared the following image(s) with their voice note. Use the Read tool to view each image for visual context:
+${imagePaths.join("\n")}
+
+These images provide important context for this action. Read them before starting work.
+`;
+  }
+
   return loadPrompt("execution", {
     ACTION_ID: action.id,
     ACTION_TYPE: action.type,
@@ -998,6 +1070,7 @@ ${dep.result}
     ACTION_TITLE: action.title,
     ACTION_DESCRIPTION: descriptionBlock,
     DEPENDENCY_CONTEXT: dependencyContext,
+    IMAGE_CONTEXT: imageContext,
     CONVERSATION_THREAD: conversationThread,
     WORKING_DIR_INSTRUCTION: workingDirInstruction,
     WORKSPACE_CLAUDE_PATH: aiClaudePath,
@@ -1026,6 +1099,7 @@ async function pollForActions(): Promise<number> {
           where: whereClause,
         },
         dependsOn: {}, // Include the dependency relationship
+        recording: { images: {} }, // Include recording's images for execution context
       },
     });
 
