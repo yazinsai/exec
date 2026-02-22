@@ -1,16 +1,12 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { View, Text, SectionList, StyleSheet, Pressable, Alert, TextInput, ScrollView, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { View, Text, SectionList, StyleSheet, Pressable, Alert, TextInput, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ActionItem, type Action } from "./ActionItem";
 import { DotPattern } from "./DotPattern";
-import { spacing, typography, radii, fontFamily, actionTypeColorsDark, actionTypeColorsLight } from "@/constants/Colors";
+import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useActionsScreenState } from "@/hooks/useActionsScreenState";
 import { db } from "@/lib/db";
-
-// Action types
-const ACTION_TYPES = ["CodeChange", "Project", "Research", "Write", "UserTask"] as const;
-type ActionTypeFilter = typeof ACTION_TYPES[number] | "all";
 
 interface ActionsScreenProps {
   actions: Action[];
@@ -236,78 +232,10 @@ function TabBar({ value, onChange, counts }: TabBarProps) {
   );
 }
 
-// Type filter chips
-interface TypeFilterProps {
-  selectedType: ActionTypeFilter;
-  onTypeChange: (type: ActionTypeFilter) => void;
-  typeCounts: Record<ActionTypeFilter, number>;
-}
-
-function TypeFilter({ selectedType, onTypeChange, typeCounts }: TypeFilterProps) {
-  const { colors, isDark } = useThemeColors();
-  const typeColors = isDark ? actionTypeColorsDark : actionTypeColorsLight;
-
-  const typeChips: { key: ActionTypeFilter; label: string; color: string; bg: string }[] = [
-    { key: "all", label: "All", color: colors.textSecondary, bg: colors.textMuted + "20" },
-    ...ACTION_TYPES.map((type) => ({
-      key: type,
-      label: typeColors[type]?.label || type,
-      color: typeColors[type]?.color || colors.textSecondary,
-      bg: typeColors[type]?.bg || colors.textMuted + "20",
-    })),
-  ];
-
-  return (
-    <View style={styles.filterContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterChipsRow}
-      >
-        {typeChips.map((chip) => {
-          const isSelected = selectedType === chip.key;
-          const count = typeCounts[chip.key];
-          return (
-            <Pressable
-              key={chip.key}
-              style={[
-                styles.filterChip,
-                { backgroundColor: isSelected ? chip.bg : colors.backgroundElevated },
-                !isDark && !isSelected && styles.filterChipLightBorder,
-                !isDark && !isSelected && { borderColor: colors.border },
-              ]}
-              onPress={() => onTypeChange(chip.key)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: isSelected ? chip.color : colors.textTertiary },
-                  isSelected && styles.filterChipTextSelected,
-                ]}
-              >
-                {chip.label}
-              </Text>
-              {count > 0 && (
-                <View style={[styles.filterChipBadge, { backgroundColor: isSelected ? chip.color + "30" : colors.textMuted + "20" }]}>
-                  <Text style={[styles.filterChipBadgeText, { color: isSelected ? chip.color : colors.textTertiary }]}>
-                    {count > 99 ? "99+" : count}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
 export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
   const { colors, isDark } = useThemeColors();
   const { tabMode, setTabMode, scrollPosition, setScrollPosition, isLoaded } = useActionsScreenState();
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<ActionTypeFilter>("all");
-
   // Ref for SectionList to restore scroll position
   const sectionListRef = useRef<SectionList<Action>>(null);
   const hasRestoredScroll = useRef(false);
@@ -329,27 +257,7 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
     }
   }, [tabCounts, tabMode, isLoaded, setTabMode]);
 
-  // Calculate type counts (for current tab)
-  const typeCounts = useMemo(() => {
-    const tabFiltered = actions.filter((a) => categorizeAction(a) === tabMode);
-    const counts: Record<ActionTypeFilter, number> = {
-      all: tabFiltered.length,
-      CodeChange: 0,
-      Project: 0,
-      Research: 0,
-      Write: 0,
-      UserTask: 0,
-    };
-    tabFiltered.forEach((action) => {
-      const type = action.type as ActionTypeFilter;
-      if (type in counts) {
-        counts[type]++;
-      }
-    });
-    return counts;
-  }, [actions, tabMode]);
-
-  // Filter actions by search query and type
+  // Filter actions by search query
   const filteredActions = useMemo(() => {
     let result = actions;
 
@@ -366,13 +274,8 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
       });
     }
 
-    // Apply type filter
-    if (typeFilter !== "all") {
-      result = result.filter((action) => action.type === typeFilter);
-    }
-
     return result;
-  }, [actions, searchQuery, typeFilter]);
+  }, [actions, searchQuery]);
 
   const sections = useMemo(() => {
     return groupActionsForTab(filteredActions, tabMode);
@@ -465,13 +368,6 @@ export function ActionsScreen({ actions, onActionPress }: ActionsScreenProps) {
 
       {/* Tab Bar */}
       <TabBar value={tabMode} onChange={handleTabChange} counts={tabCounts} />
-
-      {/* Type Filter */}
-      <TypeFilter
-        selectedType={typeFilter}
-        onTypeChange={setTypeFilter}
-        typeCounts={typeCounts}
-      />
 
       {searchQuery.trim() && filteredActions.length === 0 ? (
         <View style={styles.noResults}>
@@ -799,43 +695,5 @@ const styles = StyleSheet.create({
   emptyTabSubtitle: {
     fontSize: typography.sm,
     textAlign: "center",
-  },
-  // Type filter styles
-  filterContainer: {
-    paddingBottom: spacing.sm,
-  },
-  filterChipsRow: {
-    flexDirection: "row",
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-  },
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    gap: spacing.xs,
-  },
-  filterChipLightBorder: {
-    borderWidth: 1,
-  },
-  filterChipText: {
-    fontSize: typography.xs,
-    fontWeight: typography.medium,
-  },
-  filterChipTextSelected: {
-    fontWeight: typography.semibold,
-  },
-  filterChipBadge: {
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
-    borderRadius: radii.full,
-    minWidth: 18,
-    alignItems: "center",
-  },
-  filterChipBadgeText: {
-    fontSize: 10,
-    fontWeight: typography.semibold,
   },
 });
