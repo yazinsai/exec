@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
 import "../global.css";
+import { useEffect } from "react";
 import { useFonts } from "expo-font";
 import {
   SpaceGrotesk_300Light,
@@ -9,9 +10,13 @@ import {
   SpaceGrotesk_700Bold,
 } from "@expo-google-fonts/space-grotesk";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 import { ShareIntentProvider } from "expo-share-intent";
+
+// Keep splash visible while fonts load
+SplashScreen.preventAutoHideAsync();
 
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
 import { ShareIntentHandler } from "@/hooks/useShareIntent";
@@ -50,6 +55,12 @@ export default function RootLayout() {
     SpaceGrotesk_SemiBold: SpaceGrotesk_600SemiBold,
     SpaceGrotesk_Bold: SpaceGrotesk_700Bold,
   });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
 
   if (!loaded) {
     return null;
