@@ -1,4 +1,5 @@
-import { i } from "@instantdb/admin";
+// Use core so schema works in both React Native app and Bun agent process
+import { i } from "@instantdb/core";
 
 const _schema = i.schema({
   entities: {
