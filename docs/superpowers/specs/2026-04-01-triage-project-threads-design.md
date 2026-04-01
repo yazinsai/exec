@@ -64,13 +64,14 @@ projects
   createdAt   number        # indexed
 ```
 
-**Modified entity: `tasks`** — add project link, add sequenceIndex, remove sessionId
+**Modified entity: `tasks`** — add project link, add sequenceIndex, keep sessionId for standalone tasks
 ```
 tasks
   input       string        # The self-contained action (rewritten by triage)
   rawInput    string?       # Original slice from transcription (for provenance/audit)
   status      string        # pending | running | done | failed | cancelled
   result      string?
+  sessionId   string?       # For standalone tasks (no project). Project tasks use project.sessionId
   sequenceIndex  number?    # Order within same input, for dependent tasks
   liveOutput  string?
   cancelRequested  boolean?
@@ -122,9 +123,9 @@ ${projectIndex}`,
 - The project index (names + one-line descriptions only, not full details — scales to hundreds of projects)
 - Recently active projects (last 5 with tasks in the past 7 days, plus their latest task summary)
 
-This gives the LLM context to match "add a pricing section" to the landing page project even when the user doesn't name it explicitly. If genuinely ambiguous, triage routes to the most recently active project as a best guess — the agent can always ask for clarification during execution.
+This gives the LLM context to match "add a pricing section" to the landing page project even when the user doesn't name it explicitly. If genuinely ambiguous, triage creates the task as standalone (no project) — the agent can ask the user for clarification during execution and link it to a project afterward. This is safer than guessing wrong and sending destructive work to the wrong repo.
 
-**New project creation**: When triage identifies a request for a new project (e.g. "build me a habit tracker"), it sets `newProject: true`. The agent process creates the `projects` record with the suggested name and `path: null`. During execution, the agent creates the actual directory and updates the path. The project is also added to `INDEX.md`.
+**New project creation**: When triage identifies a request for a new project (e.g. "build me a habit tracker"), it sets `newProject: true`. The triage step immediately creates the `projects` record (with `path: null`) so tasks from the same input can link to it. Name is slugified and checked for uniqueness — collisions get a numeric suffix (e.g. `landing-page-2`). During execution, the agent creates the actual directory and updates the path. The project is also added to `INDEX.md`.
 
 ### Project Session Continuity
 
@@ -147,8 +148,9 @@ When the agent executes a task:
 
 Tasks not tied to a project (research, writing, general questions) have no project link. They:
 - Start fresh sessions every time (no resume)
+- Store their own `sessionId` on the task (not on a project)
 - Have their own task-scoped message thread
-- Are functionally identical to how the current system works
+- **Follow-ups on standalone tasks** inject the parent task's result and messages into the new session's prompt, since there's no project session to resume
 
 This avoids the "general" project problem entirely — there's no shared bucket. Standalone tasks are just tasks without a project.
 
