@@ -19,6 +19,7 @@ SplashScreen.preventAutoHideAsync();
 
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
 import { PushNotificationsProvider } from "@/hooks/usePushNotifications";
+import { CrashReporter } from "@/components/CrashReporter";
 
 function AppContent() {
   const { colors, isDark } = useThemeColors();
@@ -61,10 +62,12 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <PushNotificationsProvider>
-        <AppContent />
-      </PushNotificationsProvider>
-    </ThemeProvider>
+    <CrashReporter>
+      <ThemeProvider>
+        <PushNotificationsProvider>
+          <AppContent />
+        </PushNotificationsProvider>
+      </ThemeProvider>
+    </CrashReporter>
   );
 }
