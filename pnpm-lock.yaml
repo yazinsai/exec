@@ -17,6 +17,9 @@ importers:
       '@instantdb/admin':
         specifier: latest
         version: 0.22.110
+      '@instantdb/core':
+        specifier: ^0.22.180
+        version: 0.22.180
       '@instantdb/react-native':
         specifier: latest
         version: 0.22.110(@react-native-async-storage/async-storage@2.2.0(react-native@0.81.4(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)))(@react-native-community/netinfo@11.4.1(react-native@0.81.4(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)))(react-native-get-random-values@1.11.0(react-native@0.81.4(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -1013,6 +1016,9 @@ packages:
   '@instantdb/core@0.22.110':
     resolution: {integrity: sha512-WDc6GtTDpUltoRR69EIiEbMqcEBN3pyLFxw82UTWXabA/QUphcrkQqWYRlO6As4A05M2mMI2yXt+5EteB9cC6g==}
 
+  '@instantdb/core@0.22.180':
+    resolution: {integrity: sha512-zjI3A/ycalg4ss1BkoHnKVG+v1ILdpKrwO/zEbe6CLIO2QQJlXr10yyEohBtZllnNSDMcJ8MTkqi4E7T5d79tw==}
+
   '@instantdb/react-common@0.22.110':
     resolution: {integrity: sha512-XBsDAIXIY9dlkco9a9nv6P3zgPTjQHQ1abzTgdhkZAXY1bA2TSsa/WHC3U2IBT/COe+vtmyu/dHIslUntzZwcw==}
     peerDependencies:
@@ -1029,6 +1035,9 @@ packages:
 
   '@instantdb/version@0.22.110':
     resolution: {integrity: sha512-KJAdJeCuIjL0dvahrtudeLZ/dBkLVbo9Zwd7my6YmgdQmK+BfbOlgwFfKC9bS8lzvDXCNVJnqo/NtnThEQ7jVQ==}
+
+  '@instantdb/version@0.22.180':
+    resolution: {integrity: sha512-5RVoCddwxEUW3BzQBQJbirRaj+j+TyloKtlYl5kad8IIEb2vQDGb7evpLHxkRGeSrjDOwMFg/EA4Y3EEVZJ6rA==}
 
   '@isaacs/balanced-match@4.0.1':
     resolution: {integrity: sha512-yzMTt9lEb8Gv7zRioUilSglI0c0smZ9k5D65677DLWLtWJaXIS3CqcGyUFByYKlnUj6TkjLVs54fBl6+TiGQDQ==}
@@ -5926,6 +5935,12 @@ snapshots:
       mutative: 1.3.0
       uuid: 11.1.0
 
+  '@instantdb/core@0.22.180':
+    dependencies:
+      '@instantdb/version': 0.22.180
+      mutative: 1.3.0
+      uuid: 11.1.0
+
   '@instantdb/react-common@0.22.110(react@19.1.0)':
     dependencies:
       '@instantdb/core': 0.22.110
@@ -5944,6 +5959,8 @@ snapshots:
       react-native-get-random-values: 1.11.0(react-native@0.81.4(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))
 
   '@instantdb/version@0.22.110': {}
+
+  '@instantdb/version@0.22.180': {}
 
   '@isaacs/balanced-match@4.0.1': {}
 
