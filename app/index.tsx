@@ -879,16 +879,43 @@ export default function HomeScreen() {
                               : colors.borderLight,
                           }}
                         >
-                          <Text
-                            style={{
-                              color: colors.textPrimary,
-                              fontSize: typography.base,
-                              fontFamily: fontFamily.regular,
-                              lineHeight: 20,
-                            }}
-                          >
-                            {msg.content}
-                          </Text>
+                          {isUser ? (
+                            <Text
+                              style={{
+                                color: colors.textPrimary,
+                                fontSize: typography.base,
+                                fontFamily: fontFamily.regular,
+                                lineHeight: 20,
+                              }}
+                            >
+                              {msg.content}
+                            </Text>
+                          ) : (
+                            <Markdown
+                              style={{
+                                body: {
+                                  color: colors.textPrimary,
+                                  fontSize: typography.base,
+                                  fontFamily: fontFamily.regular,
+                                  lineHeight: 20,
+                                },
+                                strong: { fontFamily: fontFamily.bold },
+                                code_inline: {
+                                  backgroundColor: colors.backgroundElevated,
+                                  color: colors.primary,
+                                  fontFamily: "SpaceMono",
+                                  fontSize: typography.sm,
+                                  paddingHorizontal: 4,
+                                  borderRadius: 4,
+                                },
+                                table: { borderColor: colors.borderLight },
+                                th: { borderColor: colors.borderLight, padding: 6 },
+                                td: { borderColor: colors.borderLight, padding: 6 },
+                              }}
+                            >
+                              {msg.content}
+                            </Markdown>
+                          )}
                         </View>
                         <Text
                           style={{
