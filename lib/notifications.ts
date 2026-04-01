@@ -4,14 +4,16 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 // Configure how notifications are handled when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 /**
  * Request push notification permissions and get the Expo push token.
@@ -108,6 +110,7 @@ export function addNotificationResponseReceivedListener(
  * Get the notification data payload if the app was opened from a notification.
  */
 export async function getLastNotificationResponse(): Promise<Notifications.NotificationResponse | null> {
+  if (Platform.OS === "web") return null;
   return Notifications.getLastNotificationResponseAsync();
 }
 
