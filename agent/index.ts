@@ -19,8 +19,8 @@ import { resolve } from "path";
 
 // --- Config ---
 
-const APP_ID = process.env.INSTANT_APP_ID || "7e356cba-464a-4cee-a177-0e731e0853b9";
-const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN || "1e86bcda-bcd6-4dde-ab34-cda3abd6af4e";
+const APP_ID = process.env.INSTANT_APP_ID!;
+const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
 const PID_FILE = "/tmp/exec-agent.pid";
 const LESSONS_PATH = resolve(homedir(), "ai/lessons.md");
 const SYSTEM_PROMPT_PATH = resolve(import.meta.dir, "system-prompt.md");

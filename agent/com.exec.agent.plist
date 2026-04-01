@@ -6,18 +6,14 @@
     <string>com.exec.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/rock/.bun/bin/bun</string>
-        <string>run</string>
-        <string>/Users/rock/ai/projects/exec/agent/index.ts</string>
+        <string>/bin/zsh</string>
+        <string>-c</string>
+        <string>source /Users/rock/ai/projects/exec/agent/.env.sh &amp;&amp; /Users/rock/.bun/bin/bun run /Users/rock/ai/projects/exec/agent/index.ts</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/rock/ai/projects/exec/agent</string>
     <key>EnvironmentVariables</key>
     <dict>
-        <key>INSTANT_APP_ID</key>
-        <string>7e356cba-464a-4cee-a177-0e731e0853b9</string>
-        <key>INSTANT_ADMIN_TOKEN</key>
-        <string>1e86bcda-bcd6-4dde-ab34-cda3abd6af4e</string>
         <key>PATH</key>
         <string>/Users/rock/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>

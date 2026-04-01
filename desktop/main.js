@@ -29,10 +29,8 @@ if (!process.env.GROQ_API_KEY) {
 const { init, id: instantId } = require("@instantdb/admin");
 
 // --- InstantDB setup ---
-const INSTANT_APP_ID =
-  process.env.INSTANT_APP_ID || "7e356cba-464a-4cee-a177-0e731e0853b9";
-const INSTANT_ADMIN_TOKEN =
-  process.env.INSTANT_ADMIN_TOKEN || "1e86bcda-bcd6-4dde-ab34-cda3abd6af4e";
+const INSTANT_APP_ID = process.env.INSTANT_APP_ID;
+const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
 const GROQ_API_KEY =
   process.env.GROQ_API_KEY || process.env.EXPO_PUBLIC_GROQ_API_KEY;
 

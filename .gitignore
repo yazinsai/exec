@@ -39,6 +39,8 @@ yarn-error.*
 app-example
 
 .env
+.env.sh
+desktop/.env
 .beads/
 
 
