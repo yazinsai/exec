@@ -109,7 +109,7 @@ export default function HomeScreen() {
   const { data, isLoading } = db.useQuery({
     tasks: {
       $: { order: { createdAt: "desc" }, limit: 50 },
-      messages: { $: { order: { createdAt: "asc" } } },
+      messages: {},
     },
   });
 
@@ -701,7 +701,7 @@ export default function HomeScreen() {
 
                 {/* Scrollable content */}
                 <FlatList
-                  data={selectedTask.messages ?? []}
+                  data={[...(selectedTask.messages ?? [])].sort((a, b) => a.createdAt - b.createdAt)}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={{
                     padding: spacing.xl,
