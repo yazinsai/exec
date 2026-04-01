@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -18,12 +17,9 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Ionicons } from "@expo/vector-icons";
 import { Waveform } from "./Waveform";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 import { useColors } from "@/hooks/useThemeColors";
-import { getProjectLabel } from "@/lib/actionTimeline";
-import type { PendingImage } from "@/hooks/useShareIntent";
 
 interface RecordingOverlayProps {
   isVisible: boolean;
@@ -35,15 +31,12 @@ interface RecordingOverlayProps {
   onPauseResume: () => void;
   onStop: () => void;
   onDelete: () => void;
-  pendingImages?: PendingImage[];
-  projectContext?: string | null;
 }
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  const tenths = 0;
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${tenths}`;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.0`;
 }
 
 export function RecordingOverlay({
@@ -56,14 +49,10 @@ export function RecordingOverlay({
   onPauseResume,
   onStop,
   onDelete,
-  pendingImages,
-  projectContext,
 }: RecordingOverlayProps) {
   const colors = useColors();
   const recordingDotOpacity = useSharedValue(1);
   const buttonScale = useSharedValue(1);
-
-  const hasImages = pendingImages && pendingImages.length > 0;
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -114,47 +103,11 @@ export function RecordingOverlay({
       style={[styles.overlay, { backgroundColor: colors.background }]}
     >
       <View style={styles.topSection}>
-        {projectContext && (
-          <View style={[styles.projectContextPill, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
-            <Ionicons name="folder-open-outline" size={14} color={colors.primary} />
-            <Text style={[styles.projectContextText, { color: colors.primary }]} numberOfLines={1}>
-              {getProjectLabel(projectContext)}
-            </Text>
-          </View>
-        )}
-        {hasImages ? (
-          <View style={styles.imageContextContainer}>
-            <View style={styles.thumbnailRow}>
-              {pendingImages.slice(0, 3).map((img, idx) => (
-                <Image
-                  key={img.id}
-                  source={{ uri: img.localPath }}
-                  style={[
-                    styles.thumbnail,
-                    { borderColor: colors.primary },
-                    idx > 0 && { marginLeft: -12 },
-                  ]}
-                />
-              ))}
-              {pendingImages.length > 3 && (
-                <View style={[styles.thumbnailMore, { backgroundColor: colors.backgroundElevated, borderColor: colors.primary }]}>
-                  <Text style={[styles.thumbnailMoreText, { color: colors.textSecondary }]}>
-                    +{pendingImages.length - 3}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.contextText, { color: colors.textSecondary }]}>
-              Add voice context for your {pendingImages.length === 1 ? "screenshot" : "screenshots"}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.speechIndicator}>
-            <Text style={[styles.speechText, { color: colors.primary }]}>
-              {isPaused ? "Paused" : projectContext ? getProjectLabel(projectContext) : "Audio"}
-            </Text>
-          </View>
-        )}
+        <View style={styles.speechIndicator}>
+          <Text style={[styles.speechText, { color: colors.primary }]}>
+            {isPaused ? "Paused" : "Audio"}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.waveformSection}>
@@ -235,22 +188,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.xl,
   },
-  projectContextPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
-  },
-  projectContextText: {
-    fontSize: typography.sm,
-    fontFamily: fontFamily.semibold,
-    fontWeight: typography.semibold,
-    maxWidth: 200,
-  },
   speechIndicator: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -262,38 +199,6 @@ const styles = StyleSheet.create({
     letterSpacing: typography.tracking.wider,
     textTransform: "uppercase",
   },
-  imageContextContainer: {
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  thumbnailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  thumbnail: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.md,
-    borderWidth: 2,
-  },
-  thumbnailMore: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    marginLeft: -12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  thumbnailMoreText: {
-    fontSize: typography.sm,
-    fontWeight: typography.semibold,
-  },
-  contextText: {
-    fontSize: typography.base,
-    fontWeight: typography.medium,
-    textAlign: "center",
-  },
   waveformSection: {
     flex: 1,
     justifyContent: "center",
@@ -303,43 +208,6 @@ const styles = StyleSheet.create({
   bottomSection: {
     alignItems: "center",
     gap: spacing.lg,
-  },
-  audioBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  audioBadgeIcon: {
-    width: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  soundBars: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  soundBar: {
-    width: 2,
-    borderRadius: 1,
-  },
-  soundBar1: {
-    height: 6,
-  },
-  soundBar2: {
-    height: 10,
-  },
-  soundBar3: {
-    height: 6,
-  },
-  audioBadgeText: {
-    fontSize: typography.sm,
-    fontWeight: typography.medium,
   },
   durationContainer: {
     flexDirection: "row",

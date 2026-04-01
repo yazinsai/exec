@@ -4,87 +4,50 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mic-app is a voice-to-action React Native/Expo app. Users record voice notes describing bugs, features, or ideas on their phone. These are transcribed, synced to InstantDB, and automatically implemented by Claude Code via background workers on a Mac.
+Exec is a voice-to-action system. Users record voice commands on their phone or Mac desktop (via global hotkey), which are transcribed and executed by a persistent Claude agent with full Mac access. No action types, no extraction pipeline — the agent receives natural language and decides what to do.
 
 ## Development Commands
 
 ```bash
-# Package manager: pnpm
+# Package manager: pnpm (mobile app), bun (agent + desktop)
 
-# Start Expo dev server
-pnpm start
+# Mobile app
+pnpm start              # Expo dev server
+pnpm ios / android      # Run on platform
+pnpm update:preview     # OTA update
 
-# Run on specific platform
-pnpm ios
-pnpm android
-pnpm web
+# Agent process
+cd agent && bun run start
 
-# Lint
-pnpm lint
+# Desktop hotkey app
+cd desktop && npm start
 
-# Push OTA update (after making app changes)
-pnpm update:preview       # Preview channel
-pnpm update:production    # Production channel
-
-# Push InstantDB schema/permissions
+# InstantDB schema/permissions
 npx instant-cli push schema --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
 npx instant-cli push perms --app $INSTANT_APP_ID --token $INSTANT_ADMIN_TOKEN --yes
-```
-
-⚠️ **CRITICAL**: The instant-cli commands above are for the MAIN mic-app only. Do NOT run these from other projects or with different schemas - this will destroy production data.
-
-For new projects in `~/ai/projects/`:
-- Create a NEW InstantDB app: `npx instant-cli init-without-files --title "project-name"`
-- Never reuse the mic-app's INSTANT_APP_ID (`7e356cba-464a-4cee-a177-0e731e0853b9`)
-
-### Voice Listener Workers (Mac)
-
-```bash
-cd voice-listener
-bun install
-
-# Start both workers (recommended)
-./start.sh
-
-# Or run individually
-bun run extract    # Extraction worker
-bun run execute    # Execution worker
-
-# CLI options: --dry-run, --once, --limit N
 ```
 
 ## Architecture
 
 ```
-/app                    # Expo Router pages (file-based routing)
-/components             # React Native UI components
-/hooks                  # Custom hooks (useRecorder, useQueue, useThemeColors)
-/lib                    # Core business logic
-  ├── db.ts             # InstantDB client init
-  ├── audio.ts          # Audio file operations
-  ├── queue.ts          # Processing queue
-  ├── storage.ts        # File storage utilities
-  └── transcription.ts  # Groq transcription API
-
-/voice-listener         # Bun-based backend workers
-  └── src/
-      ├── index.ts           # Extraction worker (transcription → actions)
-      ├── action-executor.ts # Execution worker (actions → Claude Code)
-      └── log-watcher.ts     # Live progress updates
+/app                    # Expo Router pages (single screen)
+/components             # React Native UI components (minimal)
+/agent                  # Persistent Claude agent process (Bun + Agent SDK)
+/desktop                # Electron hotkey app (Cmd+Shift+Space)
+/lib                    # Shared utilities (db, audio, transcription)
 ```
 
 ### Data Flow
 
-1. Phone records audio → uploads to InstantDB Storage
-2. App transcribes via Groq → saves recording with transcription
-3. **Extraction worker** polls transcriptions → extracts actions (CodeChange/Project/Research/Write/UserTask)
-4. **Execution worker** picks up pending actions → spawns Claude Code to implement
-5. Results sync back to app in real-time via InstantDB
+1. Phone records audio → transcribes via Groq → creates task in InstantDB
+2. Desktop hotkey captures voice → transcribes via Groq → creates task in InstantDB
+3. Agent process polls for pending tasks → executes via Claude Agent SDK
+4. Results sync back to phone/desktop in real-time via InstantDB
 
 ### Key Entities (instant.schema.ts)
 
-- `recordings` - Audio files with transcription, status, processing metadata
-- `actions` - Extracted items with type, status, result, thread messages, deployUrl
+- `tasks` - Voice commands with status, result, live output, session ID
+- `messages` - Thread messages linked to tasks (user follow-ups + agent replies)
 
 ## Styling
 

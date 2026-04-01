@@ -1,0 +1,13 @@
+{
+  "name": "exec-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun run --watch index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@instantdb/admin": "latest"
+  }
+}

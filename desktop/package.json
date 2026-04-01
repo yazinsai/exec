@@ -1,0 +1,20 @@
+{
+  "name": "exec-desktop",
+  "version": "1.0.0",
+  "description": "Exec v2 desktop hotkey app — Cmd+Shift+Space to record voice tasks",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "dependencies": {
+    "@instantdb/admin": "^0.18.7",
+    "dotenv": "^16.4.7",
+    "form-data": "^4.0.1",
+    "node-fetch": "^2.7.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2"
+  }
+}

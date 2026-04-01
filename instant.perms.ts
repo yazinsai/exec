@@ -1,9 +1,7 @@
-// Docs: https://www.instantdb.com/docs/permissions
-
 import type { InstantRules } from "@instantdb/admin";
 
 const rules = {
-  episodes: {
+  tasks: {
     allow: {
       view: "true",
       create: "true",
@@ -11,39 +9,7 @@ const rules = {
       update: "true",
     },
   },
-  pushTokens: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  rules: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  recordings: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  events: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  vocabularyTerms: {
+  messages: {
     allow: {
       view: "true",
       create: "true",
@@ -56,30 +22,6 @@ const rules = {
       view: "true",
       create: "true",
       delete: "true",
-    },
-  },
-  workerHeartbeats: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  promptVersions: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
-    },
-  },
-  actions: {
-    allow: {
-      view: "true",
-      create: "true",
-      delete: "true",
-      update: "true",
     },
   },
 } satisfies InstantRules;

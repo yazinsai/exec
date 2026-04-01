@@ -13,18 +13,12 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
-import { ShareIntentProvider } from "expo-share-intent";
 
 // Keep splash visible while fonts load
 SplashScreen.preventAutoHideAsync();
 
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
-import { ShareIntentHandler } from "@/hooks/useShareIntent";
 import { PushNotificationsProvider } from "@/hooks/usePushNotifications";
-import { initBackgroundQueue } from "@/lib/backgroundQueue";
-
-// Initialize background queue processing (runs AppState listener for Android)
-initBackgroundQueue();
 
 function AppContent() {
   const { colors, isDark } = useThemeColors();
@@ -67,14 +61,10 @@ export default function RootLayout() {
   }
 
   return (
-    <ShareIntentProvider>
-      <ThemeProvider>
-        <PushNotificationsProvider>
-          <ShareIntentHandler>
-            <AppContent />
-          </ShareIntentHandler>
-        </PushNotificationsProvider>
-      </ThemeProvider>
-    </ShareIntentProvider>
+    <ThemeProvider>
+      <PushNotificationsProvider>
+        <AppContent />
+      </PushNotificationsProvider>
+    </ThemeProvider>
   );
 }

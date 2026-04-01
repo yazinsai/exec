@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      -webkit-app-region: no-drag;
+    }
+
+    .container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 360px;
+      height: 88px;
+      padding: 0 28px;
+      background: rgba(20, 20, 22, 0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 0.5px rgba(255, 255, 255, 0.05) inset;
+      opacity: 0;
+      transform: scale(0.96) translateY(4px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .container.visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    .indicator {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+
+    .indicator.recording {
+      background: #ef4444;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .indicator.transcribing {
+      background: #f59e0b;
+      animation: spin-dot 1s linear infinite;
+    }
+
+    .indicator.creating {
+      background: #3b82f6;
+      animation: spin-dot 1s linear infinite;
+    }
+
+    .indicator.done {
+      background: #22c55e;
+    }
+
+    .indicator.error {
+      background: #ef4444;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    @keyframes spin-dot {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+
+    .label {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="container">
+    <div class="indicator" id="indicator"></div>
+    <span class="label" id="label"></span>
+  </div>
+
+  <script>
+    const container = document.getElementById("container");
+    const indicator = document.getElementById("indicator");
+    const label = document.getElementById("label");
+
+    window.electronAPI.onStateChange(({ state, text }) => {
+      indicator.className = "indicator " + state;
+      label.textContent = text;
+
+      // Show with animation
+      requestAnimationFrame(() => {
+        container.classList.add("visible");
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.exec.desktop</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rock/ai/projects/exec/desktop/node_modules/.bin/electron</string>
+        <string>/Users/rock/ai/projects/exec/desktop</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/rock/ai/projects/exec/desktop</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/tmp/exec-desktop.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/exec-desktop.stderr.log</string>
+</dict>
+</plist>
