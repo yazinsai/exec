@@ -1,15 +1,12 @@
 import { Audio } from "expo-av";
 import {
   documentDirectory,
-  cacheDirectory,
   getInfoAsync,
   makeDirectoryAsync,
   moveAsync,
   copyAsync,
   deleteAsync,
-  downloadAsync,
 } from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
 
 export const RECORDINGS_DIR = `${documentDirectory}recordings/`;
 
@@ -95,38 +92,6 @@ export async function readFileAsBlob(filePath: string): Promise<Blob> {
   return response.blob();
 }
 
-export async function exportRecording(
-  localFilePath: string,
-  cloudUrl?: string
-): Promise<void> {
-  const canShare = await Sharing.isAvailableAsync();
-  if (!canShare) {
-    throw new Error("Sharing is not available on this device");
-  }
-
-  const localInfo = await getInfoAsync(localFilePath);
-
-  if (localInfo.exists) {
-    await Sharing.shareAsync(localFilePath, {
-      mimeType: "audio/x-m4a",
-      dialogTitle: "Export Recording",
-    });
-    return;
-  }
-
-  if (cloudUrl) {
-    const tempPath = `${cacheDirectory}temp_recording.m4a`;
-    await downloadAsync(cloudUrl, tempPath);
-    await Sharing.shareAsync(tempPath, {
-      mimeType: "audio/x-m4a",
-      dialogTitle: "Export Recording",
-    });
-    await deleteAsync(tempPath, { idempotent: true });
-    return;
-  }
-
-  throw new Error("Audio file not found locally or in cloud");
-}
 
 export async function requestAudioPermissions(): Promise<boolean> {
   const { status } = await Audio.requestPermissionsAsync();
