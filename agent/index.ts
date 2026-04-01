@@ -182,6 +182,70 @@ async function handleTask(taskId: string) {
   let sessionId: string | undefined = task.sessionId || undefined;
   let lastLiveOutputTime = 0;
 
+  // Activity tracking for live output
+  const MAX_ACTIVITY_ITEMS = 15;
+  const activityItems: Array<{
+    type: "tool" | "text" | "thinking";
+    name?: string;
+    detail?: string;
+    content?: string;
+    ts: number;
+  }> = [];
+
+  function addActivity(item: (typeof activityItems)[0]) {
+    activityItems.push(item);
+    if (activityItems.length > MAX_ACTIVITY_ITEMS) {
+      activityItems.splice(0, activityItems.length - MAX_ACTIVITY_ITEMS);
+    }
+  }
+
+  function formatToolDetail(name: string, input: Record<string, any>): string {
+    switch (name) {
+      case "Read":
+        return input.file_path ? truncPath(input.file_path) : "";
+      case "Write":
+        return input.file_path ? truncPath(input.file_path) : "";
+      case "Edit":
+        return input.file_path ? truncPath(input.file_path) : "";
+      case "Glob":
+        return input.pattern || "";
+      case "Grep":
+        return input.pattern ? `"${input.pattern}"` : "";
+      case "Bash":
+        return input.command ? truncStr(input.command, 80) : "";
+      case "Agent":
+        return input.description || input.prompt?.slice(0, 60) || "";
+      case "WebSearch":
+        return input.query || "";
+      case "WebFetch":
+        return input.url ? truncStr(input.url, 60) : "";
+      default:
+        return "";
+    }
+  }
+
+  function truncPath(p: string): string {
+    // Show last 3 segments
+    const parts = p.split("/");
+    return parts.length > 3 ? ".../" + parts.slice(-3).join("/") : p;
+  }
+
+  function truncStr(s: string, max: number): string {
+    return s.length > max ? s.slice(0, max) + "..." : s;
+  }
+
+  async function flushLiveOutput() {
+    const now = Date.now();
+    if (now - lastLiveOutputTime >= LIVE_OUTPUT_THROTTLE_MS && activityItems.length > 0) {
+      lastLiveOutputTime = now;
+      await db.transact(
+        db.tx.tasks[taskId].update({
+          liveOutput: JSON.stringify(activityItems),
+        })
+      );
+    }
+  }
+
   try {
     for await (const message of q) {
       if (abortController.signal.aborted) break;
@@ -190,19 +254,39 @@ async function handleTask(taskId: string) {
         const assistantMsg = message as SDKAssistantMessage;
         if (assistantMsg.session_id) sessionId = assistantMsg.session_id;
 
-        const textBlocks = assistantMsg.message.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text);
-
-        if (textBlocks.length > 0) {
-          const now = Date.now();
-          if (now - lastLiveOutputTime >= LIVE_OUTPUT_THROTTLE_MS) {
-            lastLiveOutputTime = now;
-            await db.transact(
-              db.tx.tasks[taskId].update({ liveOutput: textBlocks.join("\n") })
-            );
+        for (const block of assistantMsg.message.content as any[]) {
+          if (block.type === "tool_use") {
+            addActivity({
+              type: "tool",
+              name: block.name,
+              detail: formatToolDetail(block.name, block.input || {}),
+              ts: Date.now(),
+            });
+          } else if (block.type === "thinking" && block.thinking) {
+            // Capture first line of thinking as a summary
+            const firstLine = block.thinking.split("\n")[0].trim();
+            if (firstLine) {
+              addActivity({
+                type: "thinking",
+                content: truncStr(firstLine, 120),
+                ts: Date.now(),
+              });
+            }
+          } else if (block.type === "text" && block.text) {
+            // Capture latest text snippet
+            const lines = block.text.trim().split("\n");
+            const lastLine = lines[lines.length - 1].trim();
+            if (lastLine) {
+              addActivity({
+                type: "text",
+                content: truncStr(lastLine, 150),
+                ts: Date.now(),
+              });
+            }
           }
         }
+
+        await flushLiveOutput();
       }
 
       if (message.type === "result") {

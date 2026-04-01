@@ -50,6 +50,268 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#f59e0b",
 };
 
+// Tool icon mapping
+const TOOL_ICONS: Record<string, { icon: string; label: string }> = {
+  Read: { icon: "document-text-outline", label: "Reading" },
+  Write: { icon: "create-outline", label: "Writing" },
+  Edit: { icon: "pencil-outline", label: "Editing" },
+  Glob: { icon: "search-outline", label: "Finding files" },
+  Grep: { icon: "code-slash-outline", label: "Searching" },
+  Bash: { icon: "terminal-outline", label: "Running" },
+  Agent: { icon: "git-branch-outline", label: "Subagent" },
+  WebSearch: { icon: "globe-outline", label: "Searching web" },
+  WebFetch: { icon: "cloud-download-outline", label: "Fetching" },
+  Skill: { icon: "flash-outline", label: "Using skill" },
+};
+
+type ActivityItem = {
+  type: "tool" | "text" | "thinking";
+  name?: string;
+  detail?: string;
+  content?: string;
+  ts: number;
+};
+
+function LiveActivityFeed({
+  liveOutput,
+  colors,
+}: {
+  liveOutput: string;
+  colors: any;
+}) {
+  let items: ActivityItem[] = [];
+  try {
+    items = JSON.parse(liveOutput);
+  } catch {
+    // Fallback for plain text liveOutput (backward compat)
+    return (
+      <View
+        style={{
+          backgroundColor: colors.backgroundElevated,
+          borderRadius: radii.md,
+          padding: spacing.md,
+          marginBottom: spacing.lg,
+          borderLeftWidth: 3,
+          borderLeftColor: STATUS_COLORS.running,
+        }}
+      >
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: typography.sm,
+            fontFamily: fontFamily.mono,
+            lineHeight: 20,
+          }}
+        >
+          {liveOutput}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  // Show last 8 items, most recent at bottom
+  const visible = items.slice(-8);
+
+  return (
+    <View
+      style={{
+        marginBottom: spacing.lg,
+        gap: 6,
+      }}
+    >
+      {/* Activity header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.xs,
+          marginBottom: 4,
+        }}
+      >
+        <ActivityIndicator size="small" color={STATUS_COLORS.running} />
+        <Text
+          style={{
+            color: STATUS_COLORS.running,
+            fontSize: typography.xs,
+            fontFamily: fontFamily.semibold,
+            textTransform: "uppercase",
+            letterSpacing: typography.tracking.wider,
+          }}
+        >
+          Working
+        </Text>
+      </View>
+
+      {visible.map((item, i) => {
+        const isLatest = i === visible.length - 1;
+        const opacity = isLatest ? 1 : 0.5 + (i / visible.length) * 0.5;
+
+        if (item.type === "tool") {
+          const toolInfo = TOOL_ICONS[item.name || ""] || {
+            icon: "ellipsis-horizontal-outline",
+            label: item.name || "Tool",
+          };
+          return (
+            <View
+              key={`${item.ts}-${i}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                opacity,
+                paddingVertical: 3,
+              }}
+            >
+              <Ionicons
+                name={toolInfo.icon as any}
+                size={14}
+                color={isLatest ? STATUS_COLORS.running : colors.textTertiary}
+              />
+              <Text
+                numberOfLines={1}
+                style={{
+                  flex: 1,
+                  color: isLatest ? colors.textPrimary : colors.textSecondary,
+                  fontSize: typography.sm,
+                  fontFamily: isLatest ? fontFamily.medium : fontFamily.regular,
+                  lineHeight: 18,
+                }}
+              >
+                <Text style={{ color: isLatest ? STATUS_COLORS.running : colors.textTertiary }}>
+                  {toolInfo.label}
+                </Text>
+                {item.detail ? (
+                  <Text style={{ color: isLatest ? colors.textSecondary : colors.textTertiary }}>
+                    {"  "}
+                    {item.detail}
+                  </Text>
+                ) : null}
+              </Text>
+            </View>
+          );
+        }
+
+        if (item.type === "thinking") {
+          return (
+            <View
+              key={`${item.ts}-${i}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                opacity,
+                paddingVertical: 3,
+              }}
+            >
+              <Ionicons
+                name="bulb-outline"
+                size={14}
+                color={isLatest ? "#a78bfa" : colors.textTertiary}
+              />
+              <Text
+                numberOfLines={1}
+                style={{
+                  flex: 1,
+                  color: isLatest ? colors.textSecondary : colors.textTertiary,
+                  fontSize: typography.sm,
+                  fontFamily: fontFamily.regular,
+                  fontStyle: "italic",
+                  lineHeight: 18,
+                }}
+              >
+                {item.content}
+              </Text>
+            </View>
+          );
+        }
+
+        // text type
+        return (
+          <View
+            key={`${item.ts}-${i}`}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+              opacity,
+              paddingVertical: 3,
+            }}
+          >
+            <Ionicons
+              name="chatbubble-outline"
+              size={14}
+              color={isLatest ? colors.textSecondary : colors.textTertiary}
+            />
+            <Text
+              numberOfLines={2}
+              style={{
+                flex: 1,
+                color: isLatest ? colors.textSecondary : colors.textTertiary,
+                fontSize: typography.sm,
+                fontFamily: fontFamily.regular,
+                lineHeight: 18,
+              }}
+            >
+              {item.content}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function RunningLabel({
+  liveOutput,
+  colors,
+}: {
+  liveOutput?: string | null;
+  colors: any;
+}) {
+  let label = "Running";
+
+  if (liveOutput) {
+    try {
+      const items: ActivityItem[] = JSON.parse(liveOutput);
+      if (Array.isArray(items) && items.length > 0) {
+        const last = items[items.length - 1];
+        if (last.type === "tool" && last.name) {
+          const toolInfo = TOOL_ICONS[last.name];
+          label = toolInfo ? toolInfo.label : last.name;
+          if (last.detail) {
+            // Show truncated detail
+            const short = last.detail.length > 25
+              ? last.detail.slice(0, 25) + "..."
+              : last.detail;
+            label += ` ${short}`;
+          }
+        } else if (last.type === "thinking") {
+          label = "Thinking...";
+        }
+      }
+    } catch {
+      // plain text fallback
+    }
+  }
+
+  return (
+    <Text
+      numberOfLines={1}
+      style={{
+        color: STATUS_COLORS.running,
+        fontSize: typography.xs,
+        fontFamily: fontFamily.medium,
+        letterSpacing: 0.3,
+        flexShrink: 1,
+      }}
+    >
+      {label}
+    </Text>
+  );
+}
+
 function relativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const seconds = Math.floor(diff / 1000);
@@ -382,6 +644,10 @@ export default function HomeScreen() {
       fontSize: typography.sm,
       color: colors.textSecondary,
     },
+    pre: {
+      backgroundColor: colors.backgroundElevated,
+      borderRadius: radii.md,
+    },
     link: {
       color: colors.primary,
     },
@@ -464,17 +730,7 @@ export default function HomeScreen() {
               {relativeTime(item.createdAt)}
             </Text>
             {item.status === "running" && (
-              <Text
-                style={{
-                  color: STATUS_COLORS.running,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.medium,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Running
-              </Text>
+              <RunningLabel liveOutput={(item as any).liveOutput} colors={colors} />
             )}
             {item.status === "failed" && (
               <Text
@@ -745,29 +1001,12 @@ export default function HomeScreen() {
                         </View>
                       )}
 
-                      {/* Live output (while running) */}
+                      {/* Live activity feed (while running) */}
                       {selectedTask.status === "running" && selectedTask.liveOutput && (
-                        <View
-                          style={{
-                            backgroundColor: colors.backgroundElevated,
-                            borderRadius: radii.md,
-                            padding: spacing.md,
-                            marginBottom: spacing.lg,
-                            borderLeftWidth: 3,
-                            borderLeftColor: STATUS_COLORS.running,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: colors.textSecondary,
-                              fontSize: typography.sm,
-                              fontFamily: fontFamily.mono,
-                              lineHeight: 20,
-                            }}
-                          >
-                            {selectedTask.liveOutput}
-                          </Text>
-                        </View>
+                        <LiveActivityFeed
+                          liveOutput={selectedTask.liveOutput}
+                          colors={colors}
+                        />
                       )}
 
                       {/* Result (markdown) */}
@@ -907,6 +1146,26 @@ export default function HomeScreen() {
                                   fontSize: typography.sm,
                                   paddingHorizontal: 4,
                                   borderRadius: 4,
+                                },
+                                code_block: {
+                                  backgroundColor: colors.backgroundElevated,
+                                  padding: spacing.md,
+                                  borderRadius: radii.md,
+                                  fontFamily: fontFamily.mono,
+                                  fontSize: typography.sm,
+                                  color: colors.textSecondary,
+                                },
+                                fence: {
+                                  backgroundColor: colors.backgroundElevated,
+                                  padding: spacing.md,
+                                  borderRadius: radii.md,
+                                  fontFamily: fontFamily.mono,
+                                  fontSize: typography.sm,
+                                  color: colors.textSecondary,
+                                },
+                                pre: {
+                                  backgroundColor: colors.backgroundElevated,
+                                  borderRadius: radii.md,
                                 },
                                 table: { borderColor: colors.borderLight },
                                 th: { borderColor: colors.borderLight, padding: 6 },

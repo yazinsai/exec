@@ -11,6 +11,7 @@ import {
 } from "@expo-google-fonts/space-grotesk";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Updates from "expo-updates";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
@@ -56,6 +57,20 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Check for OTA updates on launch and apply immediately
+  useEffect(() => {
+    if (__DEV__) return;
+    (async () => {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch {}
+    })();
+  }, []);
 
   if (!loaded) {
     return null;
