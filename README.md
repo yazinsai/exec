@@ -109,22 +109,28 @@ npx instant-cli push perms --app $EXPO_PUBLIC_INSTANT_APP_ID --token $INSTANT_AP
 
 ### Auto-Start on Login (macOS)
 
-launchd plists are provided for both the agent and desktop app:
+launchd plists are included in the repo. Symlink them to `~/Library/LaunchAgents/` so macOS picks them up:
 
 ```bash
-# Agent process
+# Symlink the plists (one-time setup)
 ln -s ~/ai/projects/exec/agent/com.exec.agent.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.exec.agent.plist
-
-# Desktop hotkey app
 ln -s ~/ai/projects/exec/desktop/com.exec.desktop.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.exec.desktop.plist
+
+# Start them
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.exec.agent.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.exec.desktop.plist
 ```
 
 To stop:
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.exec.agent.plist
-launchctl unload ~/Library/LaunchAgents/com.exec.desktop.plist
+launchctl bootout gui/$(id -u)/com.exec.agent
+launchctl bootout gui/$(id -u)/com.exec.desktop
+```
+
+To restart:
+```bash
+launchctl kickstart -k gui/$(id -u)/com.exec.agent
+launchctl kickstart -k gui/$(id -u)/com.exec.desktop
 ```
 
 Logs: `/tmp/exec-agent.stdout.log`, `/tmp/exec-desktop.stdout.log`
