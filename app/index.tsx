@@ -27,7 +27,11 @@ import {
   RECORDING_OPTIONS,
 } from "@/lib/audio";
 import { Audio } from "expo-av";
-import { RecordingOverlay } from "@/components/RecordingOverlay";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActiveTaskCard } from "@/components/ActiveTaskCard";
+import { TaskListItem } from "@/components/TaskListItem";
+import { RecordFAB } from "@/components/RecordFAB";
+import { RecordingSheet } from "@/components/RecordingSheet";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import {
   spacing,
@@ -348,10 +352,13 @@ export default function HomeScreen() {
   const [isTranscribingFollowUp, setIsTranscribingFollowUp] = useState(false);
   const followUpRecordingRef = useRef<Audio.Recording | null>(null);
 
+  const insets = useSafeAreaInsets();
+
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [metering, setMetering] = useState(-160);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -360,7 +367,7 @@ export default function HomeScreen() {
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<FlatList>(null);
 
-  const isActive = isRecording || isPaused;
+  const isActive = isRecording || isSaving;
 
   // Check permission on mount
   useEffect(() => {
@@ -379,34 +386,67 @@ export default function HomeScreen() {
   }, []);
 
   // Query tasks
-  const { data, isLoading } = db.useQuery({
+  const { data: recentData, isLoading: isLoadingRecent } = db.useQuery({
     tasks: {
       $: { order: { createdAt: "desc" }, limit: 50 },
       messages: {},
     },
   });
 
-  const tasks = (data?.tasks ?? []).sort((a, b) => {
-    const priority: Record<string, number> = { running: 0, pending: 1, failed: 2, done: 3, cancelled: 4 };
-    const pa = priority[a.status] ?? 3;
-    const pb = priority[b.status] ?? 3;
-    if (pa !== pb) return pa - pb;
-    return b.createdAt - a.createdAt;
+  const { data: activeData, isLoading: isLoadingActive } = db.useQuery({
+    tasks: {
+      $: {
+        where: {
+          or: [{ status: "running" }, { status: "pending" }],
+        },
+      },
+      messages: {},
+    },
   });
+
+  const isLoading = isLoadingRecent || isLoadingActive;
+
+  // Merge and deduplicate (active query wins on conflict)
+  const allTasks = (() => {
+    const recentTasks = recentData?.tasks ?? [];
+    const activeTsks = activeData?.tasks ?? [];
+    const taskMap = new Map<string, Task>();
+    for (const t of recentTasks) taskMap.set(t.id, t);
+    for (const t of activeTsks) taskMap.set(t.id, t);
+    return Array.from(taskMap.values());
+  })();
+
+  // Split into active + history
+  const activeTasks = allTasks
+    .filter((t) => t.status === "running" || t.status === "pending")
+    .sort((a, b) => {
+      if (a.status === "running" && b.status !== "running") return -1;
+      if (b.status === "running" && a.status !== "running") return 1;
+      return b.createdAt - a.createdAt;
+    })
+    .slice(0, 3);
+
+  const allActiveIds = new Set(
+    allTasks.filter((t) => t.status === "running" || t.status === "pending").map((t) => t.id)
+  );
+  const historyTasks = allTasks
+    .filter((t) => !allActiveIds.has(t.id))
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   // Keep selectedTask in sync with live data
   useEffect(() => {
     if (selectedTask) {
-      const updated = tasks.find((t) => t.id === selectedTask.id);
+      const updated = allTasks.find((t) => t.id === selectedTask.id);
       if (updated) {
         setSelectedTask(updated);
       }
     }
-  }, [tasks]);
+  }, [allTasks]);
 
   // Recording handlers
   const startRecording = useCallback(async () => {
-    if (hasPermission === false) return;
+    if (hasPermission === false || recordingRef.current || isProcessing) return;
+    setRecordingError(null);
     try {
       await configureAudioMode();
       const METERING_OPTIONS: Audio.RecordingOptions = {
@@ -437,50 +477,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Failed to start recording:", error);
     }
-  }, [hasPermission]);
-
-  const pauseRecording = useCallback(async () => {
-    if (!isRecording || !recordingRef.current) return;
-    try {
-      await recordingRef.current.pauseAsync();
-      setIsPaused(true);
-      setIsRecording(false);
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
-      }
-      if (meteringIntervalRef.current) {
-        clearInterval(meteringIntervalRef.current);
-        meteringIntervalRef.current = null;
-      }
-    } catch (error) {
-      console.error("Failed to pause:", error);
-    }
-  }, [isRecording]);
-
-  const resumeRecording = useCallback(async () => {
-    if (!isPaused || !recordingRef.current) return;
-    try {
-      await recordingRef.current.startAsync();
-      setIsPaused(false);
-      setIsRecording(true);
-      durationIntervalRef.current = setInterval(() => {
-        setDuration((d) => d + 1);
-      }, 1000);
-      meteringIntervalRef.current = setInterval(async () => {
-        if (recordingRef.current) {
-          try {
-            const status = await recordingRef.current.getStatusAsync();
-            if (status.isRecording && status.metering !== undefined) {
-              setMetering(status.metering);
-            }
-          } catch {}
-        }
-      }, 100);
-    } catch (error) {
-      console.error("Failed to resume:", error);
-    }
-  }, [isPaused]);
+  }, [hasPermission, isProcessing]);
 
   const cancelRecording = useCallback(async () => {
     if (durationIntervalRef.current) {
@@ -495,10 +492,10 @@ export default function HomeScreen() {
       try {
         await recordingRef.current.stopAndUnloadAsync();
       } catch {}
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
     }
     recordingRef.current = null;
     setIsRecording(false);
-    setIsPaused(false);
     setDuration(0);
     setMetering(-160);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -511,7 +508,7 @@ export default function HomeScreen() {
 
     setIsSaving(true);
     setIsRecording(false);
-    setIsPaused(false);
+    setIsProcessing(true);
 
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
@@ -535,7 +532,10 @@ export default function HomeScreen() {
       // Transcribe
       const transcription = await transcribeAudio(filePath);
       if (!transcription || transcription.trim().length === 0) {
+        setRecordingError("No speech detected");
+        setTimeout(() => setRecordingError(null), 1500);
         setIsSaving(false);
+        setIsProcessing(false);
         setDuration(0);
         setMetering(-160);
         return;
@@ -573,9 +573,12 @@ export default function HomeScreen() {
       });
     } catch (error) {
       console.error("Failed to save recording:", error);
+      setRecordingError("Transcription failed");
+      setTimeout(() => setRecordingError(null), 1500);
     }
 
     setIsSaving(false);
+    setIsProcessing(false);
     setDuration(0);
     setMetering(-160);
   }, []);
@@ -646,17 +649,16 @@ export default function HomeScreen() {
   }, [isRecordingFollowUp, hasPermission]);
 
   // Cancel task handler
-  const cancelTask = useCallback(async () => {
-    if (!selectedTask) return;
+  const cancelTask = useCallback(async (taskId: string) => {
     try {
       await db.transact(
-        db.tx.tasks[selectedTask.id].update({ cancelRequested: true })
+        db.tx.tasks[taskId].update({ cancelRequested: true })
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch (error) {
       console.error("Failed to cancel task:", error);
     }
-  }, [selectedTask]);
+  }, []);
 
   // Markdown styles
   const mdStyles = {
@@ -740,110 +742,11 @@ export default function HomeScreen() {
     },
   };
 
-  // Task row
-  const renderTask = ({ item }: { item: Task }) => {
-    const statusColor = getStatusColor(item.status, colors);
-    const statusLabel = STATUS_LABELS[item.status] ?? "Pending";
-    const isRunning = item.status === "running";
-    const isDone = item.status === "done";
-    const isFailed = item.status === "failed";
-    return (
-      <Pressable
-        onPress={() => {
-          setSelectedTask(item);
-          setFollowUpText("");
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.input}, ${statusLabel}, ${relativeTime(item.createdAt)}`}
-        accessibilityHint="Opens task details"
-        style={({ pressed }) => [
-          {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.lg,
-            gap: spacing.md,
-            backgroundColor: pressed
-              ? colors.backgroundPressed
-              : colors.backgroundElevated,
-            borderRadius: radii.lg,
-            borderWidth: isRunning ? 1 : 0,
-            borderColor: isRunning ? "rgba(59, 130, 246, 0.25)" : "transparent",
-          },
-        ]}
-      >
-        {/* Status indicator */}
-        <View
-          accessibilityElementsHidden
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 5,
-            backgroundColor: statusColor,
-            flexShrink: 0,
-          }}
-        />
-
-        {/* Text content */}
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text
-            numberOfLines={2}
-            style={{
-              color: colors.textPrimary,
-              fontSize: typography.base,
-              fontFamily: fontFamily.medium,
-              lineHeight: 21,
-            }}
-          >
-            {item.summary || item.input}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            <Text
-              style={{
-                color: colors.textTertiary,
-                fontSize: typography.xs,
-                fontFamily: fontFamily.regular,
-              }}
-            >
-              {relativeTime(item.createdAt)}
-            </Text>
-            {isRunning && (
-              <RunningLabel liveOutput={(item as any).liveOutput} colors={colors} />
-            )}
-            {isFailed && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                <Ionicons name="alert-circle" size={11} color={colors.statusFailed} />
-                <Text
-                  style={{
-                    color: colors.statusFailed,
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.medium,
-                  }}
-                >
-                  Failed
-                </Text>
-              </View>
-            )}
-            {isDone && (
-              <Ionicons name="checkmark-circle" size={13} color={colors.statusDone} />
-            )}
-          </View>
-        </View>
-
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      </Pressable>
-    );
-  };
-
-  const showOverlay = isActive || isSaving;
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView
-        style={{
-          flex: 1,
-          backgroundColor: colors.background,
-        }}
+        style={{ flex: 1, backgroundColor: colors.background }}
+        edges={["top"]}
       >
         {/* Header */}
         <View
@@ -865,134 +768,125 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Main content */}
-        {!showOverlay && (
-          <View style={{ flex: 1 }}>
-            {/* Record button area - compact when tasks exist */}
-            <View
-              style={{
-                flexDirection: tasks.length > 0 ? "row" : "column",
-                alignItems: "center",
-                justifyContent: tasks.length > 0 ? "center" : "center",
-                paddingVertical: tasks.length > 0 ? spacing.lg : spacing.xxl,
-                gap: tasks.length > 0 ? spacing.md : 0,
-              }}
-            >
-              <Pressable
-                onPress={startRecording}
-                disabled={hasPermission === false}
-                accessibilityRole="button"
-                accessibilityLabel="Record voice command"
-                accessibilityHint="Starts recording a voice command"
-                accessibilityState={{ disabled: hasPermission === false }}
-                style={({ pressed }) => [
-                  {
-                    width: tasks.length > 0 ? 56 : 88,
-                    height: tasks.length > 0 ? 56 : 88,
-                    borderRadius: tasks.length > 0 ? 28 : 44,
-                    backgroundColor: colors.backgroundElevated,
-                    borderWidth: tasks.length > 0 ? 2 : 3,
-                    borderColor: colors.primary,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    ...shadows.md,
-                  },
-                  pressed && { transform: [{ scale: 0.95 }], borderColor: colors.primaryLight },
-                ]}
-              >
-                <View
-                  style={{
-                    width: tasks.length > 0 ? 22 : 36,
-                    height: tasks.length > 0 ? 22 : 36,
-                    borderRadius: tasks.length > 0 ? 11 : 18,
-                    backgroundColor: colors.primary,
-                  }}
-                />
-              </Pressable>
-              <Text
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: tasks.length > 0 ? typography.xs : typography.sm,
-                  fontFamily: fontFamily.regular,
-                  marginTop: tasks.length > 0 ? 0 : spacing.md,
+        {/* Active Tasks (fixed, non-scrolling) */}
+        {activeTasks.length > 0 && (
+          <View
+            style={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.md,
+              gap: spacing.sm,
+            }}
+          >
+            {activeTasks.map((task) => (
+              <ActiveTaskCard
+                key={task.id}
+                title={task.summary || task.input}
+                status={task.status as "running" | "pending"}
+                startedAt={(task as any).startedAt}
+                createdAt={task.createdAt}
+                cancelRequested={(task as any).cancelRequested}
+                onView={() => {
+                  setSelectedTask(task);
+                  setFollowUpText("");
                 }}
-              >
-                {hasPermission === false ? "Microphone access required" : "Tap to record"}
-              </Text>
-            </View>
-
-            {/* Task list */}
-            {isLoading ? (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <ActivityIndicator color={colors.primary} />
-              </View>
-            ) : tasks.length === 0 ? (
-              <View
-                style={{
-                  flex: 1,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingHorizontal: spacing.xxl,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.textTertiary,
-                    fontSize: typography.base,
-                    fontFamily: fontFamily.regular,
-                    textAlign: "center",
-                    lineHeight: 22,
-                  }}
-                >
-                  No tasks yet. Record a voice note to get started.
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                ref={scrollRef}
-                data={tasks}
-                keyExtractor={(item) => item.id}
-                renderItem={renderTask}
-                ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-                ListHeaderComponent={
-                  <Text
-                    style={{
-                      color: colors.textTertiary,
-                      fontSize: typography.xs,
-                      fontFamily: fontFamily.semibold,
-                      textTransform: "uppercase",
-                      letterSpacing: typography.tracking.wider,
-                      marginBottom: spacing.md,
-                      paddingHorizontal: spacing.xs,
-                    }}
-                  >
-                    Recent
-                  </Text>
-                }
-                contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 60, paddingHorizontal: spacing.lg }}
-                showsVerticalScrollIndicator={false}
+                onCancel={() => cancelTask(task.id)}
               />
-            )}
+            ))}
           </View>
         )}
 
-        {/* Recording overlay */}
-        {showOverlay && (
-          <RecordingOverlay
-            isVisible={true}
-            duration={duration}
-            metering={metering}
-            isRecording={isRecording}
-            isPaused={isPaused}
-            isSaving={isSaving}
-            onPauseResume={() => {
-              if (isPaused) resumeRecording();
-              else pauseRecording();
+        {/* History list */}
+        {isLoading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : historyTasks.length === 0 && activeTasks.length === 0 ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: spacing.xxl,
             }}
-            onStop={stopRecording}
-            onDelete={cancelRecording}
+          >
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: typography.base,
+                fontFamily: fontFamily.regular,
+                textAlign: "center",
+                lineHeight: 22,
+              }}
+            >
+              No tasks yet. Tap the mic to get started.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={scrollRef}
+            data={historyTasks}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TaskListItem
+                title={item.summary || item.input}
+                status={item.status as "done" | "failed" | "cancelled"}
+                createdAt={item.createdAt}
+                onPress={() => {
+                  setSelectedTask(item);
+                  setFollowUpText("");
+                }}
+              />
+            )}
+            ListHeaderComponent={
+              historyTasks.length > 0 ? (
+                <Text
+                  style={{
+                    color: colors.textTertiary,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.semibold,
+                    textTransform: "uppercase",
+                    letterSpacing: typography.tracking.wider,
+                    marginBottom: spacing.sm,
+                    paddingHorizontal: spacing.lg,
+                  }}
+                >
+                  Recent
+                </Text>
+              ) : null
+            }
+            contentContainerStyle={{
+              paddingTop: spacing.sm,
+              paddingBottom: insets.bottom + 64 + 32,
+            }}
+            showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* FAB */}
+        <RecordFAB
+          isRecording={isRecording}
+          isProcessing={isProcessing}
+          bottomInset={insets.bottom}
+          onPress={() => {
+            if (isRecording) {
+              stopRecording();
+            } else {
+              startRecording();
+            }
+          }}
+        />
+
+        {/* Recording bottom sheet */}
+        <RecordingSheet
+          isVisible={isActive}
+          duration={duration}
+          metering={metering}
+          isRecording={isRecording}
+          isSaving={isSaving}
+          error={recordingError}
+          onDone={stopRecording}
+          onDelete={cancelRecording}
+        />
 
         {/* Task detail bottom sheet (Modal) */}
         <Modal
@@ -1140,7 +1034,7 @@ export default function HomeScreen() {
                       {/* Cancel button */}
                       {selectedTask.status === "running" && !selectedTask.cancelRequested && (
                         <Pressable
-                          onPress={cancelTask}
+                          onPress={() => cancelTask(selectedTask.id)}
                           accessibilityRole="button"
                           accessibilityLabel="Cancel task"
                           style={{
