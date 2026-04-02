@@ -26,7 +26,7 @@ const mono = {
   cream: "#fafaf9",
   silver: "#a1a1aa",
   gray: "#71717a",
-  darkGray: "#3f3f46",
+  darkGray: "#52525b",
 };
 
 // Semantic colors - minimal, status only
@@ -34,6 +34,8 @@ const semantic = {
   success: "#22c55e",
   error: "#ef4444",
   warning: gold.bright,
+  info: "#3b82f6",
+  thinking: "#a78bfa",
 };
 
 // Action type colors - dark theme (premium black aesthetic)
@@ -93,6 +95,19 @@ const darkColors = {
   errorDark: "#dc2626",
   success: semantic.success,
   warning: semantic.warning,
+  info: semantic.info,
+  thinking: semantic.thinking,
+
+  // Status dot / label
+  statusPending: "#71717a",
+  statusRunning: semantic.info,
+  statusDone: semantic.success,
+  statusFailed: semantic.error,
+  statusCancelled: semantic.warning,
+
+  // Alpha variants
+  primaryAlpha20: "rgba(212, 175, 55, 0.13)",
+  primaryAlpha30: "rgba(212, 175, 55, 0.19)",
 
   // Overlays
   overlay: "rgba(0, 0, 0, 0.85)",
@@ -135,6 +150,17 @@ const lightColors = {
   errorDark: "#dc2626",
   success: semantic.success,
   warning: semantic.warning,
+  info: semantic.info,
+  thinking: semantic.thinking,
+
+  statusPending: "#71717a",
+  statusRunning: semantic.info,
+  statusDone: semantic.success,
+  statusFailed: semantic.error,
+  statusCancelled: semantic.warning,
+
+  primaryAlpha20: "rgba(184, 134, 11, 0.13)",
+  primaryAlpha30: "rgba(184, 134, 11, 0.19)",
 
   overlay: "rgba(0, 0, 0, 0.5)",
   overlayLight: "rgba(0, 0, 0, 0.3)",

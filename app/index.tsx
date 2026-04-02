@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { id } from "@instantdb/react-native";
 import { db } from "@/lib/db";
 import { transcribeAudio } from "@/lib/transcription";
+import { summarizeInput } from "@/lib/summarize";
 import {
   requestAudioPermissions,
   configureAudioMode,
@@ -37,17 +38,30 @@ import {
 } from "@/constants/Colors";
 import type { InstaQLEntity } from "@instantdb/react-native";
 import type { AppSchema } from "@/instant.schema";
+import type { ThemeColors } from "@/constants/Colors";
 
 type Task = InstaQLEntity<AppSchema, "tasks", { messages: {} }>;
 type Message = InstaQLEntity<AppSchema, "messages">;
 
-// Status dot colors
-const STATUS_COLORS: Record<string, string> = {
-  pending: "#71717a",
-  running: "#3b82f6",
-  done: "#22c55e",
-  failed: "#ef4444",
-  cancelled: "#f59e0b",
+type TaskStatus = "pending" | "running" | "done" | "failed" | "cancelled";
+
+function getStatusColor(status: string, colors: ThemeColors): string {
+  const map: Record<string, string> = {
+    pending: colors.statusPending,
+    running: colors.statusRunning,
+    done: colors.statusDone,
+    failed: colors.statusFailed,
+    cancelled: colors.statusCancelled,
+  };
+  return map[status] ?? colors.statusPending;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  running: "Running",
+  done: "Done",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 // Tool icon mapping
@@ -77,7 +91,7 @@ function LiveActivityFeed({
   colors,
 }: {
   liveOutput: string;
-  colors: any;
+  colors: ThemeColors;
 }) {
   let items: ActivityItem[] = [];
   try {
@@ -92,7 +106,7 @@ function LiveActivityFeed({
           padding: spacing.md,
           marginBottom: spacing.lg,
           borderLeftWidth: 3,
-          borderLeftColor: STATUS_COLORS.running,
+          borderLeftColor: colors.statusRunning,
         }}
       >
         <Text
@@ -130,10 +144,10 @@ function LiveActivityFeed({
           marginBottom: 4,
         }}
       >
-        <ActivityIndicator size="small" color={STATUS_COLORS.running} />
+        <ActivityIndicator size="small" color={colors.statusRunning} />
         <Text
           style={{
-            color: STATUS_COLORS.running,
+            color: colors.statusRunning,
             fontSize: typography.xs,
             fontFamily: fontFamily.semibold,
             textTransform: "uppercase",
@@ -167,7 +181,7 @@ function LiveActivityFeed({
               <Ionicons
                 name={toolInfo.icon as any}
                 size={14}
-                color={isLatest ? STATUS_COLORS.running : colors.textTertiary}
+                color={isLatest ? colors.statusRunning : colors.textTertiary}
               />
               <Text
                 numberOfLines={1}
@@ -179,7 +193,7 @@ function LiveActivityFeed({
                   lineHeight: 18,
                 }}
               >
-                <Text style={{ color: isLatest ? STATUS_COLORS.running : colors.textTertiary }}>
+                <Text style={{ color: isLatest ? colors.statusRunning : colors.textTertiary }}>
                   {toolInfo.label}
                 </Text>
                 {item.detail ? (
@@ -208,7 +222,7 @@ function LiveActivityFeed({
               <Ionicons
                 name="bulb-outline"
                 size={14}
-                color={isLatest ? "#a78bfa" : colors.textTertiary}
+                color={isLatest ? colors.thinking : colors.textTertiary}
               />
               <Text
                 numberOfLines={1}
@@ -268,7 +282,7 @@ function RunningLabel({
   colors,
 }: {
   liveOutput?: string | null;
-  colors: any;
+  colors: ThemeColors;
 }) {
   let label = "Running";
 
@@ -300,7 +314,7 @@ function RunningLabel({
     <Text
       numberOfLines={1}
       style={{
-        color: STATUS_COLORS.running,
+        color: colors.statusRunning,
         fontSize: typography.xs,
         fontFamily: fontFamily.medium,
         letterSpacing: 0.3,
@@ -323,12 +337,6 @@ function relativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
-}
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.0`;
 }
 
 export default function HomeScreen() {
@@ -531,10 +539,11 @@ export default function HomeScreen() {
       const taskId = id();
       const messageId = id();
       const now = Date.now();
+      const trimmedInput = transcription.trim();
 
       await db.transact([
         db.tx.tasks[taskId].update({
-          input: transcription.trim(),
+          input: trimmedInput,
           status: "pending",
           source: "phone",
           createdAt: now,
@@ -542,13 +551,20 @@ export default function HomeScreen() {
         db.tx.messages[messageId]
           .update({
             role: "user",
-            content: transcription.trim(),
+            content: trimmedInput,
             createdAt: now,
           })
           .link({ task: taskId }),
       ]);
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Generate summary in background (non-blocking)
+      summarizeInput(trimmedInput).then((summary) => {
+        if (summary) {
+          db.transact(db.tx.tasks[taskId].update({ summary }));
+        }
+      });
     } catch (error) {
       console.error("Failed to save recording:", error);
     }
@@ -720,13 +736,17 @@ export default function HomeScreen() {
 
   // Task row
   const renderTask = ({ item }: { item: Task }) => {
-    const statusColor = STATUS_COLORS[item.status] ?? "#71717a";
+    const statusColor = getStatusColor(item.status, colors);
+    const statusLabel = STATUS_LABELS[item.status] ?? "Pending";
     return (
       <Pressable
         onPress={() => {
           setSelectedTask(item);
           setFollowUpText("");
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.input}, ${statusLabel}, ${relativeTime(item.createdAt)}`}
+        accessibilityHint="Opens task details"
         style={({ pressed }) => [
           {
             flexDirection: "row",
@@ -742,6 +762,7 @@ export default function HomeScreen() {
       >
         {/* Status dot */}
         <View
+          accessibilityElementsHidden
           style={{
             width: 10,
             height: 10,
@@ -754,15 +775,15 @@ export default function HomeScreen() {
         {/* Text content */}
         <View style={{ flex: 1, gap: 2 }}>
           <Text
-            numberOfLines={2}
+            numberOfLines={1}
             style={{
               color: colors.textPrimary,
               fontSize: typography.base,
-              fontFamily: fontFamily.regular,
+              fontFamily: fontFamily.medium,
               lineHeight: 20,
             }}
           >
-            {item.input}
+            {item.summary || item.input}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
             <Text
@@ -780,7 +801,7 @@ export default function HomeScreen() {
             {item.status === "failed" && (
               <Text
                 style={{
-                  color: STATUS_COLORS.failed,
+                  color: colors.statusFailed,
                   fontSize: typography.xs,
                   fontFamily: fontFamily.medium,
                   textTransform: "uppercase",
@@ -789,6 +810,9 @@ export default function HomeScreen() {
               >
                 Failed
               </Text>
+            )}
+            {item.status === "done" && (
+              <Ionicons name="checkmark" size={12} color={colors.statusDone} />
             )}
           </View>
         </View>
@@ -841,6 +865,10 @@ export default function HomeScreen() {
               <Pressable
                 onPress={startRecording}
                 disabled={hasPermission === false}
+                accessibilityRole="button"
+                accessibilityLabel="Record voice command"
+                accessibilityHint="Starts recording a voice command"
+                accessibilityState={{ disabled: hasPermission === false }}
                 style={({ pressed }) => [
                   {
                     width: 88,
@@ -977,20 +1005,24 @@ export default function HomeScreen() {
                       borderBottomColor: colors.border,
                     }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                    <View
+                      accessibilityLabel={`Status: ${STATUS_LABELS[selectedTask.status] ?? "Pending"}`}
+                      style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+                    >
                       <View
+                        accessibilityElementsHidden
                         style={{
                           width: 10,
                           height: 10,
                           borderRadius: 5,
-                          backgroundColor: STATUS_COLORS[selectedTask.status] ?? "#71717a",
+                          backgroundColor: getStatusColor(selectedTask.status, colors),
                         }}
                       />
                       <Text
                         style={{
                           fontSize: typography.xs,
                           fontFamily: fontFamily.semibold,
-                          color: STATUS_COLORS[selectedTask.status] ?? colors.textTertiary,
+                          color: getStatusColor(selectedTask.status, colors),
                           textTransform: "uppercase",
                           letterSpacing: typography.tracking.wider,
                         }}
@@ -1009,6 +1041,8 @@ export default function HomeScreen() {
                         }
                         setSelectedTask(null);
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Close task details"
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -1034,17 +1068,27 @@ export default function HomeScreen() {
                           fontSize: typography.lg,
                           fontFamily: fontFamily.medium,
                           lineHeight: 26,
-                          marginBottom: spacing.lg,
+                          marginBottom: spacing.xs,
                         }}
                       >
                         {selectedTask.input}
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.textTertiary,
+                          fontSize: typography.xs,
+                          fontFamily: fontFamily.regular,
+                          marginBottom: spacing.lg,
+                        }}
+                      >
+                        {relativeTime(selectedTask.createdAt)}
                       </Text>
 
                       {/* Error message */}
                       {selectedTask.errorMessage && (
                         <View
                           style={{
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            backgroundColor: colors.errorBgAlpha,
                             borderRadius: radii.md,
                             padding: spacing.md,
                             marginBottom: spacing.lg,
@@ -1070,19 +1114,12 @@ export default function HomeScreen() {
                         />
                       )}
 
-                      {/* Result (markdown) */}
-                      {selectedTask.result && (
-                        <View style={{ marginBottom: spacing.lg }}>
-                          <Markdown style={mdStyles}>
-                            {selectedTask.result}
-                          </Markdown>
-                        </View>
-                      )}
-
                       {/* Cancel button */}
                       {selectedTask.status === "running" && !selectedTask.cancelRequested && (
                         <Pressable
                           onPress={cancelTask}
+                          accessibilityRole="button"
+                          accessibilityLabel="Cancel task"
                           style={{
                             alignSelf: "flex-start",
                             flexDirection: "row",
@@ -1090,7 +1127,7 @@ export default function HomeScreen() {
                             gap: spacing.xs,
                             paddingHorizontal: spacing.md,
                             paddingVertical: spacing.sm,
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            backgroundColor: colors.errorBgAlpha,
                             borderRadius: radii.md,
                             marginBottom: spacing.xl,
                           }}
@@ -1130,8 +1167,8 @@ export default function HomeScreen() {
                         </View>
                       )}
 
-                      {/* Messages header */}
-                      {(selectedTask.messages?.length ?? 0) > 0 && (
+                      {/* Divider before thread */}
+                      {((selectedTask.messages?.length ?? 0) > 0 || selectedTask.result) && (
                         <View
                           style={{
                             borderTopWidth: 1,
@@ -1139,7 +1176,22 @@ export default function HomeScreen() {
                             paddingTop: spacing.lg,
                             marginBottom: spacing.md,
                           }}
+                        />
+                      )}
+                    </>
+                  }
+                  ListFooterComponent={
+                    selectedTask.result ? (
+                      <View style={{ marginTop: spacing.md }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: spacing.sm,
+                            marginBottom: spacing.sm,
+                          }}
                         >
+                          <Ionicons name="checkmark-circle" size={14} color={colors.statusDone} />
                           <Text
                             style={{
                               color: colors.textTertiary,
@@ -1149,11 +1201,14 @@ export default function HomeScreen() {
                               letterSpacing: typography.tracking.label,
                             }}
                           >
-                            Thread
+                            Result
                           </Text>
                         </View>
-                      )}
-                    </>
+                        <Markdown style={mdStyles}>
+                          {selectedTask.result}
+                        </Markdown>
+                      </View>
+                    ) : null
                   }
                   renderItem={({ item: msg }: { item: Message }) => {
                     const isUser = msg.role === "user";
@@ -1168,14 +1223,14 @@ export default function HomeScreen() {
                         <View
                           style={{
                             backgroundColor: isUser
-                              ? colors.primary + "20"
+                              ? colors.primaryAlpha20
                               : colors.backgroundElevated,
                             borderRadius: radii.lg,
                             paddingHorizontal: spacing.md,
                             paddingVertical: spacing.sm,
                             borderWidth: 1,
                             borderColor: isUser
-                              ? colors.primary + "30"
+                              ? colors.primaryAlpha30
                               : colors.borderLight,
                           }}
                         >
@@ -1272,14 +1327,17 @@ export default function HomeScreen() {
                     <Pressable
                       onPress={() => toggleFollowUpRecording()}
                       disabled={isTranscribingFollowUp}
-                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={isRecordingFollowUp ? "Stop recording" : "Record voice follow-up"}
+                      accessibilityState={{ disabled: isTranscribingFollowUp }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={({ pressed }) => [
                         {
-                          width: isRecordingFollowUp ? 42 : 36,
-                          height: isRecordingFollowUp ? 42 : 36,
-                          borderRadius: isRecordingFollowUp ? 21 : 18,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
                           backgroundColor: isRecordingFollowUp
-                            ? "#ef4444"
+                            ? colors.error
                             : colors.backgroundElevated,
                           alignItems: "center",
                           justifyContent: "center",
@@ -1292,7 +1350,7 @@ export default function HomeScreen() {
                       ) : (
                         <Ionicons
                           name={isRecordingFollowUp ? "stop" : "mic"}
-                          size={isRecordingFollowUp ? 20 : 18}
+                          size={isRecordingFollowUp ? 18 : 18}
                           color={isRecordingFollowUp ? colors.white : colors.textMuted}
                         />
                       )}
@@ -1302,7 +1360,9 @@ export default function HomeScreen() {
                       value={followUpText}
                       onChangeText={setFollowUpText}
                       placeholder={isRecordingFollowUp ? "Recording..." : "Follow up..."}
-                      placeholderTextColor={isRecordingFollowUp ? "#ef4444" : colors.textMuted}
+                      placeholderTextColor={isRecordingFollowUp ? colors.error : colors.textMuted}
+                      accessibilityLabel="Follow-up message"
+                      accessibilityHint="Type a follow-up message to this task"
                       style={{
                         flex: 1,
                         backgroundColor: colors.backgroundElevated,
@@ -1320,11 +1380,15 @@ export default function HomeScreen() {
                     <Pressable
                       onPress={sendFollowUp}
                       disabled={!followUpText.trim() || sendingFollowUp}
+                      accessibilityRole="button"
+                      accessibilityLabel="Send follow-up"
+                      accessibilityState={{ disabled: !followUpText.trim() || sendingFollowUp }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={({ pressed }) => [
                         {
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
                           backgroundColor: followUpText.trim()
                             ? colors.primary
                             : colors.backgroundElevated,

@@ -12,6 +12,7 @@ const _schema = i.schema({
     }),
     tasks: i.entity({
       input: i.string(),
+      summary: i.string().optional(),
       status: i.string().indexed(),
       result: i.string().optional(),
       source: i.string(),
