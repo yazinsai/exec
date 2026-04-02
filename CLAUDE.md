@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Exec is a voice-to-action system. Users record voice commands on their phone or Mac desktop (via global hotkey), which are transcribed and executed by a persistent Claude agent with full Mac access. No action types, no extraction pipeline — the agent receives natural language and decides what to do.
 
+## Git Policy
+
+Always commit changes after modifying code in this project. Add the specific files you changed (never `git add -A`) and write a concise commit message.
+
 ## Development Commands
 
 ```bash

@@ -386,7 +386,13 @@ export default function HomeScreen() {
     },
   });
 
-  const tasks = data?.tasks ?? [];
+  const tasks = (data?.tasks ?? []).sort((a, b) => {
+    const priority: Record<string, number> = { running: 0, pending: 1, failed: 2, done: 3, cancelled: 4 };
+    const pa = priority[a.status] ?? 3;
+    const pb = priority[b.status] ?? 3;
+    if (pa !== pb) return pa - pb;
+    return b.createdAt - a.createdAt;
+  });
 
   // Keep selectedTask in sync with live data
   useEffect(() => {
@@ -738,6 +744,9 @@ export default function HomeScreen() {
   const renderTask = ({ item }: { item: Task }) => {
     const statusColor = getStatusColor(item.status, colors);
     const statusLabel = STATUS_LABELS[item.status] ?? "Pending";
+    const isRunning = item.status === "running";
+    const isDone = item.status === "done";
+    const isFailed = item.status === "failed";
     return (
       <Pressable
         onPress={() => {
@@ -751,16 +760,19 @@ export default function HomeScreen() {
           {
             flexDirection: "row",
             alignItems: "center",
-            paddingHorizontal: spacing.xl,
-            paddingVertical: 14,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.lg,
             gap: spacing.md,
             backgroundColor: pressed
               ? colors.backgroundPressed
-              : "transparent",
+              : colors.backgroundElevated,
+            borderRadius: radii.lg,
+            borderWidth: isRunning ? 1 : 0,
+            borderColor: isRunning ? "rgba(59, 130, 246, 0.25)" : "transparent",
           },
         ]}
       >
-        {/* Status dot */}
+        {/* Status indicator */}
         <View
           accessibilityElementsHidden
           style={{
@@ -773,14 +785,14 @@ export default function HomeScreen() {
         />
 
         {/* Text content */}
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flex: 1, gap: 4 }}>
           <Text
-            numberOfLines={1}
+            numberOfLines={2}
             style={{
               color: colors.textPrimary,
               fontSize: typography.base,
               fontFamily: fontFamily.medium,
-              lineHeight: 20,
+              lineHeight: 21,
             }}
           >
             {item.summary || item.input}
@@ -795,24 +807,25 @@ export default function HomeScreen() {
             >
               {relativeTime(item.createdAt)}
             </Text>
-            {item.status === "running" && (
+            {isRunning && (
               <RunningLabel liveOutput={(item as any).liveOutput} colors={colors} />
             )}
-            {item.status === "failed" && (
-              <Text
-                style={{
-                  color: colors.statusFailed,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.medium,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Failed
-              </Text>
+            {isFailed && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <Ionicons name="alert-circle" size={11} color={colors.statusFailed} />
+                <Text
+                  style={{
+                    color: colors.statusFailed,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.medium,
+                  }}
+                >
+                  Failed
+                </Text>
+              </View>
             )}
-            {item.status === "done" && (
-              <Ionicons name="checkmark" size={12} color={colors.statusDone} />
+            {isDone && (
+              <Ionicons name="checkmark-circle" size={13} color={colors.statusDone} />
             )}
           </View>
         </View>
@@ -855,11 +868,14 @@ export default function HomeScreen() {
         {/* Main content */}
         {!showOverlay && (
           <View style={{ flex: 1 }}>
-            {/* Record button area */}
+            {/* Record button area - compact when tasks exist */}
             <View
               style={{
+                flexDirection: tasks.length > 0 ? "row" : "column",
                 alignItems: "center",
-                paddingVertical: spacing.xxl,
+                justifyContent: tasks.length > 0 ? "center" : "center",
+                paddingVertical: tasks.length > 0 ? spacing.lg : spacing.xxl,
+                gap: tasks.length > 0 ? spacing.md : 0,
               }}
             >
               <Pressable
@@ -871,11 +887,11 @@ export default function HomeScreen() {
                 accessibilityState={{ disabled: hasPermission === false }}
                 style={({ pressed }) => [
                   {
-                    width: 88,
-                    height: 88,
-                    borderRadius: 44,
+                    width: tasks.length > 0 ? 56 : 88,
+                    height: tasks.length > 0 ? 56 : 88,
+                    borderRadius: tasks.length > 0 ? 28 : 44,
                     backgroundColor: colors.backgroundElevated,
-                    borderWidth: 3,
+                    borderWidth: tasks.length > 0 ? 2 : 3,
                     borderColor: colors.primary,
                     alignItems: "center",
                     justifyContent: "center",
@@ -886,9 +902,9 @@ export default function HomeScreen() {
               >
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
+                    width: tasks.length > 0 ? 22 : 36,
+                    height: tasks.length > 0 ? 22 : 36,
+                    borderRadius: tasks.length > 0 ? 11 : 18,
                     backgroundColor: colors.primary,
                   }}
                 />
@@ -896,23 +912,14 @@ export default function HomeScreen() {
               <Text
                 style={{
                   color: colors.textTertiary,
-                  fontSize: typography.sm,
+                  fontSize: tasks.length > 0 ? typography.xs : typography.sm,
                   fontFamily: fontFamily.regular,
-                  marginTop: spacing.md,
+                  marginTop: tasks.length > 0 ? 0 : spacing.md,
                 }}
               >
                 {hasPermission === false ? "Microphone access required" : "Tap to record"}
               </Text>
             </View>
-
-            {/* Divider */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: colors.border,
-                marginHorizontal: spacing.xl,
-              }}
-            />
 
             {/* Task list */}
             {isLoading ? (
@@ -946,7 +953,23 @@ export default function HomeScreen() {
                 data={tasks}
                 keyExtractor={(item) => item.id}
                 renderItem={renderTask}
-                contentContainerStyle={{ paddingTop: spacing.lg, paddingBottom: 60, paddingHorizontal: spacing.md }}
+                ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+                ListHeaderComponent={
+                  <Text
+                    style={{
+                      color: colors.textTertiary,
+                      fontSize: typography.xs,
+                      fontFamily: fontFamily.semibold,
+                      textTransform: "uppercase",
+                      letterSpacing: typography.tracking.wider,
+                      marginBottom: spacing.md,
+                      paddingHorizontal: spacing.xs,
+                    }}
+                  >
+                    Recent
+                  </Text>
+                }
+                contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 60, paddingHorizontal: spacing.lg }}
                 showsVerticalScrollIndicator={false}
               />
             )}
