@@ -43,9 +43,12 @@ const activeTasks = tasks
   })
   .slice(0, 3);
 
-const activeIds = new Set(activeTasks.map(t => t.id));
+// Exclude ALL active tasks from history, not just the displayed 3
+const allActiveIds = new Set(
+  tasks.filter(t => t.status === "running" || t.status === "pending").map(t => t.id)
+);
 const historyTasks = tasks
-  .filter(t => !activeIds.has(t.id))
+  .filter(t => !allActiveIds.has(t.id))
   .sort((a, b) => b.createdAt - a.createdAt);
 ```
 
@@ -69,10 +72,10 @@ Elevated cards with color-coded left border.
 - Title: `fontFamily.medium`, `typography.base`, `colors.textPrimary`, max 2 lines
 - Status line: `typography.xs`, status color text
 - Running cards: pulse animation on left border opacity (reanimated `withRepeat` + `withSequence`, 0.4 → 1.0, 800ms cycle)
-- Elapsed time: computed from `startedAt` (running) or `createdAt` (pending), updated every second via `setInterval`
+- Elapsed time: computed from `startedAt ?? createdAt` (running) or `createdAt` (pending), updated every second via `setInterval`. Fallback handles legacy tasks without `startedAt`.
 - Pending cards show "Queued" instead of elapsed time, no cancel button
 - "View" button opens existing detail modal
-- "✕" button sets `cancelRequested: true`
+- "✕" button sets `cancelRequested: true`. Once pressed, replace with "Cancelling..." label (disabled state) — agent processes the flag asynchronously
 
 ### Empty state
 Section doesn't render at all. No placeholder text.
@@ -102,8 +105,9 @@ Compact, flat rows. No elevation, no cards.
 ## FAB (Floating Action Button)
 
 ### Position & size
-- `position: "absolute"`, `bottom: 32`, `alignSelf: "center"`
+- `position: "absolute"`, bottom offset = `safeAreaBottom + 16`, horizontally centered via `left/right: 0` + `alignItems: "center"` wrapper
 - 64px circle
+- FlatList bottom padding = `safeAreaBottom + 64 + 32` (FAB height + breathing room)
 
 ### Idle state
 - Background: `colors.primary` (gold)
@@ -123,7 +127,7 @@ Compact, flat rows. No elevation, no cards.
 Replaces the full-screen `RecordingOverlay`. Built with reanimated + gesture handler (no new deps).
 
 ### Trigger
-FAB tap → recording starts immediately → sheet slides up.
+FAB tap → start recording → on success, sheet slides up. If recording fails to start (permission denied, audio error), FAB stays idle — no sheet. Permission is checked on mount (existing behavior).
 
 ### Layout (280px height)
 ```
@@ -188,8 +192,8 @@ FAB tap → recording starts immediately → sheet slides up.
 ### Data flow
 - Two queries to avoid missing old running tasks:
   - Main: `db.useQuery({ tasks: { $: { order: { createdAt: "desc" }, limit: 50 }, messages: {} } })` — recent tasks for history
-  - Active: `db.useQuery({ tasks: { $: { where: { or: [{ status: "running" }, { status: "pending" }] } } } })` — all active tasks regardless of age
-- Merge and deduplicate by task ID, then split into `activeTasks` and `historyTasks` arrays
+  - Active: `db.useQuery({ tasks: { $: { where: { or: [{ status: "running" }, { status: "pending" }] } }, messages: {} } })` — all active tasks regardless of age, with messages for detail modal
+- Merge and deduplicate by task ID (active query wins on conflict to ensure fresh data), then split into `activeTasks` and `historyTasks` arrays
 - Recording callbacks (`startRecording`, `stopRecording`, `cancelRecording`) passed from HomeScreen to FAB + Sheet
 - `selectedTask` state + detail modal remain in HomeScreen
 
