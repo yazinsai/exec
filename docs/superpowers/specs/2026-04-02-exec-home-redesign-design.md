@@ -147,15 +147,20 @@ FAB tap → recording starts immediately → sheet slides up.
 ### Behavior
 - No pause/resume — just record and done
 - Swipe down to dismiss = cancel recording (same as Delete)
-- "Done" = stop recording + transcribe + create task
-- Sheet dismisses immediately on "Done", transcription happens in background
-- New task appears in Active section with "pending" status
+- "Done" = stop recording → sheet transitions to "Transcribing..." state (spinner replaces waveform, controls disabled) → task created → sheet dismisses
+- If transcription fails or returns empty, show brief error text in sheet ("No speech detected" / "Transcription failed"), then dismiss after 1.5s
+- New task appears in Active section with "pending" status once transcription completes
 - Waveform: reuse existing `Waveform` component, ~100px height
 - Duration: same format as current overlay (`MM:SS.0`)
 
+### Recording guards
+- `startRecording` must check `recordingRef.current` is null before creating a new recording (prevent overlapping sessions)
+- Add `isProcessing` state flag — set true during transcription, prevents FAB re-tap
+- `cancelRecording` must call `Audio.setAudioModeAsync({ allowsRecordingIOS: false })` to properly reset iOS audio session (matching `stopRecording` behavior)
+
 ### Controls
 - "Delete" (left): `colors.error` text, cancels recording, dismisses sheet
-- "Done" (right): `colors.primary` text, stops recording, triggers transcription
+- "Done" (right): `colors.primary` text, stops recording, shows transcribing state
 
 ## Component Architecture
 
@@ -181,8 +186,10 @@ FAB tap → recording starts immediately → sheet slides up.
 - Detail modal — messages, follow-up input, live activity feed all unchanged
 
 ### Data flow
-- `db.useQuery({ tasks: { $: { order: { createdAt: "desc" }, limit: 50 }, messages: {} } })` — same query
-- HomeScreen splits tasks into `activeTasks` and `historyTasks` arrays
+- Two queries to avoid missing old running tasks:
+  - Main: `db.useQuery({ tasks: { $: { order: { createdAt: "desc" }, limit: 50 }, messages: {} } })` — recent tasks for history
+  - Active: `db.useQuery({ tasks: { $: { where: { or: [{ status: "running" }, { status: "pending" }] } } } })` — all active tasks regardless of age
+- Merge and deduplicate by task ID, then split into `activeTasks` and `historyTasks` arrays
 - Recording callbacks (`startRecording`, `stopRecording`, `cancelRecording`) passed from HomeScreen to FAB + Sheet
 - `selectedTask` state + detail modal remain in HomeScreen
 
