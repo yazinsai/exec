@@ -67,6 +67,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
+    [
+      "expo-share-intent",
+      {
+        iosActivationRules: {
+          NSExtensionActivationSupportsText: true,
+          NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+          NSExtensionActivationSupportsFileWithMaxCount: 100,
+        },
+        androidIntentFilters: ["text/*", "audio/*"],
+        androidMultiIntentFilters: ["audio/*"],
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

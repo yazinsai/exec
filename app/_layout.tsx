@@ -20,6 +20,7 @@ SplashScreen.preventAutoHideAsync();
 
 import { ThemeProvider, useThemeColors } from "@/hooks/useThemeColors";
 import { PushNotificationsProvider } from "@/hooks/usePushNotifications";
+import { ShareIntentHandler } from "@/hooks/useShareIntent";
 import { CrashReporter } from "@/components/CrashReporter";
 
 function AppContent() {
@@ -80,7 +81,9 @@ export default function RootLayout() {
     <CrashReporter>
       <ThemeProvider>
         <PushNotificationsProvider>
-          <AppContent />
+          <ShareIntentHandler>
+            <AppContent />
+          </ShareIntentHandler>
         </PushNotificationsProvider>
       </ThemeProvider>
     </CrashReporter>
