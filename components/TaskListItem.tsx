@@ -46,7 +46,7 @@ export function TaskListItem({
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
+        paddingHorizontal: spacing.xl,
         opacity: pressed ? 0.7 : 1,
       })}
     >

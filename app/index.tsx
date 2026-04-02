@@ -772,7 +772,7 @@ export default function HomeScreen() {
         {activeTasks.length > 0 && (
           <View
             style={{
-              paddingHorizontal: spacing.lg,
+              paddingHorizontal: spacing.xl,
               paddingBottom: spacing.md,
               gap: spacing.sm,
             }}
@@ -847,7 +847,7 @@ export default function HomeScreen() {
                     textTransform: "uppercase",
                     letterSpacing: typography.tracking.wider,
                     marginBottom: spacing.sm,
-                    paddingHorizontal: spacing.lg,
+                    paddingHorizontal: spacing.xl,
                   }}
                 >
                   Recent
