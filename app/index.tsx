@@ -336,6 +336,9 @@ export default function HomeScreen() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [followUpText, setFollowUpText] = useState("");
   const [sendingFollowUp, setSendingFollowUp] = useState(false);
+  const [isRecordingFollowUp, setIsRecordingFollowUp] = useState(false);
+  const [isTranscribingFollowUp, setIsTranscribingFollowUp] = useState(false);
+  const followUpRecordingRef = useRef<Audio.Recording | null>(null);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -577,6 +580,48 @@ export default function HomeScreen() {
     }
     setSendingFollowUp(false);
   }, [selectedTask, followUpText]);
+
+  // Voice follow-up recording
+  const toggleFollowUpRecording = useCallback(async () => {
+    if (isRecordingFollowUp) {
+      // Stop recording and transcribe
+      const recording = followUpRecordingRef.current;
+      if (!recording) return;
+      followUpRecordingRef.current = null;
+      setIsRecordingFollowUp(false);
+      setIsTranscribingFollowUp(true);
+
+      try {
+        const status = await recording.getStatusAsync();
+        if (status.canRecord) {
+          await recording.stopAndUnloadAsync();
+        }
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+
+        const tempId = id();
+        const { filePath } = await saveRecordingLocally(recording, tempId);
+        const transcription = await transcribeAudio(filePath);
+        if (transcription.trim()) {
+          setFollowUpText((prev) => (prev ? prev + " " + transcription.trim() : transcription.trim()));
+        }
+      } catch (error) {
+        console.error("Failed to transcribe follow-up:", error);
+      }
+      setIsTranscribingFollowUp(false);
+    } else {
+      // Start recording
+      if (hasPermission === false) return;
+      try {
+        await configureAudioMode();
+        const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
+        followUpRecordingRef.current = recording;
+        setIsRecordingFollowUp(true);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (error) {
+        console.error("Failed to start follow-up recording:", error);
+      }
+    }
+  }, [isRecordingFollowUp, hasPermission]);
 
   // Cancel task handler
   const cancelTask = useCallback(async () => {
@@ -873,7 +918,7 @@ export default function HomeScreen() {
                 data={tasks}
                 keyExtractor={(item) => item.id}
                 renderItem={renderTask}
-                contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 20 }}
+                contentContainerStyle={{ paddingTop: spacing.lg, paddingBottom: 60, paddingHorizontal: spacing.md }}
                 showsVerticalScrollIndicator={false}
               />
             )}
@@ -903,11 +948,19 @@ export default function HomeScreen() {
           visible={!!selectedTask}
           animationType="slide"
           presentationStyle="pageSheet"
-          onRequestClose={() => setSelectedTask(null)}
+          onRequestClose={() => {
+            if (followUpRecordingRef.current) {
+              followUpRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+              followUpRecordingRef.current = null;
+              setIsRecordingFollowUp(false);
+              setIsTranscribingFollowUp(false);
+            }
+            setSelectedTask(null);
+          }}
         >
           <KeyboardAvoidingView
             style={{ flex: 1, backgroundColor: colors.background }}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior="padding"
           >
             {selectedTask && (
               <>
@@ -947,7 +1000,15 @@ export default function HomeScreen() {
                     </View>
 
                     <Pressable
-                      onPress={() => setSelectedTask(null)}
+                      onPress={() => {
+                        if (followUpRecordingRef.current) {
+                          followUpRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+                          followUpRecordingRef.current = null;
+                          setIsRecordingFollowUp(false);
+                          setIsTranscribingFollowUp(false);
+                        }
+                        setSelectedTask(null);
+                      }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -1207,11 +1268,41 @@ export default function HomeScreen() {
                       backgroundColor: colors.background,
                     }}
                   >
+                    {/* Mic button */}
+                    <Pressable
+                      onPress={() => toggleFollowUpRecording()}
+                      disabled={isTranscribingFollowUp}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      style={({ pressed }) => [
+                        {
+                          width: isRecordingFollowUp ? 42 : 36,
+                          height: isRecordingFollowUp ? 42 : 36,
+                          borderRadius: isRecordingFollowUp ? 21 : 18,
+                          backgroundColor: isRecordingFollowUp
+                            ? "#ef4444"
+                            : colors.backgroundElevated,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      {isTranscribingFollowUp ? (
+                        <ActivityIndicator size="small" color={colors.textMuted} />
+                      ) : (
+                        <Ionicons
+                          name={isRecordingFollowUp ? "stop" : "mic"}
+                          size={isRecordingFollowUp ? 20 : 18}
+                          color={isRecordingFollowUp ? colors.white : colors.textMuted}
+                        />
+                      )}
+                    </Pressable>
+
                     <TextInput
                       value={followUpText}
                       onChangeText={setFollowUpText}
-                      placeholder="Follow up..."
-                      placeholderTextColor={colors.textMuted}
+                      placeholder={isRecordingFollowUp ? "Recording..." : "Follow up..."}
+                      placeholderTextColor={isRecordingFollowUp ? "#ef4444" : colors.textMuted}
                       style={{
                         flex: 1,
                         backgroundColor: colors.backgroundElevated,
