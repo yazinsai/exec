@@ -27,7 +27,6 @@ interface ActiveTaskCardProps {
   cancelRequested?: boolean | null;
   errorMessage?: string | null;
   onView: () => void;
-  onCancel: () => void;
   onRetry?: () => void;
 }
 
@@ -48,7 +47,6 @@ export function ActiveTaskCard({
   cancelRequested,
   errorMessage,
   onView,
-  onCancel,
   onRetry,
 }: ActiveTaskCardProps) {
   const colors = useColors();
@@ -113,14 +111,16 @@ export function ActiveTaskCard({
   const statusColor = borderColor;
 
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={onView}
+      style={({ pressed }) => ({
         flexDirection: "row",
         backgroundColor: colors.backgroundElevated,
         borderRadius: radii.lg,
         overflow: "hidden",
         ...shadows.sm,
-      }}
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
       {/* Animated left border */}
       <Animated.View
@@ -200,26 +200,6 @@ export function ActiveTaskCard({
               </Pressable>
             )}
 
-            {!isTranscribing && !isTranscriptionFailed && (
-              <Pressable onPress={onView} hitSlop={8}>
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.medium,
-                  }}
-                >
-                  View
-                </Text>
-              </Pressable>
-            )}
-
-            {isRunning && !cancelRequested && (
-              <Pressable onPress={onCancel} hitSlop={8}>
-                <Ionicons name="close" size={16} color={colors.textTertiary} />
-              </Pressable>
-            )}
-
             {cancelRequested && (
               <Text
                 style={{
@@ -234,6 +214,6 @@ export function ActiveTaskCard({
           </View>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }

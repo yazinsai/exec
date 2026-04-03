@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
+  Alert,
 } from "react-native";
 import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -403,6 +404,7 @@ export default function HomeScreen() {
   const modalListContentHeight = useRef(0);
   const modalListScrollY = useRef(0);
   const [showJumpToEnd, setShowJumpToEnd] = useState(false);
+  const [showJumpToTop, setShowJumpToTop] = useState(false);
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isSaving;
@@ -945,8 +947,8 @@ export default function HomeScreen() {
                   setSelectedTask(task);
                   setFollowUpText("");
                   setShowJumpToEnd(false);
+                  setShowJumpToTop(false);
                 }}
-                onCancel={() => cancelTask(task.id)}
                 onRetry={
                   task.status === "transcription_failed" && (task as any).audioFilePath
                     ? () => retryTranscription(task.id, (task as any).audioFilePath)
@@ -997,6 +999,7 @@ export default function HomeScreen() {
                   setSelectedTask(item);
                   setFollowUpText("");
                   setShowJumpToEnd(false);
+                  setShowJumpToTop(false);
                 }}
               />
             )}
@@ -1138,6 +1141,7 @@ export default function HomeScreen() {
                     modalListLayoutHeight.current = layoutMeasurement.height;
                     const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
                     setShowJumpToEnd(distanceFromEnd > 300);
+                    setShowJumpToTop(contentOffset.y > 300);
                   }}
                   scrollEventThrottle={100}
                   onContentSizeChange={(_, contentHeight) => {
@@ -1208,7 +1212,20 @@ export default function HomeScreen() {
                       {/* Cancel button */}
                       {selectedTask.status === "running" && !selectedTask.cancelRequested && (
                         <Pressable
-                          onPress={() => cancelTask(selectedTask.id)}
+                          onPress={() => {
+                            Alert.alert(
+                              "Cancel Task",
+                              "Are you sure you want to cancel this task?",
+                              [
+                                { text: "No", style: "cancel" },
+                                {
+                                  text: "Yes, Cancel",
+                                  style: "destructive",
+                                  onPress: () => cancelTask(selectedTask.id),
+                                },
+                              ]
+                            );
+                          }}
                           accessibilityRole="button"
                           accessibilityLabel="Cancel task"
                           style={{
@@ -1272,7 +1289,9 @@ export default function HomeScreen() {
                     </>
                   }
                   ListFooterComponent={
-                    selectedTask.result ? (
+                    selectedTask.result &&
+                    selectedTask.status !== "running" &&
+                    !(selectedTask.messages?.some((m: Message) => m.role === "user")) ? (
                       <View style={{ marginTop: spacing.md }}>
                         <View
                           style={{
@@ -1399,6 +1418,31 @@ export default function HomeScreen() {
                     );
                   }}
                 />
+
+                {/* Jump to top button */}
+                {showJumpToTop && (
+                  <Pressable
+                    onPress={() => modalListRef.current?.scrollToOffset({ offset: 0, animated: true })}
+                    style={{
+                      position: "absolute",
+                      right: spacing.xl,
+                      bottom: showJumpToEnd ? 130 : 80,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: colors.backgroundElevated,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      ...shadows.sm,
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Jump to top"
+                  >
+                    <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
+                  </Pressable>
+                )}
 
                 {/* Jump to end button */}
                 {showJumpToEnd && (
