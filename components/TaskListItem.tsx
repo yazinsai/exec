@@ -53,6 +53,8 @@ export function TaskListItem({
         numberOfLines={1}
         style={{
           flex: 1,
+          flexShrink: 1,
+          minWidth: 0,
           color: colors.textPrimary,
           fontSize: typography.base,
           fontFamily: fontFamily.regular,
@@ -62,7 +64,7 @@ export function TaskListItem({
         {title}
       </Text>
 
-      <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 0, marginLeft: spacing.sm, gap: spacing.sm }}>
+      <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 0, marginLeft: spacing.sm, gap: spacing.xs }}>
         <Text
           style={{
             color: colors.textTertiary,
