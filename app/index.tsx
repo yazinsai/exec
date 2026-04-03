@@ -367,6 +367,9 @@ export default function HomeScreen() {
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<FlatList>(null);
   const modalListRef = useRef<FlatList>(null);
+  const modalListLayoutHeight = useRef(0);
+  const modalListContentHeight = useRef(0);
+  const modalListScrollY = useRef(0);
   const [showJumpToEnd, setShowJumpToEnd] = useState(false);
 
   const isActive = isRecording || isSaving;
@@ -983,10 +986,23 @@ export default function HomeScreen() {
                   showsVerticalScrollIndicator={false}
                   onScroll={(e) => {
                     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+                    modalListScrollY.current = contentOffset.y;
+                    modalListContentHeight.current = contentSize.height;
+                    modalListLayoutHeight.current = layoutMeasurement.height;
                     const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
                     setShowJumpToEnd(distanceFromEnd > 300);
                   }}
                   scrollEventThrottle={100}
+                  onContentSizeChange={(_, contentHeight) => {
+                    modalListContentHeight.current = contentHeight;
+                    const distanceFromEnd = contentHeight - modalListLayoutHeight.current - modalListScrollY.current;
+                    setShowJumpToEnd(distanceFromEnd > 300);
+                  }}
+                  onLayout={(e) => {
+                    modalListLayoutHeight.current = e.nativeEvent.layout.height;
+                    const distanceFromEnd = modalListContentHeight.current - e.nativeEvent.layout.height - modalListScrollY.current;
+                    setShowJumpToEnd(distanceFromEnd > 300);
+                  }}
                   ListHeaderComponent={
                     <>
                       {/* Task input */}
