@@ -283,7 +283,7 @@ function createTray() {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip("Exec — Cmd+Shift+Space to record");
+  tray.setToolTip("Exec — Cmd+Option+Space to record");
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -292,7 +292,7 @@ function createTray() {
     },
     { type: "separator" },
     {
-      label: "Record (Cmd+Shift+Space)",
+      label: "Record (Cmd+Option+Space)",
       click: () => handleHotkeyDown(),
     },
     { type: "separator" },
@@ -325,10 +325,10 @@ app.whenReady().then(() => {
   });
 
   if (!registered) {
-    console.error("Failed to register global shortcut Cmd+Shift+Space");
+    console.error("Failed to register global shortcut Cmd+Option+Space");
     console.error("Another app may be using this shortcut.");
   } else {
-    console.log("Exec Desktop ready — Cmd+Shift+Space to record");
+    console.log("Exec Desktop ready — Cmd+Option+Space to record");
   }
 });
 
