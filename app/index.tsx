@@ -11,10 +11,12 @@ import {
   ActivityIndicator,
   Keyboard,
 } from "react-native";
+import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Markdown from "react-native-markdown-display";
 import * as Haptics from "expo-haptics";
+import * as Updates from "expo-updates";
 import { Ionicons } from "@expo/vector-icons";
 import { id } from "@instantdb/react-native";
 import { db } from "@/lib/db";
@@ -343,6 +345,26 @@ function relativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
+function getReleaseInfo() {
+  const version = Constants.expoConfig?.version ?? "dev";
+  const channel =
+    Updates.channel || (__DEV__ ? "dev" : Platform.OS === "web" ? "web" : "embedded");
+
+  let nativeBuild: string | number | null = null;
+  if (Platform.OS === "ios") {
+    nativeBuild = Constants.platform?.ios?.buildNumber ?? null;
+  } else if (Platform.OS === "android") {
+    nativeBuild = Constants.platform?.android?.versionCode ?? null;
+  }
+
+  const build = nativeBuild ? `${version} (${nativeBuild})` : version;
+
+  return {
+    channel: channel.toUpperCase(),
+    build,
+  };
+}
+
 export default function HomeScreen() {
   const { colors, isDark } = useThemeColors();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -371,6 +393,7 @@ export default function HomeScreen() {
   const modalListContentHeight = useRef(0);
   const modalListScrollY = useRef(0);
   const [showJumpToEnd, setShowJumpToEnd] = useState(false);
+  const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isSaving;
 
@@ -778,6 +801,9 @@ export default function HomeScreen() {
         {/* Header */}
         <View
           style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
             paddingHorizontal: spacing.xl,
             paddingTop: spacing.md,
             paddingBottom: spacing.lg,
@@ -790,9 +816,40 @@ export default function HomeScreen() {
               color: colors.textPrimary,
               letterSpacing: typography.tracking.tight,
             }}
-          >
+            >
             Exec
           </Text>
+
+          <View
+            style={{
+              alignItems: "flex-end",
+              marginLeft: spacing.lg,
+              flexShrink: 0,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.semibold,
+                textTransform: "uppercase",
+                letterSpacing: typography.tracking.wider,
+              }}
+            >
+              {releaseInfo.channel}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.textSecondary,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.regular,
+                marginTop: 2,
+              }}
+            >
+              {releaseInfo.build}
+            </Text>
+          </View>
         </View>
 
         {/* Active Tasks (fixed, non-scrolling) */}
