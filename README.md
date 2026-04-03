@@ -11,7 +11,7 @@ Phone (Expo) → InstantDB ← Agent (Bun + Claude Agent SDK) ← Desktop (Elect
 Three components:
 - **Mobile app** — Expo/React Native. Record voice, view task status + results
 - **Agent process** — Bun. Polls InstantDB for tasks, executes via Claude Agent SDK
-- **Desktop hotkey** — Electron. `Cmd+Shift+Space` push-to-talk overlay
+- **Desktop hotkey** — Electron. `Cmd+Option+Space` push-to-talk overlay
 
 ## Prerequisites
 
@@ -68,7 +68,7 @@ npm install
 npm start           # Launch Electron app
 ```
 
-Press `Cmd+Shift+Space` to record. Press again to stop, transcribe, and send to the agent. Runs as a menubar tray app.
+Press `Cmd+Option+Space` to record. Press again to stop, transcribe, and send to the agent. Runs as a menubar tray app.
 
 ## Building & Deploying
 
