@@ -15,29 +15,19 @@ const { execFile } = require("child_process");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
-// Also try parent .env for GROQ key
-if (!process.env.GROQ_API_KEY) {
-  require("dotenv").config({
-    path: path.join(__dirname, "..", ".env"),
-    override: false,
-  });
-  if (process.env.EXPO_PUBLIC_GROQ_API_KEY && !process.env.GROQ_API_KEY) {
-    process.env.GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-  }
-}
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
 
 const { init, id: instantId } = require("@instantdb/admin");
 
 // --- InstantDB setup ---
 const INSTANT_APP_ID = process.env.INSTANT_APP_ID;
 const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-const GROQ_API_KEY =
-  process.env.GROQ_API_KEY || process.env.EXPO_PUBLIC_GROQ_API_KEY;
-
-if (!GROQ_API_KEY) {
-  console.error("Missing GROQ_API_KEY in environment");
-  process.exit(1);
-}
+const WHISPER_MODEL = path.join(
+  os.homedir(),
+  ".local/share/whisper-cpp/models/ggml-large-v3-turbo.bin"
+);
+const WHISPER_CLI = "/opt/homebrew/bin/whisper-cli";
 
 const db = init({ appId: INSTANT_APP_ID, adminToken: INSTANT_ADMIN_TOKEN });
 
@@ -152,38 +142,17 @@ function stopRecording() {
   });
 }
 
-// --- Groq Transcription ---
+// --- Local Whisper Transcription ---
 async function transcribeAudio(audioPath) {
-  const FormData = require("form-data");
-  const fetch = require("node-fetch");
+  const { stdout } = await execFileAsync(WHISPER_CLI, [
+    "--model", WHISPER_MODEL,
+    "--language", "en",
+    "--no-timestamps",
+    "--no-prints",
+    audioPath,
+  ], { timeout: 60000 });
 
-  const form = new FormData();
-  form.append("file", fs.createReadStream(audioPath), {
-    filename: "recording.wav",
-    contentType: "audio/wav",
-  });
-  form.append("model", "whisper-large-v3-turbo");
-  form.append("language", "en");
-
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/audio/transcriptions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        ...form.getHeaders(),
-      },
-      body: form,
-    }
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Groq API error ${response.status}: ${text}`);
-  }
-
-  const data = await response.json();
-  return data.text;
+  return stdout.trim();
 }
 
 // --- InstantDB Task Creation ---
