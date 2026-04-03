@@ -988,7 +988,7 @@ export default function HomeScreen() {
                           marginBottom: spacing.xs,
                         }}
                       >
-                        {selectedTask.input}
+                        {selectedTask.summary || selectedTask.input}
                       </Text>
                       <Text
                         style={{
