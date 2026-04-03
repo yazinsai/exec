@@ -366,6 +366,8 @@ export default function HomeScreen() {
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<FlatList>(null);
+  const modalListRef = useRef<FlatList>(null);
+  const [showJumpToEnd, setShowJumpToEnd] = useState(false);
 
   const isActive = isRecording || isSaving;
 
@@ -788,6 +790,7 @@ export default function HomeScreen() {
                 onView={() => {
                   setSelectedTask(task);
                   setFollowUpText("");
+                  setShowJumpToEnd(false);
                 }}
                 onCancel={() => cancelTask(task.id)}
               />
@@ -834,6 +837,7 @@ export default function HomeScreen() {
                 onPress={() => {
                   setSelectedTask(item);
                   setFollowUpText("");
+                  setShowJumpToEnd(false);
                 }}
               />
             )}
@@ -969,6 +973,7 @@ export default function HomeScreen() {
 
                 {/* Scrollable content */}
                 <FlatList
+                  ref={modalListRef}
                   data={[...(selectedTask.messages ?? [])].sort((a, b) => a.createdAt - b.createdAt)}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={{
@@ -976,6 +981,12 @@ export default function HomeScreen() {
                     paddingBottom: 100,
                   }}
                   showsVerticalScrollIndicator={false}
+                  onScroll={(e) => {
+                    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+                    const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
+                    setShowJumpToEnd(distanceFromEnd > 300);
+                  }}
+                  scrollEventThrottle={100}
                   ListHeaderComponent={
                     <>
                       {/* Task input */}
@@ -1225,6 +1236,31 @@ export default function HomeScreen() {
                     );
                   }}
                 />
+
+                {/* Jump to end button */}
+                {showJumpToEnd && (
+                  <Pressable
+                    onPress={() => modalListRef.current?.scrollToEnd({ animated: true })}
+                    style={{
+                      position: "absolute",
+                      right: spacing.xl,
+                      bottom: 80,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: colors.backgroundElevated,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      ...shadows.sm,
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Jump to end"
+                  >
+                    <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                  </Pressable>
+                )}
 
                 {/* Follow-up input */}
                 <SafeAreaView edges={["bottom"]}>

@@ -9,7 +9,6 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
   withRepeat,
   withSequence,
@@ -74,10 +73,10 @@ export function RecordingSheet({
   // Slide in/out
   useEffect(() => {
     if (isVisible) {
-      translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+      translateY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.cubic) });
       backdropOpacity.value = withTiming(1, { duration: 200 });
     } else {
-      translateY.value = withSpring(SHEET_HEIGHT, { damping: 20, stiffness: 200 });
+      translateY.value = withTiming(SHEET_HEIGHT, { duration: 200, easing: Easing.in(Easing.cubic) });
       backdropOpacity.value = withTiming(0, { duration: 200 });
     }
   }, [isVisible, translateY, backdropOpacity]);
@@ -103,11 +102,11 @@ export function RecordingSheet({
     })
     .onEnd((e) => {
       if (e.translationY > 80) {
-        translateY.value = withSpring(SHEET_HEIGHT, { damping: 20, stiffness: 200 });
+        translateY.value = withTiming(SHEET_HEIGHT, { duration: 200, easing: Easing.in(Easing.cubic) });
         backdropOpacity.value = withTiming(0, { duration: 200 });
         runOnJS(onDelete)();
       } else {
-        translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+        translateY.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
       }
     })
     .enabled(!isSaving);
