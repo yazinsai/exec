@@ -1019,7 +1019,7 @@ export default function HomeScreen() {
                 </Text>
               ) : null
             }
-            ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
             contentContainerStyle={{
               paddingTop: spacing.sm,
               paddingHorizontal: spacing.xl,

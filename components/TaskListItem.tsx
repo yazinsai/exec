@@ -1,5 +1,4 @@
 import { View, Text, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, fontFamily } from "@/constants/Colors";
 
@@ -9,12 +8,6 @@ interface TaskListItemProps {
   createdAt: number;
   onPress: () => void;
 }
-
-const STATUS_ICONS: Record<string, { name: string; colorKey: string }> = {
-  done: { name: "checkmark-circle", colorKey: "statusDone" },
-  failed: { name: "alert-circle", colorKey: "statusFailed" },
-  cancelled: { name: "close-circle", colorKey: "statusCancelled" },
-};
 
 function relativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -36,8 +29,6 @@ export function TaskListItem({
   onPress,
 }: TaskListItemProps) {
   const colors = useColors();
-  const icon = STATUS_ICONS[status] ?? STATUS_ICONS.done;
-  const iconColor = (colors as any)[icon.colorKey] as string;
 
   return (
     <Pressable
@@ -45,12 +36,11 @@ export function TaskListItem({
       style={({ pressed }) => ({
         width: "100%",
         position: "relative",
-        paddingVertical: spacing.lg,
-        marginBottom: spacing.xs,
+        paddingVertical: spacing.xl,
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View style={{ paddingRight: 84 }}>
+      <View style={{ paddingRight: 72 }}>
         <Text
           numberOfLines={1}
           style={{
@@ -72,19 +62,17 @@ export function TaskListItem({
           bottom: 0,
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.xs,
         }}
       >
         <Text
           style={{
             color: colors.textTertiary,
-            fontSize: typography.xs,
+            fontSize: typography.sm,
             fontFamily: fontFamily.regular,
           }}
         >
           {relativeTime(createdAt)}
         </Text>
-        <Ionicons name={icon.name as any} size={13} color={iconColor} />
       </View>
     </Pressable>
   );
