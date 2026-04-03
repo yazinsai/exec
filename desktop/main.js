@@ -316,7 +316,7 @@ app.whenReady().then(() => {
 
   // Register global shortcut
   // We use a single shortcut and track key state via IPC
-  const registered = globalShortcut.register("CommandOrControl+Shift+Space", () => {
+  const registered = globalShortcut.register("CommandOrControl+Option+Space", () => {
     if (!isRecording) {
       handleHotkeyDown();
     } else {
