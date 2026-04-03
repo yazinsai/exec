@@ -45,24 +45,25 @@ export function TaskListItem({
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.lg,
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <Text
-        numberOfLines={1}
-        style={{
-          flex: 1,
-          color: colors.textPrimary,
-          fontSize: typography.base,
-          fontFamily: fontFamily.regular,
-          lineHeight: 21,
-        }}
-      >
-        {title}
-      </Text>
+      <View style={{ flex: 1, flexShrink: 1, marginRight: spacing.md }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.base,
+            fontFamily: fontFamily.regular,
+            lineHeight: 21,
+          }}
+        >
+          {title}
+        </Text>
+      </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginLeft: spacing.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 0, gap: spacing.sm }}>
         <Text
           style={{
             color: colors.textTertiary,
