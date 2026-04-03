@@ -21,12 +21,14 @@ import type { ThemeColors } from "@/constants/Colors";
 
 interface ActiveTaskCardProps {
   title: string;
-  status: "running" | "pending";
+  status: "running" | "pending" | "transcribing" | "transcription_failed";
   startedAt?: number | null;
   createdAt: number;
   cancelRequested?: boolean | null;
+  errorMessage?: string | null;
   onView: () => void;
   onCancel: () => void;
+  onRetry?: () => void;
 }
 
 function formatElapsed(ms: number): string {
@@ -44,17 +46,27 @@ export function ActiveTaskCard({
   startedAt,
   createdAt,
   cancelRequested,
+  errorMessage,
   onView,
   onCancel,
+  onRetry,
 }: ActiveTaskCardProps) {
   const colors = useColors();
   const isRunning = status === "running";
-  const borderColor = isRunning ? colors.statusRunning : colors.statusPending;
+  const isTranscribing = status === "transcribing";
+  const isTranscriptionFailed = status === "transcription_failed";
+  const borderColor = isTranscriptionFailed
+    ? colors.statusFailed
+    : isTranscribing
+      ? colors.warning
+      : isRunning
+        ? colors.statusRunning
+        : colors.statusPending;
 
-  // Pulse animation for running tasks
+  // Pulse animation for running/transcribing tasks
   const borderOpacity = useSharedValue(1);
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning || isTranscribing) {
       borderOpacity.value = withRepeat(
         withSequence(
           withTiming(0.4, { duration: 400, easing: Easing.out(Easing.exp) }),
@@ -66,13 +78,13 @@ export function ActiveTaskCard({
     } else {
       borderOpacity.value = withTiming(1, { duration: 200 });
     }
-  }, [isRunning, borderOpacity]);
+  }, [isRunning, isTranscribing, borderOpacity]);
 
   const borderAnimatedStyle = useAnimatedStyle(() => ({
     opacity: borderOpacity.value,
   }));
 
-  // Elapsed time ticker
+  // Elapsed time ticker (only for running tasks)
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -91,7 +103,13 @@ export function ActiveTaskCard({
     };
   }, [isRunning, startedAt, createdAt]);
 
-  const statusLabel = isRunning ? "Executing" : "Queued";
+  const statusLabel = isTranscriptionFailed
+    ? "Transcription Failed"
+    : isTranscribing
+      ? "Transcribing..."
+      : isRunning
+        ? "Executing"
+        : "Queued";
   const statusColor = borderColor;
 
   return (
@@ -138,30 +156,63 @@ export function ActiveTaskCard({
             justifyContent: "space-between",
           }}
         >
-          <Text
-            style={{
-              color: statusColor,
-              fontSize: typography.xs,
-              fontFamily: fontFamily.medium,
-              letterSpacing: 0.3,
-            }}
-          >
-            {statusLabel}
-            {isRunning ? ` · ${formatElapsed(elapsed)}` : ""}
-          </Text>
-
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-            <Pressable onPress={onView} hitSlop={8}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text
+              style={{
+                color: statusColor,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.medium,
+                letterSpacing: 0.3,
+              }}
+            >
+              {statusLabel}
+              {isRunning ? ` · ${formatElapsed(elapsed)}` : ""}
+            </Text>
+            {isTranscriptionFailed && errorMessage && (
               <Text
+                numberOfLines={1}
                 style={{
-                  color: colors.textSecondary,
+                  color: colors.textTertiary,
                   fontSize: typography.xs,
-                  fontFamily: fontFamily.medium,
+                  fontFamily: fontFamily.regular,
                 }}
               >
-                View
+                {errorMessage}
               </Text>
-            </Pressable>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            {isTranscriptionFailed && onRetry && (
+              <Pressable onPress={onRetry} hitSlop={8}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="refresh" size={14} color={colors.primary} />
+                  <Text
+                    style={{
+                      color: colors.primary,
+                      fontSize: typography.xs,
+                      fontFamily: fontFamily.medium,
+                    }}
+                  >
+                    Retry
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+
+            {!isTranscribing && !isTranscriptionFailed && (
+              <Pressable onPress={onView} hitSlop={8}>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.medium,
+                  }}
+                >
+                  View
+                </Text>
+              </Pressable>
+            )}
 
             {isRunning && !cancelRequested && (
               <Pressable onPress={onCancel} hitSlop={8}>

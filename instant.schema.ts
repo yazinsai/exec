@@ -21,6 +21,7 @@ const _schema = i.schema({
       cancelRequested: i.boolean().optional(),
       lastSeenMessageId: i.string().optional(),
       errorMessage: i.string().optional(),
+      audioFilePath: i.string().optional(),
       createdAt: i.number().indexed(),
       startedAt: i.number().optional(),
       completedAt: i.number().optional(),

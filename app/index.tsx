@@ -58,6 +58,8 @@ function getStatusColor(status: string, colors: ThemeColors): string {
     done: colors.statusDone,
     failed: colors.statusFailed,
     cancelled: colors.statusCancelled,
+    transcribing: colors.warning,
+    transcription_failed: colors.statusFailed,
   };
   return map[status] ?? colors.statusPending;
 }
@@ -68,6 +70,8 @@ const STATUS_LABELS: Record<string, string> = {
   done: "Done",
   failed: "Failed",
   cancelled: "Cancelled",
+  transcribing: "Transcribing",
+  transcription_failed: "Transcription Failed",
 };
 
 // Tool icon mapping
@@ -419,6 +423,69 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // Transcribe a task's audio file and update it in InstantDB
+  const transcribeTask = useCallback(async (taskId: string, filePath: string) => {
+    try {
+      const transcription = await transcribeAudio(filePath);
+      if (!transcription || transcription.trim().length === 0) {
+        await db.transact(
+          db.tx.tasks[taskId].update({
+            status: "transcription_failed",
+            errorMessage: "No speech detected",
+          })
+        );
+        return;
+      }
+
+      const trimmedInput = transcription.trim();
+      const messageId = id();
+      const now = Date.now();
+
+      await db.transact([
+        db.tx.tasks[taskId].update({
+          input: trimmedInput,
+          status: "pending",
+          errorMessage: "",
+        }),
+        db.tx.messages[messageId]
+          .update({
+            role: "user",
+            content: trimmedInput,
+            createdAt: now,
+          })
+          .link({ task: taskId }),
+      ]);
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Generate summary in background (non-blocking)
+      summarizeInput(trimmedInput).then((summary) => {
+        if (summary) {
+          db.transact(db.tx.tasks[taskId].update({ summary }));
+        }
+      });
+    } catch (error) {
+      console.error("Transcription failed for task:", taskId, error);
+      await db.transact(
+        db.tx.tasks[taskId].update({
+          status: "transcription_failed",
+          errorMessage: error instanceof Error ? error.message : "Transcription failed",
+        })
+      );
+    }
+  }, []);
+
+  // Retry transcription for a failed task
+  const retryTranscription = useCallback(async (taskId: string, filePath: string) => {
+    await db.transact(
+      db.tx.tasks[taskId].update({
+        status: "transcribing",
+        errorMessage: "",
+      })
+    );
+    transcribeTask(taskId, filePath);
+  }, [transcribeTask]);
+
   // Query tasks
   const { data: recentData, isLoading: isLoadingRecent } = db.useQuery({
     tasks: {
@@ -431,7 +498,12 @@ export default function HomeScreen() {
     tasks: {
       $: {
         where: {
-          or: [{ status: "running" }, { status: "pending" }],
+          or: [
+            { status: "running" },
+            { status: "pending" },
+            { status: "transcribing" },
+            { status: "transcription_failed" },
+          ],
         },
       },
       messages: {},
@@ -439,6 +511,23 @@ export default function HomeScreen() {
   });
 
   const isLoading = isLoadingRecent || isLoadingActive;
+
+  // On startup, retry any tasks stuck in "transcribing" state (app was killed mid-transcription)
+  const retriedTasksRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!activeData?.tasks) return;
+    for (const task of activeData.tasks) {
+      if (
+        task.status === "transcribing" &&
+        (task as any).audioFilePath &&
+        !retriedTasksRef.current.has(task.id)
+      ) {
+        retriedTasksRef.current.add(task.id);
+        console.log("Retrying stuck transcription:", task.id);
+        transcribeTask(task.id, (task as any).audioFilePath);
+      }
+    }
+  }, [activeData?.tasks, transcribeTask]);
 
   // Merge and deduplicate (active query wins on conflict)
   const allTasks = (() => {
@@ -450,18 +539,20 @@ export default function HomeScreen() {
     return Array.from(taskMap.values());
   })();
 
+  const ACTIVE_STATUSES = new Set(["running", "pending", "transcribing", "transcription_failed"]);
+
   // Split into active + history
   const activeTasks = allTasks
-    .filter((t) => t.status === "running" || t.status === "pending")
+    .filter((t) => ACTIVE_STATUSES.has(t.status))
     .sort((a, b) => {
       if (a.status === "running" && b.status !== "running") return -1;
       if (b.status === "running" && a.status !== "running") return 1;
       return b.createdAt - a.createdAt;
     })
-    .slice(0, 3);
+    .slice(0, 5);
 
   const allActiveIds = new Set(
-    allTasks.filter((t) => t.status === "running" || t.status === "pending").map((t) => t.id)
+    allTasks.filter((t) => ACTIVE_STATUSES.has(t.status)).map((t) => t.id)
   );
   const historyTasks = allTasks
     .filter((t) => !allActiveIds.has(t.id))
@@ -560,54 +651,28 @@ export default function HomeScreen() {
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
-      const tempId = id();
-      const { filePath } = await saveRecordingLocally(recording, tempId);
-
-      // Transcribe
-      const transcription = await transcribeAudio(filePath);
-      if (!transcription || transcription.trim().length === 0) {
-        setRecordingError("No speech detected");
-        setTimeout(() => setRecordingError(null), 1500);
-        setIsSaving(false);
-        setIsProcessing(false);
-        setDuration(0);
-        setMetering(-160);
-        return;
-      }
-
-      // Create task + first message in InstantDB
       const taskId = id();
-      const messageId = id();
-      const now = Date.now();
-      const trimmedInput = transcription.trim();
+      const { filePath } = await saveRecordingLocally(recording, taskId);
 
-      await db.transact([
+      // Create task immediately in InstantDB (before transcription)
+      const now = Date.now();
+      await db.transact(
         db.tx.tasks[taskId].update({
-          input: trimmedInput,
-          status: "pending",
+          input: "Transcribing...",
+          status: "transcribing",
           source: "phone",
+          audioFilePath: filePath,
           createdAt: now,
-        }),
-        db.tx.messages[messageId]
-          .update({
-            role: "user",
-            content: trimmedInput,
-            createdAt: now,
-          })
-          .link({ task: taskId }),
-      ]);
+        })
+      );
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Generate summary in background (non-blocking)
-      summarizeInput(trimmedInput).then((summary) => {
-        if (summary) {
-          db.transact(db.tx.tasks[taskId].update({ summary }));
-        }
-      });
+      // Transcribe in background (non-blocking)
+      transcribeTask(taskId, filePath);
     } catch (error) {
       console.error("Failed to save recording:", error);
-      setRecordingError("Transcription failed");
+      setRecordingError("Failed to save recording");
       setTimeout(() => setRecordingError(null), 1500);
     }
 
@@ -615,7 +680,7 @@ export default function HomeScreen() {
     setIsProcessing(false);
     setDuration(0);
     setMetering(-160);
-  }, []);
+  }, [transcribeTask]);
 
   // Follow-up message handler
   const sendFollowUp = useCallback(async () => {
@@ -871,16 +936,22 @@ export default function HomeScreen() {
               <ActiveTaskCard
                 key={task.id}
                 title={task.summary || task.input}
-                status={task.status as "running" | "pending"}
+                status={task.status as "running" | "pending" | "transcribing" | "transcription_failed"}
                 startedAt={(task as any).startedAt}
                 createdAt={task.createdAt}
                 cancelRequested={(task as any).cancelRequested}
+                errorMessage={(task as any).errorMessage}
                 onView={() => {
                   setSelectedTask(task);
                   setFollowUpText("");
                   setShowJumpToEnd(false);
                 }}
                 onCancel={() => cancelTask(task.id)}
+                onRetry={
+                  task.status === "transcription_failed" && (task as any).audioFilePath
+                    ? () => retryTranscription(task.id, (task as any).audioFilePath)
+                    : undefined
+                }
               />
             ))}
           </View>
@@ -945,7 +1016,7 @@ export default function HomeScreen() {
                 </Text>
               ) : null
             }
-            ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
             contentContainerStyle={{
               paddingTop: spacing.sm,
               paddingHorizontal: spacing.xl,
