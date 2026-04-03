@@ -9,8 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "update": "eas update --auto",
-    "update:preview": "eas update --channel preview --auto",
+    "update": "echo 'Publishing update to preview by default' && eas update --channel preview --auto",
+    "update:preview": "echo 'Publishing update to preview channel' && eas update --channel preview --auto",
     "update:production": "eas update --channel production --auto"
   },
   "dependencies": {

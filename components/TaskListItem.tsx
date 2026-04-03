@@ -43,28 +43,38 @@ export function TaskListItem({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
+        width: "100%",
+        position: "relative",
         paddingVertical: spacing.lg,
+        marginBottom: spacing.xs,
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <Text
-        numberOfLines={1}
+      <View style={{ paddingRight: 84 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.base,
+            fontFamily: fontFamily.regular,
+            lineHeight: 21,
+          }}
+        >
+          {title}
+        </Text>
+      </View>
+
+      <View
         style={{
-          flex: 1,
-          flexShrink: 1,
-          minWidth: 0,
-          color: colors.textPrimary,
-          fontSize: typography.base,
-          fontFamily: fontFamily.regular,
-          lineHeight: 21,
+          position: "absolute",
+          right: 0,
+          top: 0,
+          bottom: 0,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.xs,
         }}
       >
-        {title}
-      </Text>
-
-      <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 0, marginLeft: spacing.sm, gap: spacing.xs }}>
         <Text
           style={{
             color: colors.textTertiary,

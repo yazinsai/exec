@@ -349,6 +349,11 @@ function getReleaseInfo() {
   const version = Constants.expoConfig?.version ?? "dev";
   const channel =
     Updates.channel || (__DEV__ ? "dev" : Platform.OS === "web" ? "web" : "embedded");
+  const updateId = Updates.updateId
+    ? Updates.updateId.split("-")[0]
+    : Updates.isEmbeddedLaunch
+      ? "embedded"
+      : "none";
 
   let nativeBuild: string | number | null = null;
   if (Platform.OS === "ios") {
@@ -362,6 +367,7 @@ function getReleaseInfo() {
   return {
     channel: channel.toUpperCase(),
     build,
+    updateId,
   };
 }
 
@@ -847,7 +853,7 @@ export default function HomeScreen() {
                 marginTop: 2,
               }}
             >
-              {releaseInfo.build}
+              {releaseInfo.build} / ID {releaseInfo.updateId}
             </Text>
           </View>
         </View>
@@ -939,6 +945,7 @@ export default function HomeScreen() {
                 </Text>
               ) : null
             }
+            ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
             contentContainerStyle={{
               paddingTop: spacing.sm,
               paddingHorizontal: spacing.xl,
