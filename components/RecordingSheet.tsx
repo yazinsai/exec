@@ -126,7 +126,7 @@ export function RecordingSheet({
         ]}
         pointerEvents="auto"
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={controlsDisabled ? undefined : onDelete} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={undefined} />
       </Animated.View>
 
       {/* Sheet */}
