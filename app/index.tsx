@@ -612,46 +612,68 @@ export default function HomeScreen() {
   }, [selectedTask, followUpText]);
 
   // Voice follow-up recording
-  const toggleFollowUpRecording = useCallback(async () => {
-    if (isRecordingFollowUp) {
-      // Stop recording and transcribe
-      const recording = followUpRecordingRef.current;
-      if (!recording) return;
-      followUpRecordingRef.current = null;
-      setIsRecordingFollowUp(false);
-      setIsTranscribingFollowUp(true);
+  const startFollowUpRecording = useCallback(async () => {
+    if (hasPermission === false) return;
+    try {
+      Keyboard.dismiss();
+      await configureAudioMode();
+      const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
+      followUpRecordingRef.current = recording;
+      setIsRecordingFollowUp(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error("Failed to start follow-up recording:", error);
+    }
+  }, [hasPermission]);
 
+  const cancelFollowUpRecording = useCallback(async () => {
+    const recording = followUpRecordingRef.current;
+    followUpRecordingRef.current = null;
+    setIsRecordingFollowUp(false);
+    if (recording) {
       try {
         const status = await recording.getStatusAsync();
-        if (status.canRecord) {
-          await recording.stopAndUnloadAsync();
-        }
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
-        const tempId = id();
-        const { filePath } = await saveRecordingLocally(recording, tempId);
-        const transcription = await transcribeAudio(filePath);
-        if (transcription.trim()) {
-          setFollowUpText((prev) => (prev ? prev + " " + transcription.trim() : transcription.trim()));
-        }
-      } catch (error) {
-        console.error("Failed to transcribe follow-up:", error);
-      }
-      setIsTranscribingFollowUp(false);
-    } else {
-      // Start recording
-      if (hasPermission === false) return;
-      try {
-        await configureAudioMode();
-        const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
-        followUpRecordingRef.current = recording;
-        setIsRecordingFollowUp(true);
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (error) {
-        console.error("Failed to start follow-up recording:", error);
-      }
+        if (status.canRecord) await recording.stopAndUnloadAsync();
+      } catch {}
     }
-  }, [isRecordingFollowUp, hasPermission]);
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+  }, []);
+
+  const submitFollowUpRecording = useCallback(async () => {
+    if (!selectedTask) return;
+    const recording = followUpRecordingRef.current;
+    if (!recording) return;
+    followUpRecordingRef.current = null;
+    setIsRecordingFollowUp(false);
+    setIsTranscribingFollowUp(true);
+
+    try {
+      const status = await recording.getStatusAsync();
+      if (status.canRecord) await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+
+      const tempId = id();
+      const { filePath } = await saveRecordingLocally(recording, tempId);
+      const transcription = await transcribeAudio(filePath);
+      const trimmed = transcription.trim();
+      if (trimmed) {
+        const messageId = id();
+        const now = Date.now();
+        await db.transact([
+          db.tx.messages[messageId]
+            .update({ role: "user", content: trimmed, createdAt: now })
+            .link({ task: selectedTask.id }),
+          ...(selectedTask.status === "done" || selectedTask.status === "failed"
+            ? [db.tx.tasks[selectedTask.id].update({ status: "pending" })]
+            : []),
+        ]);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (error) {
+      console.error("Failed to transcribe follow-up:", error);
+    }
+    setIsTranscribingFollowUp(false);
+  }, [selectedTask]);
 
   // Cancel task handler
   const cancelTask = useCallback(async (taskId: string) => {
@@ -901,12 +923,7 @@ export default function HomeScreen() {
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={() => {
-            if (followUpRecordingRef.current) {
-              followUpRecordingRef.current.stopAndUnloadAsync().catch(() => {});
-              followUpRecordingRef.current = null;
-              setIsRecordingFollowUp(false);
-              setIsTranscribingFollowUp(false);
-            }
+            cancelFollowUpRecording();
             setSelectedTask(null);
           }}
         >
@@ -957,12 +974,7 @@ export default function HomeScreen() {
 
                     <Pressable
                       onPress={() => {
-                        if (followUpRecordingRef.current) {
-                          followUpRecordingRef.current.stopAndUnloadAsync().catch(() => {});
-                          followUpRecordingRef.current = null;
-                          setIsRecordingFollowUp(false);
-                          setIsTranscribingFollowUp(false);
-                        }
+                        cancelFollowUpRecording();
                         setSelectedTask(null);
                       }}
                       accessibilityRole="button"
@@ -1280,104 +1292,193 @@ export default function HomeScreen() {
 
                 {/* Follow-up input */}
                 <SafeAreaView edges={["bottom"]}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing.sm,
-                      paddingHorizontal: spacing.lg,
-                      paddingVertical: spacing.sm,
-                      borderTopWidth: 1,
-                      borderTopColor: colors.border,
-                      backgroundColor: colors.background,
-                    }}
-                  >
-                    {/* Mic button */}
-                    <Pressable
-                      onPress={() => toggleFollowUpRecording()}
-                      disabled={isTranscribingFollowUp}
-                      accessibilityRole="button"
-                      accessibilityLabel={isRecordingFollowUp ? "Stop recording" : "Record voice follow-up"}
-                      accessibilityState={{ disabled: isTranscribingFollowUp }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={({ pressed }) => [
-                        {
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          backgroundColor: isRecordingFollowUp
-                            ? colors.error
-                            : colors.backgroundElevated,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        },
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      {isTranscribingFollowUp ? (
-                        <ActivityIndicator size="small" color={colors.textMuted} />
-                      ) : (
-                        <Ionicons
-                          name={isRecordingFollowUp ? "stop" : "mic"}
-                          size={isRecordingFollowUp ? 18 : 18}
-                          color={isRecordingFollowUp ? colors.white : colors.textMuted}
-                        />
-                      )}
-                    </Pressable>
-
-                    <TextInput
-                      value={followUpText}
-                      onChangeText={setFollowUpText}
-                      placeholder={isRecordingFollowUp ? "Recording..." : "Follow up..."}
-                      placeholderTextColor={isRecordingFollowUp ? colors.error : colors.textMuted}
-                      accessibilityLabel="Follow-up message"
-                      accessibilityHint="Type a follow-up message to this task"
+                  {isRecordingFollowUp ? (
+                    /* Recording mode: full-width cancel / indicator / send */
+                    <View
                       style={{
-                        flex: 1,
-                        backgroundColor: colors.backgroundElevated,
-                        borderRadius: radii.lg,
-                        paddingHorizontal: spacing.md,
-                        paddingVertical: Platform.OS === "ios" ? 10 : 8,
-                        color: colors.textPrimary,
-                        fontSize: typography.base,
-                        fontFamily: fontFamily.regular,
-                        maxHeight: 100,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: spacing.lg,
+                        paddingVertical: spacing.md,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.error,
+                        backgroundColor: colors.background,
                       }}
-                      multiline
-                      returnKeyType="default"
-                    />
-                    <Pressable
-                      onPress={sendFollowUp}
-                      disabled={!followUpText.trim() || sendingFollowUp}
-                      accessibilityRole="button"
-                      accessibilityLabel="Send follow-up"
-                      accessibilityState={{ disabled: !followUpText.trim() || sendingFollowUp }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={({ pressed }) => [
-                        {
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          backgroundColor: followUpText.trim()
-                            ? colors.primary
-                            : colors.backgroundElevated,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        },
-                        pressed && { opacity: 0.7 },
-                      ]}
                     >
-                      {sendingFollowUp ? (
-                        <ActivityIndicator size="small" color={colors.white} />
-                      ) : (
-                        <Ionicons
-                          name="arrow-up"
-                          size={18}
-                          color={followUpText.trim() ? colors.white : colors.textMuted}
+                      <Pressable
+                        onPress={cancelFollowUpRecording}
+                        hitSlop={12}
+                        style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+                      >
+                        <Text
+                          style={{
+                            color: colors.textSecondary,
+                            fontSize: typography.base,
+                            fontFamily: fontFamily.medium,
+                          }}
+                        >
+                          Cancel
+                        </Text>
+                      </Pressable>
+
+                      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm }}>
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: colors.error,
+                          }}
                         />
-                      )}
-                    </Pressable>
-                  </View>
+                        <Text
+                          style={{
+                            color: colors.error,
+                            fontSize: typography.sm,
+                            fontFamily: fontFamily.medium,
+                          }}
+                        >
+                          Recording...
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={submitFollowUpRecording}
+                        hitSlop={12}
+                        style={({ pressed }) => [
+                          {
+                            backgroundColor: colors.primary,
+                            borderRadius: radii.lg,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.sm,
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: colors.white,
+                            fontSize: typography.base,
+                            fontFamily: fontFamily.semibold,
+                          }}
+                        >
+                          Send
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : isTranscribingFollowUp ? (
+                    /* Transcribing state */
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: spacing.sm,
+                        paddingHorizontal: spacing.lg,
+                        paddingVertical: spacing.md,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
+                        backgroundColor: colors.background,
+                      }}
+                    >
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: typography.sm,
+                          fontFamily: fontFamily.medium,
+                        }}
+                      >
+                        Sending...
+                      </Text>
+                    </View>
+                  ) : (
+                    /* Default: text input with mic and send */
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing.sm,
+                        paddingHorizontal: spacing.lg,
+                        paddingVertical: spacing.sm,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
+                        backgroundColor: colors.background,
+                      }}
+                    >
+                      <Pressable
+                        onPress={startFollowUpRecording}
+                        accessibilityRole="button"
+                        accessibilityLabel="Record voice follow-up"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={({ pressed }) => [
+                          {
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: colors.backgroundElevated,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <Ionicons name="mic" size={18} color={colors.textMuted} />
+                      </Pressable>
+
+                      <TextInput
+                        value={followUpText}
+                        onChangeText={setFollowUpText}
+                        placeholder="Follow up..."
+                        placeholderTextColor={colors.textMuted}
+                        accessibilityLabel="Follow-up message"
+                        accessibilityHint="Type a follow-up message to this task"
+                        style={{
+                          flex: 1,
+                          backgroundColor: colors.backgroundElevated,
+                          borderRadius: radii.lg,
+                          paddingHorizontal: spacing.md,
+                          paddingVertical: Platform.OS === "ios" ? 10 : 8,
+                          color: colors.textPrimary,
+                          fontSize: typography.base,
+                          fontFamily: fontFamily.regular,
+                          maxHeight: 100,
+                        }}
+                        multiline
+                        returnKeyType="default"
+                      />
+                      <Pressable
+                        onPress={sendFollowUp}
+                        disabled={!followUpText.trim() || sendingFollowUp}
+                        accessibilityRole="button"
+                        accessibilityLabel="Send follow-up"
+                        accessibilityState={{ disabled: !followUpText.trim() || sendingFollowUp }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={({ pressed }) => [
+                          {
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: followUpText.trim()
+                              ? colors.primary
+                              : colors.backgroundElevated,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        {sendingFollowUp ? (
+                          <ActivityIndicator size="small" color={colors.white} />
+                        ) : (
+                          <Ionicons
+                            name="arrow-up"
+                            size={18}
+                            color={followUpText.trim() ? colors.white : colors.textMuted}
+                          />
+                        )}
+                      </Pressable>
+                    </View>
+                  )}
                 </SafeAreaView>
               </>
             )}
