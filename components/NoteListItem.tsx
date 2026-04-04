@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Pressable, Text, View, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
@@ -7,6 +8,7 @@ import {
   computeTaskStatusCounts,
   formatNoteAggregateSummary,
   NOTE_STATUSES,
+  TASK_STATUSES,
 } from "@/lib/workflow";
 
 type ChildTask = {
@@ -43,6 +45,61 @@ function relativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
+function RunningIndicator({ count, colors }: { count: number; colors: ReturnType<typeof useColors> }) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: spacing.sm,
+      }}
+    >
+      <Animated.View
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: 3.5,
+          backgroundColor: colors.statusRunning,
+          opacity,
+        }}
+      />
+      <Text
+        style={{
+          color: colors.statusRunning,
+          fontSize: typography.xs,
+          fontFamily: fontFamily.medium,
+        }}
+      >
+        {count} {count === 1 ? "task" : "tasks"} running
+      </Text>
+    </View>
+  );
+}
+
 export function NoteListItem({
   title,
   transcript,
@@ -57,6 +114,7 @@ export function NoteListItem({
 }: NoteListItemProps) {
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
+  const hasRunning = counts.running > 0;
   const aggregate = formatNoteAggregateSummary(status, counts);
   const metaParts = [
     aggregate,
@@ -69,8 +127,8 @@ export function NoteListItem({
       style={{
         backgroundColor: colors.backgroundElevated,
         borderRadius: radii.md,
-        borderWidth: expanded ? 1 : 0,
-        borderColor: colors.border,
+        borderWidth: expanded ? 1 : hasRunning ? 1 : 0,
+        borderColor: hasRunning ? "rgba(59, 130, 246, 0.25)" : colors.border,
         overflow: "hidden",
       }}
     >
@@ -115,6 +173,10 @@ export function NoteListItem({
             >
               {metaParts.join(" • ")}
             </Text>
+
+            {hasRunning && !expanded && (
+              <RunningIndicator count={counts.running} colors={colors} />
+            )}
           </View>
 
           <Ionicons
