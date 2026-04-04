@@ -384,6 +384,27 @@ async function reconcileTaskDependencies() {
   }
 }
 
+function buildDependencyContext(task: any): string {
+  const deps = (task.dependencies || [])
+    .map((edge: any) => edge.dependsOn)
+    .filter(Boolean);
+
+  if (deps.length === 0) return "";
+
+  const completedDeps = deps.filter(
+    (dep: any) => dep.status === TASK_STATUSES.done && dep.result
+  );
+
+  if (completedDeps.length === 0) return "";
+
+  const sections = completedDeps.map((dep: any) => {
+    const title = dep.summary || dep.input;
+    return `### ${title}\n\n${dep.result}`;
+  });
+
+  return `# Results from prerequisite tasks\n\nThe following tasks were completed before this one. Use their results as context.\n\n${sections.join("\n\n")}`;
+}
+
 async function handleTask(taskId: string) {
   const lessons = existsSync(LESSONS_PATH)
     ? readFileSync(LESSONS_PATH, "utf-8")
@@ -398,6 +419,7 @@ async function handleTask(taskId: string) {
       messages: {},
       project: {},
       note: {},
+      dependencies: { dependsOn: {} },
     },
   } as any);
 
@@ -406,7 +428,14 @@ async function handleTask(taskId: string) {
 
   const resumeSessionId = getResumeSessionId(task);
   const isFollowUp = Boolean(resumeSessionId && hasUnreadUserMessages(task));
-  const prompt = isFollowUp ? buildFollowUpPrompt(task) : task.input;
+
+  let prompt: string;
+  if (isFollowUp) {
+    prompt = buildFollowUpPrompt(task);
+  } else {
+    const depContext = buildDependencyContext(task);
+    prompt = depContext ? `${depContext}\n\n---\n\n${task.input}` : task.input;
+  }
 
   await db.transact(
     db.tx.tasks[taskId].update({
