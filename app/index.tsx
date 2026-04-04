@@ -911,6 +911,7 @@ export default function HomeScreen() {
                   fontFamily: fontFamily.semibold,
                   textTransform: "uppercase",
                   letterSpacing: typography.tracking.wider,
+                  paddingHorizontal: spacing.xl,
                 }}
               >
                 Voice Notes
