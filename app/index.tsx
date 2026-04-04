@@ -114,6 +114,128 @@ type ActivityItem = {
   ts: number;
 };
 
+function ActivityRow({
+  item,
+  isLatest,
+  opacity,
+  colors,
+}: {
+  item: ActivityItem;
+  isLatest: boolean;
+  opacity: number;
+  colors: ThemeColors;
+}) {
+  if (item.type === "tool") {
+    const toolInfo = TOOL_ICONS[item.name || ""] || {
+      icon: "ellipsis-horizontal-outline",
+      label: item.name || "Tool",
+    };
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.sm,
+          opacity,
+          paddingVertical: 3,
+        }}
+      >
+        <Ionicons
+          name={toolInfo.icon as any}
+          size={14}
+          color={isLatest ? colors.statusRunning : colors.textTertiary}
+        />
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            color: isLatest ? colors.textPrimary : colors.textSecondary,
+            fontSize: typography.sm,
+            fontFamily: isLatest ? fontFamily.medium : fontFamily.regular,
+            lineHeight: 18,
+          }}
+        >
+          <Text style={{ color: isLatest ? colors.statusRunning : colors.textTertiary }}>
+            {toolInfo.label}
+          </Text>
+          {item.detail ? (
+            <Text style={{ color: isLatest ? colors.textSecondary : colors.textTertiary }}>
+              {"  "}
+              {item.detail}
+            </Text>
+          ) : null}
+        </Text>
+      </View>
+    );
+  }
+
+  if (item.type === "thinking") {
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.sm,
+          opacity,
+          paddingVertical: 3,
+        }}
+      >
+        <Ionicons
+          name="bulb-outline"
+          size={14}
+          color={isLatest ? colors.thinking : colors.textTertiary}
+        />
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            color: isLatest ? colors.textSecondary : colors.textTertiary,
+            fontSize: typography.sm,
+            fontFamily: fontFamily.regular,
+            fontStyle: "italic",
+            lineHeight: 18,
+          }}
+        >
+          {item.content}
+        </Text>
+      </View>
+    );
+  }
+
+  // text type
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing.sm,
+        opacity,
+        paddingVertical: 3,
+      }}
+    >
+      <Ionicons
+        name="chatbubble-outline"
+        size={14}
+        color={isLatest ? colors.textSecondary : colors.textTertiary}
+      />
+      <Text
+        numberOfLines={2}
+        style={{
+          flex: 1,
+          color: isLatest ? colors.textSecondary : colors.textTertiary,
+          fontSize: typography.sm,
+          fontFamily: fontFamily.regular,
+          lineHeight: 18,
+        }}
+      >
+        {item.content}
+      </Text>
+    </View>
+  );
+}
+
+const COLLAPSED_COUNT = 8;
+
 function LiveActivityFeed({
   liveOutput,
   colors,
@@ -121,6 +243,8 @@ function LiveActivityFeed({
   liveOutput: string;
   colors: ThemeColors;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   let items: ActivityItem[] = [];
   try {
     items = JSON.parse(liveOutput);
@@ -153,8 +277,9 @@ function LiveActivityFeed({
 
   if (!Array.isArray(items) || items.length === 0) return null;
 
-  // Show last 8 items, most recent at bottom
-  const visible = items.slice(-8);
+  const canExpand = items.length > COLLAPSED_COUNT;
+  const visible = expanded ? items : items.slice(-COLLAPSED_COUNT);
+  const hiddenCount = items.length - COLLAPSED_COUNT;
 
   return (
     <View
@@ -184,121 +309,96 @@ function LiveActivityFeed({
         >
           Working
         </Text>
+        {canExpand && (
+          <Text
+            style={{
+              color: colors.textTertiary,
+              fontSize: typography.xs,
+              fontFamily: fontFamily.regular,
+              marginLeft: "auto",
+            }}
+          >
+            {items.length} steps
+          </Text>
+        )}
       </View>
+
+      {/* Tap to expand collapsed area */}
+      {canExpand && !expanded && (
+        <Pressable
+          onPress={() => setExpanded(true)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing.xs,
+            paddingVertical: spacing.sm,
+            marginBottom: 2,
+            borderRadius: radii.sm,
+            backgroundColor: pressed
+              ? colors.backgroundPressed
+              : colors.backgroundSubtle,
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Ionicons name="chevron-up" size={14} color={colors.textTertiary} />
+          <Text
+            style={{
+              color: colors.textTertiary,
+              fontSize: typography.xs,
+              fontFamily: fontFamily.medium,
+            }}
+          >
+            Show {hiddenCount} earlier {hiddenCount === 1 ? "step" : "steps"}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Collapse button when expanded */}
+      {canExpand && expanded && (
+        <Pressable
+          onPress={() => setExpanded(false)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing.xs,
+            paddingVertical: spacing.sm,
+            marginBottom: 2,
+            borderRadius: radii.sm,
+            backgroundColor: pressed
+              ? colors.backgroundPressed
+              : colors.backgroundSubtle,
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+          <Text
+            style={{
+              color: colors.textTertiary,
+              fontSize: typography.xs,
+              fontFamily: fontFamily.medium,
+            }}
+          >
+            Show less
+          </Text>
+        </Pressable>
+      )}
 
       {visible.map((item, i) => {
         const isLatest = i === visible.length - 1;
-        const opacity = isLatest ? 1 : 0.5 + (i / visible.length) * 0.5;
+        const opacity = expanded
+          ? (isLatest ? 1 : 0.7)
+          : (isLatest ? 1 : 0.5 + (i / visible.length) * 0.5);
 
-        if (item.type === "tool") {
-          const toolInfo = TOOL_ICONS[item.name || ""] || {
-            icon: "ellipsis-horizontal-outline",
-            label: item.name || "Tool",
-          };
-          return (
-            <View
-              key={`${item.ts}-${i}`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                opacity,
-                paddingVertical: 3,
-              }}
-            >
-              <Ionicons
-                name={toolInfo.icon as any}
-                size={14}
-                color={isLatest ? colors.statusRunning : colors.textTertiary}
-              />
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  color: isLatest ? colors.textPrimary : colors.textSecondary,
-                  fontSize: typography.sm,
-                  fontFamily: isLatest ? fontFamily.medium : fontFamily.regular,
-                  lineHeight: 18,
-                }}
-              >
-                <Text style={{ color: isLatest ? colors.statusRunning : colors.textTertiary }}>
-                  {toolInfo.label}
-                </Text>
-                {item.detail ? (
-                  <Text style={{ color: isLatest ? colors.textSecondary : colors.textTertiary }}>
-                    {"  "}
-                    {item.detail}
-                  </Text>
-                ) : null}
-              </Text>
-            </View>
-          );
-        }
-
-        if (item.type === "thinking") {
-          return (
-            <View
-              key={`${item.ts}-${i}`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                opacity,
-                paddingVertical: 3,
-              }}
-            >
-              <Ionicons
-                name="bulb-outline"
-                size={14}
-                color={isLatest ? colors.thinking : colors.textTertiary}
-              />
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  color: isLatest ? colors.textSecondary : colors.textTertiary,
-                  fontSize: typography.sm,
-                  fontFamily: fontFamily.regular,
-                  fontStyle: "italic",
-                  lineHeight: 18,
-                }}
-              >
-                {item.content}
-              </Text>
-            </View>
-          );
-        }
-
-        // text type
         return (
-          <View
+          <ActivityRow
             key={`${item.ts}-${i}`}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing.sm,
-              opacity,
-              paddingVertical: 3,
-            }}
-          >
-            <Ionicons
-              name="chatbubble-outline"
-              size={14}
-              color={isLatest ? colors.textSecondary : colors.textTertiary}
-            />
-            <Text
-              numberOfLines={2}
-              style={{
-                flex: 1,
-                color: isLatest ? colors.textSecondary : colors.textTertiary,
-                fontSize: typography.sm,
-                fontFamily: fontFamily.regular,
-                lineHeight: 18,
-              }}
-            >
-              {item.content}
-            </Text>
-          </View>
+            item={item}
+            isLatest={isLatest}
+            opacity={opacity}
+            colors={colors}
+          />
         );
       })}
     </View>
