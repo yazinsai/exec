@@ -27,6 +27,7 @@ interface NoteListItemProps {
   onToggle: () => void;
   onOpenTask: (taskId: string) => void;
   onRetryTranscription?: () => void;
+  onRetryExtraction?: () => void;
 }
 
 function relativeTime(timestamp: number): string {
@@ -52,18 +53,24 @@ export function NoteListItem({
   onToggle,
   onOpenTask,
   onRetryTranscription,
+  onRetryExtraction,
 }: NoteListItemProps) {
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
   const aggregate = formatNoteAggregateSummary(status, counts);
+  const metaParts = [
+    aggregate,
+    `${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`,
+    relativeTime(createdAt),
+  ].filter(Boolean);
 
   return (
     <View
       style={{
         backgroundColor: colors.backgroundElevated,
-        borderRadius: radii.lg,
-        borderWidth: 1,
-        borderColor: colors.borderLight,
+        borderRadius: radii.md,
+        borderWidth: expanded ? 1 : 0,
+        borderColor: colors.border,
         overflow: "hidden",
       }}
     >
@@ -78,9 +85,9 @@ export function NoteListItem({
         <View
           style={{
             flexDirection: "row",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "space-between",
-            gap: spacing.md,
+            gap: spacing.sm,
           }}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -90,55 +97,24 @@ export function NoteListItem({
                 color: colors.textPrimary,
                 fontSize: typography.md,
                 fontFamily: fontFamily.medium,
-                lineHeight: 23,
+                lineHeight: 21,
               }}
             >
               {title}
             </Text>
 
             <Text
-              numberOfLines={2}
+              numberOfLines={1}
               style={{
                 color: colors.textSecondary,
-                fontSize: typography.sm,
+                fontSize: typography.xs,
                 fontFamily: fontFamily.regular,
-                lineHeight: 19,
-                marginTop: spacing.xs,
+                lineHeight: 16,
+                marginTop: 6,
               }}
             >
-              {aggregate}
+              {metaParts.join(" • ")}
             </Text>
-
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                marginTop: spacing.sm,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.semibold,
-                  textTransform: "uppercase",
-                  letterSpacing: typography.tracking.wider,
-                }}
-              >
-                {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
-              </Text>
-
-              <Text
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.regular,
-                }}
-              >
-                {relativeTime(createdAt)}
-              </Text>
-            </View>
           </View>
 
           <Ionicons
@@ -154,30 +130,48 @@ export function NoteListItem({
           style={{
             paddingHorizontal: spacing.lg,
             paddingBottom: spacing.lg,
-            borderTopWidth: 1,
-            borderTopColor: colors.borderLight,
           }}
         >
           {tasks.length > 0 ? (
-            tasks.map((task, index) => (
-              <View
-                key={task.id}
-                style={{
-                  borderTopWidth: index === 0 ? 0 : 1,
-                  borderTopColor: colors.borderLight,
-                }}
-              >
-                <TaskListItem
-                  title={task.title}
-                  status={task.status}
-                  projectLabel={task.projectLabel}
-                  createdAt={task.createdAt}
-                  onPress={() => onOpenTask(task.id)}
-                />
-              </View>
-            ))
+            <View
+              style={{
+                marginTop: spacing.md,
+                backgroundColor: colors.backgroundSubtle,
+                borderRadius: radii.md,
+                borderWidth: 1,
+                borderColor: colors.borderLight,
+                paddingHorizontal: spacing.sm,
+              }}
+            >
+              {tasks.map((task, index) => (
+                <View
+                  key={task.id}
+                  style={{
+                    borderTopWidth: index === 0 ? 0 : 1,
+                    borderTopColor: colors.borderLight,
+                  }}
+                >
+                  <TaskListItem
+                    title={task.title}
+                    status={task.status}
+                    projectLabel={task.projectLabel}
+                    createdAt={task.createdAt}
+                    onPress={() => onOpenTask(task.id)}
+                  />
+                </View>
+              ))}
+            </View>
           ) : (
-            <View style={{ paddingTop: spacing.lg }}>
+            <View
+              style={{
+                marginTop: spacing.md,
+                backgroundColor: colors.backgroundSubtle,
+                borderRadius: radii.md,
+                borderWidth: 1,
+                borderColor: colors.borderLight,
+                padding: spacing.lg,
+              }}
+            >
               <Text
                 style={{
                   color: colors.textSecondary,
@@ -210,6 +204,29 @@ export function NoteListItem({
                     }}
                   >
                     Retry transcription
+                  </Text>
+                </Pressable>
+              ) : status === NOTE_STATUSES.triageFailed && onRetryExtraction ? (
+                <Pressable
+                  onPress={onRetryExtraction}
+                  style={({ pressed }) => ({
+                    alignSelf: "flex-start",
+                    marginTop: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.sm,
+                    borderRadius: radii.md,
+                    backgroundColor: colors.primaryAlpha20,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text
+                    style={{
+                      color: colors.primary,
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.medium,
+                    }}
+                  >
+                    Retry extraction
                   </Text>
                 </Pressable>
               ) : null}
