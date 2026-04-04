@@ -909,45 +909,43 @@ export default function HomeScreen() {
               });
 
               return (
-                <View style={{ paddingHorizontal: spacing.xl }}>
-                  <NoteListItem
-                    title={getNoteTitle(item)}
-                    transcript={item.transcript}
-                    status={item.status}
-                    createdAt={item.createdAt}
-                    tasks={noteTasks.map((task) => ({
-                      id: task.id,
-                      title: task.summary || task.input,
-                      status: task.status,
-                      createdAt: task.createdAt,
-                      projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
-                    }))}
-                    expanded={expandedNoteIds.includes(item.id)}
-                    onToggle={() => {
-                      setExpandedNoteIds((current) =>
-                        current.includes(item.id)
-                          ? current.filter((id) => id !== item.id)
-                          : [...current, item.id]
-                      );
-                    }}
-                    onOpenTask={(taskId) => {
-                      setSelectedTaskId(taskId);
-                      setFollowUpText("");
-                      setShowJumpToEnd(false);
-                      setShowJumpToTop(false);
-                    }}
-                    onRetryTranscription={
-                      item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
-                        ? () => retryTranscription(item.id, item.audioFilePath)
-                        : undefined
-                    }
-                    onRetryExtraction={
-                      item.status === NOTE_STATUSES.triageFailed
-                        ? () => retryExtraction(item.id)
-                        : undefined
-                    }
-                  />
-                </View>
+                <NoteListItem
+                  title={getNoteTitle(item)}
+                  transcript={item.transcript}
+                  status={item.status}
+                  createdAt={item.createdAt}
+                  tasks={noteTasks.map((task) => ({
+                    id: task.id,
+                    title: task.summary || task.input,
+                    status: task.status,
+                    createdAt: task.createdAt,
+                    projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
+                  }))}
+                  expanded={expandedNoteIds.includes(item.id)}
+                  onToggle={() => {
+                    setExpandedNoteIds((current) =>
+                      current.includes(item.id)
+                        ? current.filter((id) => id !== item.id)
+                        : [...current, item.id]
+                    );
+                  }}
+                  onOpenTask={(taskId) => {
+                    setSelectedTaskId(taskId);
+                    setFollowUpText("");
+                    setShowJumpToEnd(false);
+                    setShowJumpToTop(false);
+                  }}
+                  onRetryTranscription={
+                    item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
+                      ? () => retryTranscription(item.id, item.audioFilePath)
+                      : undefined
+                  }
+                  onRetryExtraction={
+                    item.status === NOTE_STATUSES.triageFailed
+                      ? () => retryExtraction(item.id)
+                      : undefined
+                  }
+                />
               );
             }}
             ListHeaderComponent={
@@ -960,7 +958,7 @@ export default function HomeScreen() {
                     textTransform: "uppercase",
                     letterSpacing: typography.tracking.wider,
                     marginBottom: spacing.sm,
-                    paddingHorizontal: spacing.xl,
+                    marginHorizontal: spacing.lg,
                   }}
                 >
                   Voice Notes
