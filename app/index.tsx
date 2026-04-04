@@ -897,9 +897,9 @@ export default function HomeScreen() {
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}
+            style={{ paddingLeft: spacing.lg, paddingRight: spacing.lg }}
             contentContainerStyle={{
               paddingTop: spacing.sm,
-              paddingHorizontal: spacing.lg,
               paddingBottom: insets.bottom + 64 + 32,
               gap: spacing.md,
             }}
