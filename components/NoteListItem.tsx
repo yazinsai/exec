@@ -67,7 +67,6 @@ export function NoteListItem({
   return (
     <View
       style={{
-        marginHorizontal: spacing.lg,
         backgroundColor: colors.backgroundElevated,
         borderRadius: radii.md,
         borderWidth: expanded ? 1 : 0,

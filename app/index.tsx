@@ -897,6 +897,7 @@ export default function HomeScreen() {
         ) : (
           <FlatList
             ref={scrollRef}
+            style={{ paddingLeft: spacing.lg, paddingRight: spacing.lg }}
             data={notes}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => {
@@ -958,7 +959,6 @@ export default function HomeScreen() {
                     textTransform: "uppercase",
                     letterSpacing: typography.tracking.wider,
                     marginBottom: spacing.sm,
-                    marginHorizontal: spacing.lg,
                   }}
                 >
                   Voice Notes
