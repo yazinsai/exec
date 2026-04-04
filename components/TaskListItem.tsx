@@ -38,8 +38,9 @@ export function TaskListItem({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: "100%",
         position: "relative",
+        alignSelf: "stretch",
+        paddingHorizontal: spacing.sm,
         paddingVertical: spacing.lg,
         opacity: pressed ? 0.7 : 1,
       })}

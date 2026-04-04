@@ -115,7 +115,7 @@ export async function triageTranscript(transcript: string): Promise<TriageOutput
       cwd: getProjectsRoot(),
       model: "claude-sonnet-4-6",
       effort: "medium",
-      maxTurns: 1,
+      maxTurns: 3,
       permissionMode: "plan",
       outputFormat: {
         type: "json_schema",
