@@ -27,36 +27,30 @@ function isAudioFile(file: {
   );
 }
 
-async function createTask(input: string, source: string) {
-  const taskId = id();
-  const messageId = id();
+async function createNote(input: string, source: string) {
+  const noteId = id();
   const now = Date.now();
   const trimmed = input.trim();
 
-  await db.transact([
-    db.tx.tasks[taskId].update({
-      input: trimmed,
+  await db.transact(
+    db.tx.notes[noteId].update({
+      transcript: trimmed,
       status: "pending",
       source,
+      errorMessage: "",
       createdAt: now,
-    }),
-    db.tx.messages[messageId]
-      .update({
-        role: "user",
-        content: trimmed,
-        createdAt: now,
-      })
-      .link({ task: taskId }),
-  ]);
+      transcribedAt: now,
+    })
+  );
 
   // Generate summary in background
   summarizeInput(trimmed).then((summary) => {
     if (summary) {
-      db.transact(db.tx.tasks[taskId].update({ summary }));
+      db.transact(db.tx.notes[noteId].update({ summary }));
     }
   });
 
-  return taskId;
+  return noteId;
 }
 
 export function ShareIntentHandler({ children }: { children?: ReactNode }) {
@@ -72,11 +66,11 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
       }
 
       try {
-        await createTask(text, "share-text");
-        Alert.alert("Task Created", "Your shared text has been queued.");
+        await createNote(text, "share-text");
+        Alert.alert("Note Saved", "Your shared text has been queued for task extraction.");
       } catch (error) {
-        console.error("Failed to create task from shared text:", error);
-        Alert.alert("Error", "Failed to create task from shared text.");
+        console.error("Failed to create note from shared text:", error);
+        Alert.alert("Error", "Failed to save shared text.");
       }
       resetShareIntent();
     },
@@ -89,11 +83,11 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
       const input = title ? `${title}\n${url}` : url;
 
       try {
-        await createTask(input, "share-url");
-        Alert.alert("Task Created", "URL has been queued.");
+        await createNote(input, "share-url");
+        Alert.alert("Note Saved", "URL has been queued for task extraction.");
       } catch (error) {
-        console.error("Failed to create task from shared URL:", error);
-        Alert.alert("Error", "Failed to create task from shared URL.");
+        console.error("Failed to create note from shared URL:", error);
+        Alert.alert("Error", "Failed to save shared URL.");
       }
       resetShareIntent();
     },
@@ -102,12 +96,12 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
 
   const handleSharedFiles = useCallback(
     async (
-      files: Array<{
+      files: {
         path?: string;
         filePath?: string;
         fileName?: string;
         mimeType?: string;
-      }>
+      }[]
     ) => {
       const audioFiles = files.filter(
         (f) => getFilePath(f) && isAudioFile(f)
@@ -149,7 +143,7 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
             continue;
           }
 
-          await createTask(transcription, "share-audio");
+          await createNote(transcription, "share-audio");
           imported++;
         } catch (error) {
           console.error("Failed to import:", filePath, error);

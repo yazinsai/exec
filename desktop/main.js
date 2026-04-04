@@ -155,29 +155,23 @@ async function transcribeAudio(audioPath) {
   return stdout.trim();
 }
 
-// --- InstantDB Task Creation ---
-async function createTask(transcription) {
-  const taskId = instantId();
-  const messageId = instantId();
+// --- InstantDB Note Creation ---
+async function createNote(transcription) {
+  const noteId = instantId();
   const now = Date.now();
 
-  await db.transact([
-    db.tx.tasks[taskId].update({
-      input: transcription,
+  await db.transact(
+    db.tx.notes[noteId].update({
+      transcript: transcription,
       status: "pending",
       source: "mac",
+      errorMessage: "",
       createdAt: now,
-    }),
-    db.tx.messages[messageId]
-      .update({
-        role: "user",
-        content: transcription,
-        createdAt: now,
-      })
-      .link({ task: taskId }),
-  ]);
+      transcribedAt: now,
+    })
+  );
 
-  return taskId;
+  return noteId;
 }
 
 // --- Hotkey Handler ---
@@ -214,8 +208,8 @@ async function handleHotkeyUp() {
       return;
     }
 
-    showOverlay("creating", "Creating task...");
-    await createTask(transcription.trim());
+    showOverlay("creating", "Saving note...");
+    await createNote(transcription.trim());
 
     showOverlay("done", "Got it ✓");
     setTimeout(hideOverlay, 1200);

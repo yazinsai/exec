@@ -13,7 +13,10 @@ import {
   Alert,
 } from "react-native";
 import Constants from "expo-constants";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Markdown from "react-native-markdown-display";
 import * as Haptics from "expo-haptics";
@@ -30,9 +33,7 @@ import {
   RECORDING_OPTIONS,
 } from "@/lib/audio";
 import { Audio } from "expo-av";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActiveTaskCard } from "@/components/ActiveTaskCard";
-import { TaskListItem } from "@/components/TaskListItem";
+import { NoteListItem } from "@/components/NoteListItem";
 import { RecordFAB } from "@/components/RecordFAB";
 import { RecordingSheet } from "@/components/RecordingSheet";
 import { useThemeColors } from "@/hooks/useThemeColors";
@@ -43,18 +44,32 @@ import {
   fontFamily,
   shadows,
 } from "@/constants/Colors";
+import {
+  getTaskSortWeight,
+  NOTE_STATUSES,
+} from "@/lib/workflow";
 import type { InstaQLEntity } from "@instantdb/react-native";
 import type { AppSchema } from "@/instant.schema";
 import type { ThemeColors } from "@/constants/Colors";
 
-type Task = InstaQLEntity<AppSchema, "tasks", { messages: {} }>;
+type Task = InstaQLEntity<AppSchema, "tasks", {
+  messages: {};
+  project: {};
+  dependencies: { dependsOn: {} };
+}>;
+type Note = InstaQLEntity<AppSchema, "notes", {
+  tasks: {
+    messages: {};
+    project: {};
+    dependencies: { dependsOn: {} };
+  };
+}>;
 type Message = InstaQLEntity<AppSchema, "messages">;
-
-type TaskStatus = "pending" | "running" | "done" | "failed" | "cancelled";
 
 function getStatusColor(status: string, colors: ThemeColors): string {
   const map: Record<string, string> = {
     pending: colors.statusPending,
+    blocked: colors.warning,
     running: colors.statusRunning,
     done: colors.statusDone,
     failed: colors.statusFailed,
@@ -67,6 +82,7 @@ function getStatusColor(status: string, colors: ThemeColors): string {
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
+  blocked: "Blocked",
   running: "Running",
   done: "Done",
   failed: "Failed",
@@ -288,55 +304,6 @@ function LiveActivityFeed({
   );
 }
 
-function RunningLabel({
-  liveOutput,
-  colors,
-}: {
-  liveOutput?: string | null;
-  colors: ThemeColors;
-}) {
-  let label = "Running";
-
-  if (liveOutput) {
-    try {
-      const items: ActivityItem[] = JSON.parse(liveOutput);
-      if (Array.isArray(items) && items.length > 0) {
-        const last = items[items.length - 1];
-        if (last.type === "tool" && last.name) {
-          const toolInfo = TOOL_ICONS[last.name];
-          label = toolInfo ? toolInfo.label : last.name;
-          if (last.detail) {
-            // Show truncated detail
-            const short = last.detail.length > 25
-              ? last.detail.slice(0, 25) + "..."
-              : last.detail;
-            label += ` ${short}`;
-          }
-        } else if (last.type === "thinking") {
-          label = "Thinking...";
-        }
-      }
-    } catch {
-      // plain text fallback
-    }
-  }
-
-  return (
-    <Text
-      numberOfLines={1}
-      style={{
-        color: colors.statusRunning,
-        fontSize: typography.xs,
-        fontFamily: fontFamily.medium,
-        letterSpacing: 0.3,
-        flexShrink: 1,
-      }}
-    >
-      {label}
-    </Text>
-  );
-}
-
 function relativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const seconds = Math.floor(diff / 1000);
@@ -348,6 +315,16 @@ function relativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
+}
+
+function getNoteTitle(note: Pick<Note, "summary" | "transcript" | "status">): string {
+  if (note.summary) return note.summary;
+  if (note.transcript.trim()) return note.transcript.trim();
+  if (note.status === NOTE_STATUSES.transcribing) return "Transcribing...";
+  if (note.status === NOTE_STATUSES.pending || note.status === NOTE_STATUSES.triaging) {
+    return "Processing note";
+  }
+  return "Voice note";
 }
 
 function getReleaseInfo() {
@@ -377,8 +354,9 @@ function getReleaseInfo() {
 }
 
 export default function HomeScreen() {
-  const { colors, isDark } = useThemeColors();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { colors } = useThemeColors();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<string[]>([]);
   const [followUpText, setFollowUpText] = useState("");
   const [sendingFollowUp, setSendingFollowUp] = useState(false);
   const [isRecordingFollowUp, setIsRecordingFollowUp] = useState(false);
@@ -425,14 +403,14 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Transcribe a task's audio file and update it in InstantDB
-  const transcribeTask = useCallback(async (taskId: string, filePath: string) => {
+  // Transcribe a note's audio file and update it in InstantDB
+  const transcribeNote = useCallback(async (noteId: string, filePath: string) => {
     try {
       const transcription = await transcribeAudio(filePath);
       if (!transcription || transcription.trim().length === 0) {
         await db.transact(
-          db.tx.tasks[taskId].update({
-            status: "transcription_failed",
+          db.tx.notes[noteId].update({
+            status: NOTE_STATUSES.transcriptionFailed,
             errorMessage: "No speech detected",
           })
         );
@@ -440,135 +418,81 @@ export default function HomeScreen() {
       }
 
       const trimmedInput = transcription.trim();
-      const messageId = id();
       const now = Date.now();
 
-      await db.transact([
-        db.tx.tasks[taskId].update({
-          input: trimmedInput,
-          status: "pending",
+      await db.transact(
+        db.tx.notes[noteId].update({
+          transcript: trimmedInput,
+          status: NOTE_STATUSES.pending,
           errorMessage: "",
-        }),
-        db.tx.messages[messageId]
-          .update({
-            role: "user",
-            content: trimmedInput,
-            createdAt: now,
-          })
-          .link({ task: taskId }),
-      ]);
+          transcribedAt: now,
+        })
+      );
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       // Generate summary in background (non-blocking)
       summarizeInput(trimmedInput).then((summary) => {
         if (summary) {
-          db.transact(db.tx.tasks[taskId].update({ summary }));
+          db.transact(db.tx.notes[noteId].update({ summary }));
         }
       });
     } catch (error) {
-      console.error("Transcription failed for task:", taskId, error);
+      console.error("Transcription failed for note:", noteId, error);
       await db.transact(
-        db.tx.tasks[taskId].update({
-          status: "transcription_failed",
+        db.tx.notes[noteId].update({
+          status: NOTE_STATUSES.transcriptionFailed,
           errorMessage: error instanceof Error ? error.message : "Transcription failed",
         })
       );
     }
   }, []);
 
-  // Retry transcription for a failed task
-  const retryTranscription = useCallback(async (taskId: string, filePath: string) => {
+  // Retry transcription for a failed note
+  const retryTranscription = useCallback(async (noteId: string, filePath: string) => {
     await db.transact(
-      db.tx.tasks[taskId].update({
-        status: "transcribing",
+      db.tx.notes[noteId].update({
+        status: NOTE_STATUSES.transcribing,
         errorMessage: "",
       })
     );
-    transcribeTask(taskId, filePath);
-  }, [transcribeTask]);
+    transcribeNote(noteId, filePath);
+  }, [transcribeNote]);
 
-  // Query tasks
-  const { data: recentData, isLoading: isLoadingRecent } = db.useQuery({
-    tasks: {
+  // Query notes with nested child tasks
+  const { data: notesData, isLoading } = db.useQuery({
+    notes: {
       $: { order: { createdAt: "desc" }, limit: 50 },
-      messages: {},
-    },
-  });
-
-  const { data: activeData, isLoading: isLoadingActive } = db.useQuery({
-    tasks: {
-      $: {
-        where: {
-          or: [
-            { status: "running" },
-            { status: "pending" },
-            { status: "transcribing" },
-            { status: "transcription_failed" },
-          ],
-        },
+      tasks: {
+        messages: {},
+        project: {},
+        dependencies: { dependsOn: {} },
       },
-      messages: {},
     },
-  });
+  } as any);
 
-  const isLoading = isLoadingRecent || isLoadingActive;
-
-  // On startup, retry any tasks stuck in "transcribing" state (app was killed mid-transcription)
-  const retriedTasksRef = useRef(new Set<string>());
+  // On startup, retry any notes stuck in "transcribing" state (app was killed mid-transcription)
+  const retriedNotesRef = useRef(new Set<string>());
+  const notes = (((notesData as { notes?: Note[] } | undefined)?.notes) ?? []) as Note[];
   useEffect(() => {
-    if (!activeData?.tasks) return;
-    for (const task of activeData.tasks) {
+    const currentNotes = (((notesData as { notes?: Note[] } | undefined)?.notes) ?? []) as Note[];
+    if (currentNotes.length === 0) return;
+    for (const note of currentNotes) {
       if (
-        task.status === "transcribing" &&
-        (task as any).audioFilePath &&
-        !retriedTasksRef.current.has(task.id)
+        note.status === "transcribing" &&
+        (note as any).audioFilePath &&
+        !retriedNotesRef.current.has(note.id)
       ) {
-        retriedTasksRef.current.add(task.id);
-        console.log("Retrying stuck transcription:", task.id);
-        transcribeTask(task.id, (task as any).audioFilePath);
+        retriedNotesRef.current.add(note.id);
+        console.log("Retrying stuck transcription:", note.id);
+        transcribeNote(note.id, (note as any).audioFilePath);
       }
     }
-  }, [activeData?.tasks, transcribeTask]);
-
-  // Merge and deduplicate (active query wins on conflict)
-  const allTasks = (() => {
-    const recentTasks = recentData?.tasks ?? [];
-    const activeTsks = activeData?.tasks ?? [];
-    const taskMap = new Map<string, Task>();
-    for (const t of recentTasks) taskMap.set(t.id, t);
-    for (const t of activeTsks) taskMap.set(t.id, t);
-    return Array.from(taskMap.values());
-  })();
-
-  const ACTIVE_STATUSES = new Set(["running", "pending", "transcribing", "transcription_failed"]);
-
-  // Split into active + history
-  const activeTasks = allTasks
-    .filter((t) => ACTIVE_STATUSES.has(t.status))
-    .sort((a, b) => {
-      if (a.status === "running" && b.status !== "running") return -1;
-      if (b.status === "running" && a.status !== "running") return 1;
-      return b.createdAt - a.createdAt;
-    })
-    .slice(0, 5);
-
-  const allActiveIds = new Set(
-    allTasks.filter((t) => ACTIVE_STATUSES.has(t.status)).map((t) => t.id)
-  );
-  const historyTasks = allTasks
-    .filter((t) => !allActiveIds.has(t.id))
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  // Keep selectedTask in sync with live data
-  useEffect(() => {
-    if (selectedTask) {
-      const updated = allTasks.find((t) => t.id === selectedTask.id);
-      if (updated) {
-        setSelectedTask(updated);
-      }
-    }
-  }, [allTasks]);
+  }, [notesData, transcribeNote]);
+  const allTasks = notes.flatMap((note) => (note.tasks ?? []) as Task[]);
+  const selectedTask = selectedTaskId
+    ? allTasks.find((task) => task.id === selectedTaskId) ?? null
+    : null;
 
   // Recording handlers
   const startRecording = useCallback(async () => {
@@ -653,15 +577,16 @@ export default function HomeScreen() {
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
-      const taskId = id();
-      const { filePath } = await saveRecordingLocally(recording, taskId);
+      const noteId = id();
+      const { filePath } = await saveRecordingLocally(recording, noteId);
 
-      // Create task immediately in InstantDB (before transcription)
+      // Create note immediately in InstantDB (before transcription)
       const now = Date.now();
       await db.transact(
-        db.tx.tasks[taskId].update({
-          input: "Transcribing...",
-          status: "transcribing",
+        db.tx.notes[noteId].update({
+          transcript: "",
+          status: NOTE_STATUSES.transcribing,
+          summary: "Transcribing...",
           source: "phone",
           audioFilePath: filePath,
           createdAt: now,
@@ -671,7 +596,7 @@ export default function HomeScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       // Transcribe in background (non-blocking)
-      transcribeTask(taskId, filePath);
+      transcribeNote(noteId, filePath);
     } catch (error) {
       console.error("Failed to save recording:", error);
       setRecordingError("Failed to save recording");
@@ -682,7 +607,7 @@ export default function HomeScreen() {
     setIsProcessing(false);
     setDuration(0);
     setMetering(-160);
-  }, [transcribeTask]);
+  }, [transcribeNote]);
 
   // Follow-up message handler
   const sendFollowUp = useCallback(async () => {
@@ -759,7 +684,9 @@ export default function HomeScreen() {
           db.tx.messages[messageId]
             .update({ role: "user", content: trimmed, createdAt: now })
             .link({ task: selectedTask.id }),
-          ...(selectedTask.status === "done" || selectedTask.status === "failed"
+          ...(selectedTask.status === "done" ||
+          selectedTask.status === "failed" ||
+          selectedTask.status === "cancelled"
             ? [db.tx.tasks[selectedTask.id].update({ status: "pending" })]
             : []),
         ]);
@@ -772,10 +699,18 @@ export default function HomeScreen() {
   }, [selectedTask]);
 
   // Cancel task handler
-  const cancelTask = useCallback(async (taskId: string) => {
+  const cancelTask = useCallback(async (taskId: string, currentStatus?: string) => {
     try {
       await db.transact(
-        db.tx.tasks[taskId].update({ cancelRequested: true })
+        currentStatus === "running"
+          ? db.tx.tasks[taskId].update({ cancelRequested: true })
+          : db.tx.tasks[taskId].update({
+              status: "cancelled",
+              cancelRequested: true,
+              blockedReason: "",
+              errorMessage: "Cancelled by user",
+              completedAt: Date.now(),
+            })
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch (error) {
@@ -925,46 +860,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Active Tasks (fixed, non-scrolling) */}
-        {activeTasks.length > 0 && (
-          <View
-            style={{
-              paddingHorizontal: spacing.xl,
-              paddingBottom: spacing.md,
-              gap: spacing.sm,
-            }}
-          >
-            {activeTasks.map((task) => (
-              <ActiveTaskCard
-                key={task.id}
-                title={task.summary || task.input}
-                status={task.status as "running" | "pending" | "transcribing" | "transcription_failed"}
-                startedAt={(task as any).startedAt}
-                createdAt={task.createdAt}
-                cancelRequested={(task as any).cancelRequested}
-                errorMessage={(task as any).errorMessage}
-                onView={() => {
-                  setSelectedTask(task);
-                  setFollowUpText("");
-                  setShowJumpToEnd(false);
-                  setShowJumpToTop(false);
-                }}
-                onRetry={
-                  task.status === "transcription_failed" && (task as any).audioFilePath
-                    ? () => retryTranscription(task.id, (task as any).audioFilePath)
-                    : undefined
-                }
-              />
-            ))}
-          </View>
-        )}
-
-        {/* History list */}
         {isLoading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={colors.primary} />
           </View>
-        ) : historyTasks.length === 0 && activeTasks.length === 0 ? (
+        ) : notes.length === 0 ? (
           <View
             style={{
               flex: 1,
@@ -982,29 +882,60 @@ export default function HomeScreen() {
                 lineHeight: 22,
               }}
             >
-              No tasks yet. Tap the mic to get started.
+              No voice notes yet. Tap the mic to get started.
             </Text>
           </View>
         ) : (
           <FlatList
             ref={scrollRef}
-            data={historyTasks}
+            data={notes}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TaskListItem
-                title={item.summary || item.input}
-                status={item.status as "done" | "failed" | "cancelled"}
-                createdAt={item.createdAt}
-                onPress={() => {
-                  setSelectedTask(item);
-                  setFollowUpText("");
-                  setShowJumpToEnd(false);
-                  setShowJumpToTop(false);
-                }}
-              />
-            )}
+            renderItem={({ item }) => {
+              const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
+                const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
+                if (weightDiff !== 0) return weightDiff;
+                const extractionDiff = ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
+                if (extractionDiff !== 0) return extractionDiff;
+                return a.createdAt - b.createdAt;
+              });
+
+              return (
+                <NoteListItem
+                  title={getNoteTitle(item)}
+                  transcript={item.transcript}
+                  status={item.status}
+                  createdAt={item.createdAt}
+                  tasks={noteTasks.map((task) => ({
+                    id: task.id,
+                    title: task.summary || task.input,
+                    status: task.status,
+                    createdAt: task.createdAt,
+                    projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
+                  }))}
+                  expanded={expandedNoteIds.includes(item.id)}
+                  onToggle={() => {
+                    setExpandedNoteIds((current) =>
+                      current.includes(item.id)
+                        ? current.filter((id) => id !== item.id)
+                        : [...current, item.id]
+                    );
+                  }}
+                  onOpenTask={(taskId) => {
+                    setSelectedTaskId(taskId);
+                    setFollowUpText("");
+                    setShowJumpToEnd(false);
+                    setShowJumpToTop(false);
+                  }}
+                  onRetryTranscription={
+                    item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
+                      ? () => retryTranscription(item.id, item.audioFilePath)
+                      : undefined
+                  }
+                />
+              );
+            }}
             ListHeaderComponent={
-              historyTasks.length > 0 ? (
+              notes.length > 0 ? (
                 <Text
                   style={{
                     color: colors.textTertiary,
@@ -1015,11 +946,11 @@ export default function HomeScreen() {
                     marginBottom: spacing.sm,
                   }}
                 >
-                  Recent
+                  Voice Notes
                 </Text>
               ) : null
             }
-            ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
             contentContainerStyle={{
               paddingTop: spacing.sm,
               paddingHorizontal: spacing.xl,
@@ -1062,7 +993,7 @@ export default function HomeScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => {
             cancelFollowUpRecording();
-            setSelectedTask(null);
+            setSelectedTaskId(null);
           }}
         >
           <KeyboardAvoidingView
@@ -1113,7 +1044,7 @@ export default function HomeScreen() {
                     <Pressable
                       onPress={() => {
                         cancelFollowUpRecording();
-                        setSelectedTask(null);
+                        setSelectedTaskId(null);
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Close task details"
@@ -1210,18 +1141,21 @@ export default function HomeScreen() {
                       )}
 
                       {/* Cancel button */}
-                      {selectedTask.status === "running" && !selectedTask.cancelRequested && (
+                      {["running", "pending", "blocked"].includes(selectedTask.status) &&
+                        !selectedTask.cancelRequested && (
                         <Pressable
                           onPress={() => {
                             Alert.alert(
                               "Cancel Task",
-                              "Are you sure you want to cancel this task?",
+                              selectedTask.status === "running"
+                                ? "Are you sure you want to cancel this task?"
+                                : "Are you sure you want to cancel this task before it runs?",
                               [
                                 { text: "No", style: "cancel" },
                                 {
                                   text: "Yes, Cancel",
                                   style: "destructive",
-                                  onPress: () => cancelTask(selectedTask.id),
+                                  onPress: () => cancelTask(selectedTask.id, selectedTask.status),
                                 },
                               ]
                             );

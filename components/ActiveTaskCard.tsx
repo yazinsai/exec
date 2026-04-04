@@ -17,7 +17,6 @@ import {
   fontFamily,
   shadows,
 } from "@/constants/Colors";
-import type { ThemeColors } from "@/constants/Colors";
 
 interface ActiveTaskCardProps {
   title: string;

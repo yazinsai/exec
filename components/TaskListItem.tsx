@@ -1,10 +1,12 @@
 import { View, Text, Pressable } from "react-native";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, fontFamily } from "@/constants/Colors";
+import { formatTaskStatusLabel } from "@/lib/workflow";
 
 interface TaskListItemProps {
   title: string;
-  status: "done" | "failed" | "cancelled";
+  status: string;
+  projectLabel?: string | null;
   createdAt: number;
   onPress: () => void;
 }
@@ -25,10 +27,12 @@ function relativeTime(timestamp: number): string {
 export function TaskListItem({
   title,
   status,
+  projectLabel,
   createdAt,
   onPress,
 }: TaskListItemProps) {
   const colors = useColors();
+  const metaParts = [projectLabel, formatTaskStatusLabel(status)].filter(Boolean);
 
   return (
     <Pressable
@@ -36,7 +40,7 @@ export function TaskListItem({
       style={({ pressed }) => ({
         width: "100%",
         position: "relative",
-        paddingVertical: spacing.xl,
+        paddingVertical: spacing.lg,
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -46,11 +50,22 @@ export function TaskListItem({
           style={{
             color: colors.textPrimary,
             fontSize: typography.base,
-            fontFamily: fontFamily.regular,
+            fontFamily: fontFamily.medium,
             lineHeight: 21,
           }}
         >
           {title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.textTertiary,
+            fontSize: typography.xs,
+            fontFamily: fontFamily.regular,
+            marginTop: spacing.xs,
+          }}
+        >
+          {metaParts.join(" • ")}
         </Text>
       </View>
 
@@ -67,7 +82,7 @@ export function TaskListItem({
         <Text
           style={{
             color: colors.textTertiary,
-            fontSize: typography.sm,
+            fontSize: typography.xs,
             fontFamily: fontFamily.regular,
           }}
         >

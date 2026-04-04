@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Exec v2 Agent Process
+ * Exec agent
  *
- * A persistent process that polls InstantDB for tasks and executes them
- * via the Claude Agent SDK with full Mac access.
+ * Notes are the top-level intake records.
+ * Triage turns notes into child tasks.
+ * The scheduler executes runnable child tasks with project serialization.
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -16,21 +17,32 @@ import schema from "../instant.schema";
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { resolve } from "path";
-
-// --- Config ---
+import { NOTE_STATUSES, TASK_STATUSES } from "../lib/workflow";
+import { triageTranscript } from "./triage";
+import { getProjectPath, getProjectsRoot } from "./project-index";
+import { migrateLegacyTasksToNotes } from "./migrations";
 
 const APP_ID = process.env.INSTANT_APP_ID!;
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
 const PID_FILE = "/tmp/exec-agent.pid";
 const LESSONS_PATH = resolve(homedir(), "ai/lessons.md");
-const SYSTEM_PROMPT_PATH = resolve(import.meta.dir, "system-prompt.md");
-const TASK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const AGENT_DIR = decodeURIComponent(new URL(".", import.meta.url).pathname);
+const SYSTEM_PROMPT_PATH = resolve(AGENT_DIR, "system-prompt.md");
+const TASK_TIMEOUT_MS = 30 * 60 * 1000;
 const LIVE_OUTPUT_THROTTLE_MS = 2000;
 const CANCEL_POLL_MS = 3000;
 const TASK_POLL_MS = 3000;
+const NOTE_POLL_MS = 3000;
 const FOLLOW_UP_POLL_MS = 5000;
+const MAX_CONCURRENT_TASKS = 2;
+const MAX_TRIAGE_CONCURRENCY = 1;
 
-// --- PID Lock ---
+const db: any = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
+
+const runningTasks = new Set<string>();
+const runningNotes = new Set<string>();
+const projectLocks = new Set<string>();
+let dispatchInProgress = false;
 
 function acquirePidLock(): boolean {
   if (existsSync(PID_FILE)) {
@@ -43,125 +55,392 @@ function acquirePidLock(): boolean {
       console.log(`Removing stale PID file (PID ${existingPid}).`);
     }
   }
+
   writeFileSync(PID_FILE, String(process.pid));
   return true;
 }
 
 function releasePidLock() {
   try {
-    if (existsSync(PID_FILE)) {
-      const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
-      if (pid === process.pid) unlinkSync(PID_FILE);
-    }
+    if (!existsSync(PID_FILE)) return;
+    const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
+    if (pid === process.pid) unlinkSync(PID_FILE);
   } catch {}
 }
 
-// --- InstantDB ---
+function truncPath(p: string): string {
+  const parts = p.split("/");
+  return parts.length > 3 ? ".../" + parts.slice(-3).join("/") : p;
+}
 
-const db = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
+function truncStr(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + "..." : s;
+}
 
-// --- FIFO Queue ---
-
-const taskQueue: string[] = [];
-const inFlight = new Set<string>();
-let processing = false;
-
-function enqueue(taskId: string) {
-  if (!inFlight.has(taskId) && !taskQueue.includes(taskId)) {
-    taskQueue.push(taskId);
-    processNext();
+function formatToolDetail(name: string, input: Record<string, any>): string {
+  switch (name) {
+    case "Read":
+    case "Write":
+    case "Edit":
+      return input.file_path ? truncPath(input.file_path) : "";
+    case "Glob":
+      return input.pattern || "";
+    case "Grep":
+      return input.pattern ? `"${input.pattern}"` : "";
+    case "Bash":
+      return input.command ? truncStr(input.command, 80) : "";
+    case "Agent":
+      return input.description || input.prompt?.slice(0, 60) || "";
+    case "WebSearch":
+      return input.query || "";
+    case "WebFetch":
+      return input.url ? truncStr(input.url, 60) : "";
+    default:
+      return "";
   }
 }
 
-async function processNext() {
-  if (processing || taskQueue.length === 0) return;
-  processing = true;
-  const taskId = taskQueue.shift()!;
-  inFlight.add(taskId);
+function getProjectSlug(task: any): string | null {
+  return task.project?.slug || task.projectSlug || null;
+}
+
+function getResumeSessionId(task: any): string | undefined {
+  return task.project?.sessionId || task.sessionId || undefined;
+}
+
+function hasUnreadUserMessages(task: any): boolean {
+  const messages = [...(task.messages || [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+  const lastSeenId = task.lastSeenMessageId;
+  const lastSeenIndex = lastSeenId
+    ? messages.findIndex((message: any) => message.id === lastSeenId)
+    : -1;
+  const relevant = lastSeenIndex >= 0 ? messages.slice(lastSeenIndex + 1) : messages;
+  return relevant.some((message: any) => message.role === "user");
+}
+
+function buildFollowUpPrompt(task: any): string {
+  const messages = [...(task.messages || [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+  const lastSeenId = task.lastSeenMessageId;
+  let startIndex = 0;
+
+  if (lastSeenId) {
+    const idx = messages.findIndex((message: any) => message.id === lastSeenId);
+    if (idx >= 0) startIndex = idx + 1;
+  }
+
+  const newMessages = messages
+    .slice(startIndex)
+    .filter((message: any) => message.role === "user");
+
+  if (newMessages.length === 0) {
+    return "The user is following up. Check for new context.";
+  }
+
+  return newMessages.map((message: any) => message.content).join("\n\n");
+}
+
+async function ensureProject(slug: string, createdAt: number): Promise<string> {
+  const existing = await db.query({
+    projects: {
+      $: { where: { slug } },
+    },
+  } as any);
+
+  const project = existing.projects[0] as any;
+  if (project) return project.id;
+
+  const projectId = id();
+  await db.transact(
+    db.tx.projects[projectId].update({
+      slug,
+      path: getProjectPath(slug),
+      createdAt,
+    })
+  );
+  return projectId;
+}
+
+async function handleNote(noteId: string) {
+  const resp = await db.query({
+    notes: {
+      $: { where: { id: noteId } },
+      tasks: {},
+    },
+  } as any);
+
+  const note = resp.notes[0] as any;
+  if (!note || note.status !== NOTE_STATUSES.pending) return;
+  if (!note.transcript?.trim()) {
+    await db.transact(
+      db.tx.notes[noteId].update({
+        status: NOTE_STATUSES.empty,
+        triagedAt: Date.now(),
+      })
+    );
+    return;
+  }
+
+  await db.transact(
+    db.tx.notes[noteId].update({
+      status: NOTE_STATUSES.triaging,
+      errorMessage: "",
+    })
+  );
+
+  const triage = await triageTranscript(note.transcript);
+  const now = Date.now();
+
+  if (triage.tasks.length === 0) {
+    await db.transact(
+      db.tx.notes[noteId].update({
+        status: NOTE_STATUSES.empty,
+        ...(triage.summary || note.summary ? { summary: triage.summary || note.summary } : {}),
+        triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
+        triagedAt: now,
+      })
+    );
+    return;
+  }
+
+  const projectIdBySlug = new Map<string, string>();
+  for (const triagedTask of triage.tasks) {
+    if (!triagedTask.projectSlug) continue;
+    if (projectIdBySlug.has(triagedTask.projectSlug)) continue;
+    const projectId = await ensureProject(triagedTask.projectSlug, now);
+    projectIdBySlug.set(triagedTask.projectSlug, projectId);
+  }
+
+  const txs: any[] = [
+    db.tx.notes[noteId].update({
+      status: NOTE_STATUSES.ready,
+      ...(triage.summary || note.summary ? { summary: triage.summary || note.summary } : {}),
+      triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
+      triagedAt: now,
+      errorMessage: "",
+    }),
+  ];
+
+  const taskIds: string[] = [];
+
+  for (const [index, triagedTask] of triage.tasks.entries()) {
+    const taskId = id();
+    const messageId = id();
+    taskIds[index] = taskId;
+
+    const links: Record<string, string> = { note: noteId };
+    if (triagedTask.projectSlug) {
+      const projectId = projectIdBySlug.get(triagedTask.projectSlug);
+      if (projectId) links.project = projectId;
+    }
+
+    txs.push(
+      db.tx.tasks[taskId]
+        .update({
+          input: triagedTask.action,
+          summary: triagedTask.title,
+          status:
+            triagedTask.dependsOn.length > 0 ? TASK_STATUSES.blocked : TASK_STATUSES.pending,
+          source: note.source,
+          ...(triagedTask.sourceSnippet ? { rawInput: triagedTask.sourceSnippet } : {}),
+          ...(triagedTask.dependsOn.length > 0
+            ? { blockedReason: "waiting_on_dependencies" }
+            : {}),
+          errorMessage: "",
+          extractionIndex: index,
+          ...(triagedTask.sourceSnippet ? { sourceSnippet: triagedTask.sourceSnippet } : {}),
+          ...(triagedTask.projectSlug ? { projectSlug: triagedTask.projectSlug } : {}),
+          triageRunId: String(now),
+          createdAt: now + index,
+        })
+        .link(links)
+    );
+    txs.push(
+      db.tx.messages[messageId]
+        .update({
+          role: "user",
+          content: triagedTask.action,
+          createdAt: now + index,
+        })
+        .link({ task: taskId })
+    );
+  }
+
+  for (const [index, triagedTask] of triage.tasks.entries()) {
+    const taskId = taskIds[index];
+    for (const blockerIndex of triagedTask.dependsOn) {
+      const blockerTaskId = taskIds[blockerIndex];
+      if (!blockerTaskId) continue;
+      txs.push(
+        db.tx.taskDependencies[id()]
+          .update({ createdAt: now })
+          .link({ task: taskId, dependsOn: blockerTaskId })
+      );
+    }
+  }
+
+  await db.transact(txs);
+}
+
+async function pollPendingNotes() {
+  if (runningNotes.size >= MAX_TRIAGE_CONCURRENCY) return;
 
   try {
-    await handleTask(taskId);
-  } catch (err: any) {
-    console.error(`Task ${taskId} failed:`, err.message);
-    try {
-      await db.transact(
-        db.tx.tasks[taskId].update({
-          status: "failed",
-          errorMessage: err.message,
-          completedAt: Date.now(),
+    const resp = await db.query({
+      notes: {
+        $: { where: { status: NOTE_STATUSES.pending }, order: { createdAt: "asc" } },
+      },
+    } as any);
+
+    for (const note of resp.notes as any[]) {
+      if (runningNotes.size >= MAX_TRIAGE_CONCURRENCY) break;
+      if (runningNotes.has(note.id)) continue;
+
+      runningNotes.add(note.id);
+      handleNote(note.id)
+        .catch(async (error: any) => {
+          console.error(`Triage failed for note ${note.id}:`, error.message);
+          await db.transact(
+            db.tx.notes[note.id].update({
+              status: NOTE_STATUSES.triageFailed,
+              errorMessage: error.message,
+            })
+          );
         })
-      );
-    } catch {}
-  } finally {
-    inFlight.delete(taskId);
-    processing = false;
-    processNext();
+        .finally(() => {
+          runningNotes.delete(note.id);
+          void dispatchRunnableTasks();
+        });
+    }
+  } catch (error: any) {
+    console.error("Pending note poll error:", error.message);
   }
 }
 
-// --- Task Handler ---
+async function reconcileTaskDependencies() {
+  const resp = await db.query({
+    tasks: {
+      $: {
+        where: {
+          or: [
+            { status: TASK_STATUSES.pending },
+            { status: TASK_STATUSES.blocked },
+          ],
+        },
+      },
+      dependencies: { dependsOn: {} },
+    },
+  } as any);
+
+  for (const task of resp.tasks as any[]) {
+    const blockers = (task.dependencies || [])
+      .map((edge: any) => edge.dependsOn)
+      .filter(Boolean);
+
+    if (task.cancelRequested) {
+      if (task.status !== TASK_STATUSES.cancelled) {
+        await db.transact(
+          db.tx.tasks[task.id].update({
+            status: TASK_STATUSES.cancelled,
+            blockedReason: "",
+            errorMessage: "Cancelled by user",
+            completedAt: Date.now(),
+          })
+        );
+      }
+      continue;
+    }
+
+    let desiredStatus = task.status;
+    let blockedReason = "";
+
+    if (blockers.length === 0) {
+      desiredStatus = TASK_STATUSES.pending;
+    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.failed)) {
+      desiredStatus = TASK_STATUSES.blocked;
+      blockedReason = "dependency_failed";
+    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.cancelled)) {
+      desiredStatus = TASK_STATUSES.blocked;
+      blockedReason = "dependency_cancelled";
+    } else if (blockers.some((blocker: any) => blocker.status !== TASK_STATUSES.done)) {
+      desiredStatus = TASK_STATUSES.blocked;
+      blockedReason = "waiting_on_dependencies";
+    } else {
+      desiredStatus = TASK_STATUSES.pending;
+    }
+
+    if (task.status !== desiredStatus || (task.blockedReason || "") !== blockedReason) {
+      const update: Record<string, any> = {
+        status: desiredStatus,
+        blockedReason,
+      };
+      if (desiredStatus === TASK_STATUSES.pending) {
+        update.errorMessage = "";
+      }
+
+      await db.transact(
+        db.tx.tasks[task.id].update(update)
+      );
+    }
+  }
+}
 
 async function handleTask(taskId: string) {
   const lessons = existsSync(LESSONS_PATH)
     ? readFileSync(LESSONS_PATH, "utf-8")
     : "";
-
   const systemPromptMd = existsSync(SYSTEM_PROMPT_PATH)
     ? readFileSync(SYSTEM_PROMPT_PATH, "utf-8")
     : "";
 
-  // Fetch task with messages
-  const resp = await db.query({ tasks: { $: { where: { id: taskId } }, messages: {} } });
+  const resp = await db.query({
+    tasks: {
+      $: { where: { id: taskId } },
+      messages: {},
+      project: {},
+      note: {},
+    },
+  } as any);
+
   const task = resp.tasks[0] as any;
-  if (!task) {
-    console.warn(`Task ${taskId} not found, skipping.`);
-    return;
-  }
+  if (!task) return;
 
-  // Determine if follow-up
-  const isFollowUp = !!task.sessionId && task.status !== "pending";
-  const prompt: string = isFollowUp ? buildFollowUpPrompt(task) : task.input;
+  const resumeSessionId = getResumeSessionId(task);
+  const isFollowUp = Boolean(resumeSessionId && hasUnreadUserMessages(task));
+  const prompt = isFollowUp ? buildFollowUpPrompt(task) : task.input;
 
-  console.log(`[${isFollowUp ? "follow-up" : "new"}] Task ${taskId}: ${String(task.input).slice(0, 80)}...`);
-
-  // Mark running
   await db.transact(
     db.tx.tasks[taskId].update({
-      status: "running",
+      status: TASK_STATUSES.running,
       startedAt: Date.now(),
       cancelRequested: false,
+      blockedReason: "",
       errorMessage: "",
       liveOutput: "",
     })
   );
 
   const abortController = new AbortController();
-
-  // Cancel polling
   const cancelInterval = setInterval(async () => {
     try {
       const r = await db.query({ tasks: { $: { where: { id: taskId } } } });
-      if (r.tasks[0]?.cancelRequested) {
-        console.log(`Task ${taskId} cancellation requested.`);
+      // typed as any to tolerate new reverse-link schema additions
+      if ((r.tasks[0] as any)?.cancelRequested) {
         abortController.abort();
       }
     } catch {}
   }, CANCEL_POLL_MS);
 
-  // Task timeout
   const timeoutHandle = setTimeout(() => {
-    console.log(`Task ${taskId} timed out after ${TASK_TIMEOUT_MS / 60000} minutes.`);
     abortController.abort();
   }, TASK_TIMEOUT_MS);
 
-  // Build system prompt context
   const appendText = [
     systemPromptMd,
     lessons ? `\n\n# Learned Preferences\n\n${lessons}` : "",
   ].filter(Boolean).join("\n\n");
 
   const queryOptions: Record<string, unknown> = {
-    cwd: resolve(homedir(), "ai/projects"),
+    cwd: getProjectsRoot(),
     systemPrompt: {
       type: "preset" as const,
       preset: "claude_code" as const,
@@ -173,77 +452,40 @@ async function handleTask(taskId: string) {
     abortController,
   };
 
-  if (isFollowUp && task.sessionId) {
-    queryOptions.resume = task.sessionId;
+  if (resumeSessionId) {
+    queryOptions.resume = resumeSessionId;
   }
 
   const q = query({ prompt, options: queryOptions as any });
-
-  let sessionId: string | undefined = task.sessionId || undefined;
+  let sessionId: string | undefined = resumeSessionId;
   let lastLiveOutputTime = 0;
-
-  // Activity tracking for live output
-  const MAX_ACTIVITY_ITEMS = 15;
-  const activityItems: Array<{
+  const activityItems: {
     type: "tool" | "text" | "thinking";
     name?: string;
     detail?: string;
     content?: string;
     ts: number;
-  }> = [];
+  }[] = [];
 
   function addActivity(item: (typeof activityItems)[0]) {
     activityItems.push(item);
-    if (activityItems.length > MAX_ACTIVITY_ITEMS) {
-      activityItems.splice(0, activityItems.length - MAX_ACTIVITY_ITEMS);
+    if (activityItems.length > 15) {
+      activityItems.splice(0, activityItems.length - 15);
     }
-  }
-
-  function formatToolDetail(name: string, input: Record<string, any>): string {
-    switch (name) {
-      case "Read":
-        return input.file_path ? truncPath(input.file_path) : "";
-      case "Write":
-        return input.file_path ? truncPath(input.file_path) : "";
-      case "Edit":
-        return input.file_path ? truncPath(input.file_path) : "";
-      case "Glob":
-        return input.pattern || "";
-      case "Grep":
-        return input.pattern ? `"${input.pattern}"` : "";
-      case "Bash":
-        return input.command ? truncStr(input.command, 80) : "";
-      case "Agent":
-        return input.description || input.prompt?.slice(0, 60) || "";
-      case "WebSearch":
-        return input.query || "";
-      case "WebFetch":
-        return input.url ? truncStr(input.url, 60) : "";
-      default:
-        return "";
-    }
-  }
-
-  function truncPath(p: string): string {
-    // Show last 3 segments
-    const parts = p.split("/");
-    return parts.length > 3 ? ".../" + parts.slice(-3).join("/") : p;
-  }
-
-  function truncStr(s: string, max: number): string {
-    return s.length > max ? s.slice(0, max) + "..." : s;
   }
 
   async function flushLiveOutput() {
     const now = Date.now();
-    if (now - lastLiveOutputTime >= LIVE_OUTPUT_THROTTLE_MS && activityItems.length > 0) {
-      lastLiveOutputTime = now;
-      await db.transact(
-        db.tx.tasks[taskId].update({
-          liveOutput: JSON.stringify(activityItems),
-        })
-      );
+    if (now - lastLiveOutputTime < LIVE_OUTPUT_THROTTLE_MS || activityItems.length === 0) {
+      return;
     }
+
+    lastLiveOutputTime = now;
+    await db.transact(
+      db.tx.tasks[taskId].update({
+        liveOutput: JSON.stringify(activityItems),
+      })
+    );
   }
 
   try {
@@ -263,7 +505,6 @@ async function handleTask(taskId: string) {
               ts: Date.now(),
             });
           } else if (block.type === "thinking" && block.thinking) {
-            // Capture first line of thinking as a summary
             const firstLine = block.thinking.split("\n")[0].trim();
             if (firstLine) {
               addActivity({
@@ -273,9 +514,8 @@ async function handleTask(taskId: string) {
               });
             }
           } else if (block.type === "text" && block.text) {
-            // Capture latest text snippet
             const lines = block.text.trim().split("\n");
-            const lastLine = lines[lines.length - 1].trim();
+            const lastLine = lines[lines.length - 1]?.trim();
             if (lastLine) {
               addActivity({
                 type: "text",
@@ -290,61 +530,77 @@ async function handleTask(taskId: string) {
       }
 
       if (message.type === "result") {
-        const resultMsg = message as any; // SDKResultMessage union type
-        const success = resultMsg.subtype === "success";
-        const resultText: string = resultMsg.result || "";
-        const errors: string[] = resultMsg.errors || [];
+        const resultMessage = message as SDKResultMessage;
+        const success = resultMessage.subtype === "success";
+        const resultText = success ? resultMessage.result || "" : "";
+        const errors = success ? [] : resultMessage.errors || [];
 
-        // Write assistant reply to thread
         if (resultText) {
           await db.transact(
-            db.tx.messages[id()].create({
-              role: "assistant",
-              content: resultText,
-              createdAt: Date.now(),
-            }).link({ task: taskId })
+            db.tx.messages[id()]
+              .create({
+                role: "assistant",
+                content: resultText,
+                createdAt: Date.now(),
+              })
+              .link({ task: taskId })
           );
         }
 
-        // Re-fetch to get latest message ID (can't paginate nested relations, so fetch all messages)
         const updated = await db.query({
-          tasks: { $: { where: { id: taskId } }, messages: {} },
-        });
-        const msgs = (updated.tasks[0] as any)?.messages || [];
-        const sortedMsgs = msgs.sort((a: any, b: any) => b.createdAt - a.createdAt);
-        const latestMsgId = sortedMsgs[0]?.id || "";
-
-        await db.transact(
-          db.tx.tasks[taskId].update({
-            status: success ? "done" : "failed",
-            result: resultText,
-            sessionId: sessionId || "",
-            liveOutput: "",
-            errorMessage: success ? "" : (errors.join("\n") || "Unknown error"),
-            completedAt: Date.now(),
-            lastSeenMessageId: latestMsgId,
-          })
+          tasks: { $: { where: { id: taskId } }, messages: {}, project: {} },
+        } as any);
+        const updatedTask = updated.tasks[0] as any;
+        const messages = [...(updatedTask?.messages || [])].sort(
+          (a: any, b: any) => b.createdAt - a.createdAt
         );
+        const latestMessageId = messages[0]?.id || "";
 
-        console.log(`Task ${taskId} ${success ? "completed" : "failed"}.`);
+        const taskUpdate = db.tx.tasks[taskId].update({
+          status: success ? TASK_STATUSES.done : TASK_STATUSES.failed,
+          result: resultText,
+          ...(updatedTask?.project ? {} : { sessionId: sessionId || "" }),
+          liveOutput: "",
+          blockedReason: "",
+          errorMessage: success ? "" : (errors.join("\n") || "Unknown error"),
+          completedAt: Date.now(),
+          lastSeenMessageId: latestMessageId,
+        });
+
+        const txs: any[] = [taskUpdate];
+        if (updatedTask?.project?.id && sessionId) {
+          txs.push(db.tx.projects[updatedTask.project.id].update({ sessionId }));
+        } else if (sessionId) {
+          txs.push(db.tx.tasks[taskId].update({ sessionId }));
+        }
+
+        await db.transact(txs);
       }
     }
-  } catch (err: any) {
-    if (err.name === "AbortError" || abortController.signal.aborted) {
-      const r = await db.query({ tasks: { $: { where: { id: taskId } } } });
-      const wasCancelled = (r.tasks[0] as any)?.cancelRequested;
-
-      await db.transact(
+  } catch (error: any) {
+    if (error.name === "AbortError" || abortController.signal.aborted) {
+      const r = await db.query({ tasks: { $: { where: { id: taskId } }, project: {} } });
+      // typed as any to tolerate new reverse-link schema additions
+      const currentTask = r.tasks[0] as any;
+      const wasCancelled = currentTask?.cancelRequested;
+      const txs: any[] = [
         db.tx.tasks[taskId].update({
-          status: wasCancelled ? "cancelled" : "failed",
+          status: wasCancelled ? TASK_STATUSES.cancelled : TASK_STATUSES.failed,
           errorMessage: wasCancelled ? "Cancelled by user" : "Task timed out",
           liveOutput: "",
-          sessionId: sessionId || "",
+          blockedReason: "",
           completedAt: Date.now(),
-        })
-      );
+          ...(currentTask?.project ? {} : { sessionId: sessionId || "" }),
+        }),
+      ];
+
+      if (currentTask?.project?.id && sessionId) {
+        txs.push(db.tx.projects[currentTask.project.id].update({ sessionId }));
+      }
+
+      await db.transact(txs);
     } else {
-      throw err;
+      throw error;
     }
   } finally {
     clearInterval(cancelInterval);
@@ -352,38 +608,75 @@ async function handleTask(taskId: string) {
   }
 }
 
-// --- Follow-up Helpers ---
+function launchTask(task: any) {
+  const projectSlug = getProjectSlug(task);
+  runningTasks.add(task.id);
+  if (projectSlug) projectLocks.add(projectSlug);
 
-function buildFollowUpPrompt(task: any): string {
-  const messages = task.messages || [];
-  const lastSeenId = task.lastSeenMessageId;
-  let newMessages = messages.filter((m: any) => m.role === "user");
-
-  if (lastSeenId) {
-    const lastSeenIdx = messages.findIndex((m: any) => m.id === lastSeenId);
-    if (lastSeenIdx >= 0) {
-      newMessages = messages
-        .slice(lastSeenIdx + 1)
-        .filter((m: any) => m.role === "user");
-    }
-  }
-
-  if (newMessages.length === 0) return "The user is following up. Check for new context.";
-  return newMessages.map((m: any) => m.content).join("\n\n");
+  handleTask(task.id)
+    .catch(async (error: any) => {
+      console.error(`Task ${task.id} failed:`, error.message);
+      await db.transact(
+        db.tx.tasks[task.id].update({
+          status: TASK_STATUSES.failed,
+          errorMessage: error.message,
+          completedAt: Date.now(),
+        })
+      );
+    })
+    .finally(() => {
+      runningTasks.delete(task.id);
+      if (projectSlug) projectLocks.delete(projectSlug);
+      void dispatchRunnableTasks();
+    });
 }
 
-// --- Polling ---
+async function dispatchRunnableTasks() {
+  if (dispatchInProgress) return;
+  dispatchInProgress = true;
 
-async function pollForPendingTasks() {
   try {
-    const resp = await db.query({
-      tasks: { $: { where: { status: "pending" }, order: { createdAt: "asc" } } },
-    });
-    for (const task of resp.tasks) {
-      enqueue(task.id);
+    await reconcileTaskDependencies();
+
+    while (runningTasks.size < MAX_CONCURRENT_TASKS) {
+      const resp = await db.query({
+        tasks: {
+          $: { where: { status: TASK_STATUSES.pending }, order: { createdAt: "asc" } },
+          project: {},
+        },
+      } as any);
+
+      let launched = false;
+
+      for (const task of resp.tasks as any[]) {
+        if (runningTasks.has(task.id)) continue;
+
+        const projectSlug = getProjectSlug(task);
+        if (projectSlug && projectLocks.has(projectSlug)) continue;
+
+        if (task.cancelRequested) {
+          await db.transact(
+            db.tx.tasks[task.id].update({
+              status: TASK_STATUSES.cancelled,
+              errorMessage: "Cancelled by user",
+              completedAt: Date.now(),
+              blockedReason: "",
+            })
+          );
+          continue;
+        }
+
+        launchTask(task);
+        launched = true;
+        if (runningTasks.size >= MAX_CONCURRENT_TASKS) break;
+      }
+
+      if (!launched) break;
     }
-  } catch (err: any) {
-    console.error("Poll error:", err.message);
+  } catch (error: any) {
+    console.error("Task dispatch error:", error.message);
+  } finally {
+    dispatchInProgress = false;
   }
 }
 
@@ -391,69 +684,91 @@ async function pollForFollowUps() {
   try {
     const resp = await db.query({
       tasks: {
-        $: { where: { status: "done" } },
+        $: {
+          where: {
+            or: [
+              { status: TASK_STATUSES.done },
+              { status: TASK_STATUSES.failed },
+              { status: TASK_STATUSES.cancelled },
+            ],
+          },
+        },
         messages: {},
+        project: {},
       },
-    });
+    } as any);
+
     for (const task of resp.tasks as any[]) {
-      const msgs = (task.messages || []).sort((a: any, b: any) => b.createdAt - a.createdAt);
-      const latestMsg = msgs[0];
-      if (
-        latestMsg &&
-        latestMsg.role === "user" &&
-        task.sessionId &&
-        latestMsg.id !== task.lastSeenMessageId
-      ) {
-        console.log(`Follow-up detected for task ${task.id}`);
-        enqueue(task.id);
-      }
+      if (!getResumeSessionId(task)) continue;
+      if (!hasUnreadUserMessages(task)) continue;
+      if (runningTasks.has(task.id)) continue;
+
+      await db.transact(
+        db.tx.tasks[task.id].update({
+          status: TASK_STATUSES.pending,
+          cancelRequested: false,
+          blockedReason: "",
+          errorMessage: "",
+        })
+      );
     }
-  } catch (err: any) {
-    console.error("Follow-up poll error:", err.message);
+
+    await dispatchRunnableTasks();
+  } catch (error: any) {
+    console.error("Follow-up poll error:", error.message);
   }
 }
-
-// --- Crash Recovery ---
 
 async function recoverStaleTasks() {
   try {
     const resp = await db.query({
-      tasks: { $: { where: { status: "running" } } },
-    });
-    for (const task of resp.tasks) {
-      console.log(`Recovering stale task ${task.id} (was running).`);
-      await db.transact(db.tx.tasks[task.id].update({ status: "pending" }));
+      tasks: { $: { where: { status: TASK_STATUSES.running } } },
+    } as any);
+
+    for (const task of resp.tasks as any[]) {
+      await db.transact(
+        db.tx.tasks[task.id].update({
+          status: TASK_STATUSES.pending,
+          liveOutput: "",
+          blockedReason: "",
+        })
+      );
     }
-  } catch (err: any) {
-    console.error("Recovery error:", err.message);
+  } catch (error: any) {
+    console.error("Recovery error:", error.message);
   }
 }
-
-// --- Main ---
 
 async function main() {
   if (!acquirePidLock()) process.exit(1);
 
   process.on("exit", releasePidLock);
-  process.on("SIGINT", () => { releasePidLock(); process.exit(0); });
-  process.on("SIGTERM", () => { releasePidLock(); process.exit(0); });
+  process.on("SIGINT", () => {
+    releasePidLock();
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    releasePidLock();
+    process.exit(0);
+  });
 
   console.log(`Exec agent started (PID ${process.pid}).`);
 
+  await migrateLegacyTasksToNotes(db);
   await recoverStaleTasks();
+  await pollPendingNotes();
+  await pollForFollowUps();
+  await dispatchRunnableTasks();
 
-  // Poll for new tasks
-  setInterval(pollForPendingTasks, TASK_POLL_MS);
-  pollForPendingTasks(); // immediate first poll
+  setInterval(() => void pollPendingNotes(), NOTE_POLL_MS);
+  setInterval(() => void pollForFollowUps(), FOLLOW_UP_POLL_MS);
+  setInterval(() => void dispatchRunnableTasks(), TASK_POLL_MS);
 
-  // Poll for follow-ups
-  setInterval(pollForFollowUps, FOLLOW_UP_POLL_MS);
-
-  console.log("Listening for tasks...");
+  console.log("Listening for notes and tasks...");
 }
 
-main().catch((err) => {
-  console.error("Fatal:", err);
+main().catch((error) => {
+  console.error("Fatal:", error);
   releasePidLock();
   process.exit(1);
 });
