@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   Pressable,
   TextInput,
   Modal,
@@ -376,7 +377,6 @@ export default function HomeScreen() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const scrollRef = useRef<FlatList>(null);
   const modalListRef = useRef<FlatList>(null);
   const modalListLayoutHeight = useRef(0);
   const modalListContentHeight = useRef(0);
@@ -895,12 +895,29 @@ export default function HomeScreen() {
             </Text>
           </View>
         ) : (
-          <FlatList
-            ref={scrollRef}
-            style={{ paddingLeft: spacing.lg, paddingRight: spacing.lg }}
-            data={notes}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => {
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingTop: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: insets.bottom + 64 + 32,
+              gap: spacing.md,
+            }}
+          >
+            {notes.length > 0 && (
+              <Text
+                style={{
+                  color: colors.textTertiary,
+                  fontSize: typography.xs,
+                  fontFamily: fontFamily.semibold,
+                  textTransform: "uppercase",
+                  letterSpacing: typography.tracking.wider,
+                }}
+              >
+                Voice Notes
+              </Text>
+            )}
+            {notes.map((item) => {
               const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
                 const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
                 if (weightDiff !== 0) return weightDiff;
@@ -911,6 +928,7 @@ export default function HomeScreen() {
 
               return (
                 <NoteListItem
+                  key={item.id}
                   title={getNoteTitle(item)}
                   transcript={item.transcript}
                   status={item.status}
@@ -948,30 +966,8 @@ export default function HomeScreen() {
                   }
                 />
               );
-            }}
-            ListHeaderComponent={
-              notes.length > 0 ? (
-                <Text
-                  style={{
-                    color: colors.textTertiary,
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.semibold,
-                    textTransform: "uppercase",
-                    letterSpacing: typography.tracking.wider,
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  Voice Notes
-                </Text>
-              ) : null
-            }
-            ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-            contentContainerStyle={{
-              paddingTop: spacing.sm,
-              paddingBottom: insets.bottom + 64 + 32,
-            }}
-            showsVerticalScrollIndicator={false}
-          />
+            })}
+          </ScrollView>
         )}
 
         {/* FAB */}
