@@ -77,7 +77,7 @@ export function NoteListItem({
       <Pressable
         onPress={onToggle}
         style={({ pressed }) => ({
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: spacing.xl,
           paddingVertical: spacing.lg,
           opacity: pressed ? 0.8 : 1,
         })}
@@ -128,7 +128,7 @@ export function NoteListItem({
       {expanded && (
         <View
           style={{
-            paddingHorizontal: spacing.lg,
+            paddingHorizontal: spacing.xl,
             paddingBottom: spacing.lg,
           }}
         >
