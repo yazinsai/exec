@@ -475,6 +475,7 @@ export default function HomeScreen() {
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -494,7 +495,7 @@ export default function HomeScreen() {
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const releaseInfo = getReleaseInfo();
 
-  const isActive = isRecording || isSaving;
+  const isActive = isRecording || isPaused || isSaving;
 
   // Check permission on mount
   useEffect(() => {
@@ -757,9 +758,56 @@ export default function HomeScreen() {
     }
     recordingRef.current = null;
     setIsRecording(false);
+    setIsPaused(false);
     setDuration(0);
     setMetering(-160);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, []);
+
+  const pauseRecording = useCallback(async () => {
+    if (!recordingRef.current) return;
+    try {
+      await recordingRef.current.pauseAsync();
+      setIsPaused(true);
+      setMetering(-160);
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      if (meteringIntervalRef.current) {
+        clearInterval(meteringIntervalRef.current);
+        meteringIntervalRef.current = null;
+      }
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error("Failed to pause recording:", error);
+    }
+  }, []);
+
+  const resumeRecording = useCallback(async () => {
+    if (!recordingRef.current) return;
+    try {
+      await recordingRef.current.startAsync();
+      setIsPaused(false);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      durationIntervalRef.current = setInterval(() => {
+        setDuration((d) => d + 1);
+      }, 1000);
+
+      meteringIntervalRef.current = setInterval(async () => {
+        if (recordingRef.current) {
+          try {
+            const status = await recordingRef.current.getStatusAsync();
+            if (status.isRecording && status.metering !== undefined) {
+              setMetering(status.metering);
+            }
+          } catch {}
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Failed to resume recording:", error);
+    }
   }, []);
 
   const stopRecording = useCallback(async () => {
@@ -769,6 +817,7 @@ export default function HomeScreen() {
 
     setIsSaving(true);
     setIsRecording(false);
+    setIsPaused(false);
     setIsProcessing(true);
 
     if (durationIntervalRef.current) {
@@ -1399,9 +1448,12 @@ export default function HomeScreen() {
           duration={duration}
           metering={metering}
           isRecording={isRecording}
+          isPaused={isPaused}
           isSaving={isSaving}
           error={recordingError}
           onDone={stopRecording}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
           onDelete={cancelRecording}
         />
 

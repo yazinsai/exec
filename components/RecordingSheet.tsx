@@ -16,6 +16,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Ionicons } from "@expo/vector-icons";
 import { Waveform } from "./Waveform";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
@@ -27,9 +28,12 @@ interface RecordingSheetProps {
   duration: number;
   metering: number;
   isRecording: boolean;
+  isPaused: boolean;
   isSaving: boolean;
   error: string | null;
   onDone: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onDelete: () => void;
 }
 
@@ -44,9 +48,12 @@ export function RecordingSheet({
   duration,
   metering,
   isRecording,
+  isPaused,
   isSaving,
   error,
   onDone,
+  onPause,
+  onResume,
   onDelete,
 }: RecordingSheetProps) {
   const colors = useColors();
@@ -56,7 +63,7 @@ export function RecordingSheet({
   // Pulsing recording dot
   const dotOpacity = useSharedValue(1);
   useEffect(() => {
-    if (isRecording) {
+    if (isRecording && !isPaused) {
       dotOpacity.value = withRepeat(
         withSequence(
           withTiming(0.3, { duration: 500, easing: Easing.out(Easing.exp) }),
@@ -68,7 +75,7 @@ export function RecordingSheet({
     } else {
       dotOpacity.value = withTiming(1, { duration: 200 });
     }
-  }, [isRecording, dotOpacity]);
+  }, [isRecording, isPaused, dotOpacity]);
 
   // Slide in/out
   useEffect(() => {
@@ -208,7 +215,7 @@ export function RecordingSheet({
                         width: 10,
                         height: 10,
                         borderRadius: 5,
-                        backgroundColor: colors.error,
+                        backgroundColor: isPaused ? colors.warning : colors.error,
                       },
                       dotStyle,
                     ]}
@@ -220,7 +227,7 @@ export function RecordingSheet({
                       fontFamily: fontFamily.medium,
                     }}
                   >
-                    Recording
+                    {isPaused ? "Paused" : "Recording"}
                   </Text>
                 </View>
                 <Text
@@ -254,7 +261,7 @@ export function RecordingSheet({
                   paddingTop: spacing.md,
                 }}
               >
-                <Pressable onPress={onDelete} hitSlop={12}>
+                <Pressable onPress={onDelete} hitSlop={12} style={{ width: 60 }}>
                   <Text
                     style={{
                       color: colors.error,
@@ -265,7 +272,30 @@ export function RecordingSheet({
                     Delete
                   </Text>
                 </Pressable>
-                <Pressable onPress={onDone} hitSlop={12}>
+
+                <Pressable
+                  onPress={isPaused ? onResume : onPause}
+                  hitSlop={12}
+                  style={({ pressed }) => ({
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: isPaused
+                      ? colors.primary
+                      : colors.backgroundPressed,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Ionicons
+                    name={isPaused ? "play" : "pause"}
+                    size={22}
+                    color={isPaused ? colors.black : colors.textPrimary}
+                  />
+                </Pressable>
+
+                <Pressable onPress={onDone} hitSlop={12} style={{ width: 60, alignItems: "flex-end" }}>
                   <Text
                     style={{
                       color: colors.primary,
