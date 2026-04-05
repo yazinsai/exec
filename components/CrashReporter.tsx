@@ -39,6 +39,7 @@ export class CrashReporter extends Component<Props, State> {
         result: crashReport,
         source: Platform.OS === "web" ? "mac" : "phone",
         errorMessage: error.message,
+        read: false,
         createdAt: Date.now(),
         completedAt: Date.now(),
       }),

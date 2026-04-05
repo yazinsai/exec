@@ -48,6 +48,7 @@ const _schema = i.schema({
       sourceSnippet: i.string().optional(),
       projectSlug: i.string().optional(),
       triageRunId: i.string().optional(),
+      read: i.boolean().optional(),
       createdAt: i.number().indexed(),
       startedAt: i.number().optional(),
       completedAt: i.number().optional(),

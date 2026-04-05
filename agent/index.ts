@@ -245,6 +245,7 @@ async function handleNote(noteId: string) {
           ...(triagedTask.dependsOn.length > 0
             ? { blockedReason: "waiting_on_dependencies" }
             : {}),
+          read: false,
           errorMessage: "",
           extractionIndex: index,
           ...(triagedTask.sourceSnippet ? { sourceSnippet: triagedTask.sourceSnippet } : {}),
