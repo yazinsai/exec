@@ -32,7 +32,13 @@ import {
   configureAudioMode,
   saveRecordingLocally,
   RECORDING_OPTIONS,
+  RECORDINGS_DIR,
 } from "@/lib/audio";
+import {
+  enqueueRecording,
+  getQueue,
+  removeFromQueue,
+} from "@/lib/offlineQueue";
 import { Audio } from "expo-av";
 import { NoteListItem } from "@/components/NoteListItem";
 import { TaskListItem } from "@/components/TaskListItem";
@@ -601,6 +607,50 @@ export default function HomeScreen() {
       }
     }
   }, [notesData, transcribeNote]);
+
+  // On startup, flush any recordings stuck in the offline queue
+  const flushedQueueRef = useRef(false);
+  useEffect(() => {
+    if (flushedQueueRef.current) return;
+    flushedQueueRef.current = true;
+
+    (async () => {
+      const queue = await getQueue();
+      if (queue.length === 0) return;
+      console.log(`Flushing ${queue.length} offline recording(s)...`);
+
+      for (const entry of queue) {
+        try {
+          // Check if the note already exists in DB (maybe optimistic write worked)
+          const existing = notes.find((n) => n.id === entry.noteId);
+          if (existing) {
+            await removeFromQueue(entry.noteId);
+            continue;
+          }
+
+          await db.transact(
+            db.tx.notes[entry.noteId].update({
+              transcript: "",
+              status: NOTE_STATUSES.transcribing,
+              summary: "Transcribing...",
+              source: "phone",
+              audioFilePath: entry.filePath,
+              createdAt: entry.createdAt,
+            })
+          );
+          await removeFromQueue(entry.noteId);
+          console.log(`Flushed queued recording: ${entry.noteId}`);
+
+          // Attempt transcription now that we're (hopefully) online
+          transcribeNote(entry.noteId, entry.filePath);
+        } catch (err) {
+          console.warn("Failed to flush queued recording:", entry.noteId, err);
+          // Leave in queue for next startup
+        }
+      }
+    })();
+  }, [notes, transcribeNote]);
+
   const allTasks = notes.flatMap((note) => (note.tasks ?? []) as Task[]);
 
   // Derive unique project slugs for filter
@@ -739,23 +789,33 @@ export default function HomeScreen() {
 
       const noteId = id();
       const { filePath } = await saveRecordingLocally(recording, noteId);
-
-      // Create note immediately in InstantDB (before transcription)
       const now = Date.now();
-      await db.transact(
-        db.tx.notes[noteId].update({
-          transcript: "",
-          status: NOTE_STATUSES.transcribing,
-          summary: "Transcribing...",
-          source: "phone",
-          audioFilePath: filePath,
-          createdAt: now,
-        })
-      );
+
+      // Persist to local queue first (survives app restart even if DB write fails)
+      await enqueueRecording({ noteId, filePath, createdAt: now });
+
+      // Create note in InstantDB (optimistic — works offline)
+      try {
+        await db.transact(
+          db.tx.notes[noteId].update({
+            transcript: "",
+            status: NOTE_STATUSES.transcribing,
+            summary: "Transcribing...",
+            source: "phone",
+            audioFilePath: filePath,
+            createdAt: now,
+          })
+        );
+        // DB write succeeded (or queued optimistically), remove from local queue
+        await removeFromQueue(noteId);
+      } catch (dbError) {
+        console.warn("DB write failed (offline?), recording queued locally:", dbError);
+        // Note stays in queue — will be flushed on next startup
+      }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Transcribe in background (non-blocking)
+      // Transcribe in background (non-blocking — will fail offline and set status)
       transcribeNote(noteId, filePath);
     } catch (error) {
       console.error("Failed to save recording:", error);
