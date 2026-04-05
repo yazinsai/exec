@@ -1039,6 +1039,7 @@ export default function HomeScreen() {
                     status: task.status,
                     createdAt: task.createdAt,
                     projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
+                    read: (task as any).read ?? true,
                   }))}
                   expanded={expandedNoteIds.includes(item.id)}
                   onToggle={() => {
@@ -1053,6 +1054,8 @@ export default function HomeScreen() {
                     setFollowUpText("");
                     setShowJumpToEnd(false);
                     setShowJumpToTop(false);
+                    // Mark as read
+                    db.transact(db.tx.tasks[taskId].update({ read: true }));
                   }}
                   onRetryTranscription={
                     item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath

@@ -17,6 +17,7 @@ type ChildTask = {
   status: string;
   createdAt: number;
   projectLabel?: string | null;
+  read?: boolean;
 };
 
 interface NoteListItemProps {
@@ -115,6 +116,7 @@ export function NoteListItem({
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
   const hasRunning = counts.running > 0;
+  const unreadCount = tasks.filter((t) => t.read === false).length;
   const aggregate = formatNoteAggregateSummary(status, counts);
   const metaParts = [
     aggregate,
@@ -179,11 +181,37 @@ export function NoteListItem({
             )}
           </View>
 
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={colors.textTertiary}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {unreadCount > 0 && !expanded && (
+              <View
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  backgroundColor: colors.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 5,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.black,
+                    fontSize: 11,
+                    fontFamily: fontFamily.semibold,
+                    lineHeight: 14,
+                  }}
+                >
+                  {unreadCount}
+                </Text>
+              </View>
+            )}
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={colors.textTertiary}
+            />
+          </View>
         </View>
       </Pressable>
 
@@ -218,6 +246,7 @@ export function NoteListItem({
                     status={task.status}
                     projectLabel={task.projectLabel}
                     createdAt={task.createdAt}
+                    read={task.read}
                     onPress={() => onOpenTask(task.id)}
                   />
                 </View>

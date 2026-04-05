@@ -9,6 +9,7 @@ interface TaskListItemProps {
   status: string;
   projectLabel?: string | null;
   createdAt: number;
+  read?: boolean;
   onPress: () => void;
 }
 
@@ -85,11 +86,13 @@ export function TaskListItem({
   status,
   projectLabel,
   createdAt,
+  read = true,
   onPress,
 }: TaskListItemProps) {
   const colors = useColors();
   const isRunning = status === TASK_STATUSES.running;
   const isDone = status === TASK_STATUSES.done;
+  const isUnread = read === false;
   const dotColor = getStatusDotColor(status, colors);
   const metaParts = [projectLabel, formatTaskStatusLabel(status)].filter(Boolean);
 
@@ -138,7 +141,7 @@ export function TaskListItem({
           style={{
             color: isDone ? colors.textTertiary : colors.textPrimary,
             fontSize: typography.base,
-            fontFamily: fontFamily.medium,
+            fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
             lineHeight: 21,
             textDecorationLine: isDone ? "line-through" : "none",
           }}
@@ -164,6 +167,7 @@ export function TaskListItem({
           right: spacing.sm,
           flexDirection: "row",
           alignItems: "center",
+          gap: 6,
         }}
       >
         <Text
@@ -175,6 +179,16 @@ export function TaskListItem({
         >
           {relativeTime(createdAt)}
         </Text>
+        {isUnread && (
+          <View
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 3.5,
+              backgroundColor: colors.primary,
+            }}
+          />
+        )}
       </View>
     </Pressable>
   );
