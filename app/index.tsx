@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -483,6 +483,8 @@ export default function HomeScreen() {
   const modalListScrollY = useRef(0);
   const [showJumpToEnd, setShowJumpToEnd] = useState(false);
   const [showJumpToTop, setShowJumpToTop] = useState(false);
+  const [filterUnread, setFilterUnread] = useState(false);
+  const [filterProject, setFilterProject] = useState<string | null>(null);
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isSaving;
@@ -599,6 +601,37 @@ export default function HomeScreen() {
     }
   }, [notesData, transcribeNote]);
   const allTasks = notes.flatMap((note) => (note.tasks ?? []) as Task[]);
+
+  // Derive unique project slugs for filter
+  const projectSlugs = useMemo(() => {
+    const slugs = new Set<string>();
+    for (const task of allTasks) {
+      const slug = (task as any).project?.slug || (task as any).projectSlug;
+      if (slug) slugs.add(slug);
+    }
+    return Array.from(slugs).sort();
+  }, [allTasks]);
+
+  // Apply filters to notes
+  const filteredNotes = useMemo(() => {
+    return notes.filter((note) => {
+      const tasks = (note.tasks ?? []) as Task[];
+      if (filterUnread) {
+        const hasUnread = tasks.some((t) => (t as any).read === false);
+        if (!hasUnread) return false;
+      }
+      if (filterProject) {
+        const hasProject = tasks.some(
+          (t) =>
+            (t as any).project?.slug === filterProject ||
+            (t as any).projectSlug === filterProject
+        );
+        if (!hasProject) return false;
+      }
+      return true;
+    });
+  }, [notes, filterUnread, filterProject]);
+
   const selectedTask = selectedTaskId
     ? allTasks.find((task) => task.id === selectedTaskId) ?? null
     : null;
@@ -969,6 +1002,126 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Filter bar */}
+        {!isLoading && notes.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xl,
+              gap: spacing.sm,
+              paddingBottom: spacing.sm,
+            }}
+          >
+            {/* Unread toggle */}
+            <Pressable
+              onPress={() => setFilterUnread((v) => !v)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: spacing.md,
+                paddingVertical: 6,
+                borderRadius: 16,
+                backgroundColor: filterUnread
+                  ? colors.primary
+                  : colors.backgroundElevated,
+                borderWidth: 1,
+                borderColor: filterUnread
+                  ? colors.primary
+                  : colors.border,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: filterUnread
+                    ? colors.black
+                    : colors.primary,
+                }}
+              />
+              <Text
+                style={{
+                  fontSize: typography.xs,
+                  fontFamily: fontFamily.medium,
+                  color: filterUnread
+                    ? colors.black
+                    : colors.textSecondary,
+                }}
+              >
+                Unread
+              </Text>
+            </Pressable>
+
+            {/* Project chips */}
+            {projectSlugs.map((slug) => (
+              <Pressable
+                key={slug}
+                onPress={() =>
+                  setFilterProject((v) => (v === slug ? null : slug))
+                }
+                style={({ pressed }) => ({
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  backgroundColor:
+                    filterProject === slug
+                      ? colors.primary
+                      : colors.backgroundElevated,
+                  borderWidth: 1,
+                  borderColor:
+                    filterProject === slug
+                      ? colors.primary
+                      : colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.medium,
+                    color:
+                      filterProject === slug
+                        ? colors.black
+                        : colors.textSecondary,
+                  }}
+                >
+                  {slug}
+                </Text>
+              </Pressable>
+            ))}
+
+            {/* Clear all filters */}
+            {(filterUnread || filterProject) && (
+              <Pressable
+                onPress={() => {
+                  setFilterUnread(false);
+                  setFilterProject(null);
+                }}
+                style={({ pressed }) => ({
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  opacity: pressed ? 0.5 : 0.7,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.regular,
+                    color: colors.textTertiary,
+                  }}
+                >
+                  Clear
+                </Text>
+              </Pressable>
+            )}
+          </ScrollView>
+        )}
+
         {isLoading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={colors.primary} />
@@ -1003,7 +1156,7 @@ export default function HomeScreen() {
               gap: spacing.md,
             }}
           >
-            {notes.length > 0 && (
+            {filteredNotes.length > 0 && (
               <Text
                 style={{
                   color: colors.textTertiary,
@@ -1014,10 +1167,31 @@ export default function HomeScreen() {
                   paddingHorizontal: spacing.xl,
                 }}
               >
-                Voice Notes
+                {filterUnread || filterProject
+                  ? `${filteredNotes.length} of ${notes.length} notes`
+                  : "Voice Notes"}
               </Text>
             )}
-            {notes.map((item) => {
+            {filteredNotes.length === 0 && (filterUnread || filterProject) && (
+              <View
+                style={{
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: spacing.xxl,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.textTertiary,
+                    fontSize: typography.sm,
+                    fontFamily: fontFamily.regular,
+                  }}
+                >
+                  No matching notes
+                </Text>
+              </View>
+            )}
+            {filteredNotes.map((item) => {
               const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
                 const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
                 if (weightDiff !== 0) return weightDiff;
