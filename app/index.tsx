@@ -35,6 +35,7 @@ import {
 } from "@/lib/audio";
 import { Audio } from "expo-av";
 import { NoteListItem } from "@/components/NoteListItem";
+import { TaskListItem } from "@/components/TaskListItem";
 import { RecordFAB } from "@/components/RecordFAB";
 import { RecordingSheet } from "@/components/RecordingSheet";
 import { useThemeColors } from "@/hooks/useThemeColors";
@@ -632,6 +633,23 @@ export default function HomeScreen() {
     });
   }, [notes, filterUnread, filterProject]);
 
+  const isFiltering = filterUnread || !!filterProject;
+
+  // Flat task list for filtered view
+  const filteredTasks = useMemo(() => {
+    if (!isFiltering) return [];
+    return allTasks
+      .filter((t) => {
+        if (filterUnread && (t as any).read !== false) return false;
+        if (filterProject) {
+          const slug = (t as any).project?.slug || (t as any).projectSlug;
+          if (slug !== filterProject) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [allTasks, isFiltering, filterUnread, filterProject]);
+
   const selectedTask = selectedTaskId
     ? allTasks.find((task) => task.id === selectedTaskId) ?? null
     : null;
@@ -1156,94 +1174,148 @@ export default function HomeScreen() {
               gap: spacing.md,
             }}
           >
-            {filteredNotes.length > 0 && (
-              <Text
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.semibold,
-                  textTransform: "uppercase",
-                  letterSpacing: typography.tracking.wider,
-                  paddingHorizontal: spacing.xl,
-                }}
-              >
-                {filterUnread || filterProject
-                  ? `${filteredNotes.length} of ${notes.length} notes`
-                  : "Voice Notes"}
-              </Text>
-            )}
-            {filteredNotes.length === 0 && (filterUnread || filterProject) && (
-              <View
-                style={{
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: spacing.xxl,
-                }}
-              >
+            {isFiltering ? (
+              <>
+                {/* Flat filtered task list */}
                 <Text
                   style={{
                     color: colors.textTertiary,
-                    fontSize: typography.sm,
-                    fontFamily: fontFamily.regular,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.semibold,
+                    textTransform: "uppercase",
+                    letterSpacing: typography.tracking.wider,
+                    paddingHorizontal: spacing.xl,
                   }}
                 >
-                  No matching notes
+                  {filteredTasks.length} {filteredTasks.length === 1 ? "task" : "tasks"}
                 </Text>
-              </View>
-            )}
-            {filteredNotes.map((item) => {
-              const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
-                const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
-                if (weightDiff !== 0) return weightDiff;
-                const extractionDiff = ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
-                if (extractionDiff !== 0) return extractionDiff;
-                return a.createdAt - b.createdAt;
-              });
+                {filteredTasks.length === 0 && (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: spacing.xxl,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.regular,
+                      }}
+                    >
+                      No matching tasks
+                    </Text>
+                  </View>
+                )}
+                <View
+                  style={{
+                    marginHorizontal: spacing.xl,
+                    backgroundColor: colors.backgroundElevated,
+                    borderRadius: radii.md,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    overflow: "hidden",
+                    paddingHorizontal: spacing.sm,
+                  }}
+                >
+                  {filteredTasks.map((task, index) => (
+                    <View
+                      key={task.id}
+                      style={{
+                        borderTopWidth: index === 0 ? 0 : 1,
+                        borderTopColor: colors.borderLight,
+                      }}
+                    >
+                      <TaskListItem
+                        title={task.summary || task.input}
+                        status={task.status}
+                        projectLabel={(task as any).project?.slug || (task as any).projectSlug || null}
+                        createdAt={task.createdAt}
+                        read={(task as any).read ?? true}
+                        onPress={() => {
+                          setSelectedTaskId(task.id);
+                          setFollowUpText("");
+                          setShowJumpToEnd(false);
+                          setShowJumpToTop(false);
+                          db.transact(db.tx.tasks[task.id].update({ read: true }));
+                        }}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Default grouped-by-note view */}
+                {notes.length > 0 && (
+                  <Text
+                    style={{
+                      color: colors.textTertiary,
+                      fontSize: typography.xs,
+                      fontFamily: fontFamily.semibold,
+                      textTransform: "uppercase",
+                      letterSpacing: typography.tracking.wider,
+                      paddingHorizontal: spacing.xl,
+                    }}
+                  >
+                    Voice Notes
+                  </Text>
+                )}
+                {notes.map((item) => {
+                  const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
+                    const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
+                    if (weightDiff !== 0) return weightDiff;
+                    const extractionDiff = ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
+                    if (extractionDiff !== 0) return extractionDiff;
+                    return a.createdAt - b.createdAt;
+                  });
 
-              return (
-                <NoteListItem
-                  key={item.id}
-                  title={getNoteTitle(item)}
-                  transcript={item.transcript}
-                  status={item.status}
-                  createdAt={item.createdAt}
-                  tasks={noteTasks.map((task) => ({
-                    id: task.id,
-                    title: task.summary || task.input,
-                    status: task.status,
-                    createdAt: task.createdAt,
-                    projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
-                    read: (task as any).read ?? true,
-                  }))}
-                  expanded={expandedNoteIds.includes(item.id)}
-                  onToggle={() => {
-                    setExpandedNoteIds((current) =>
-                      current.includes(item.id)
-                        ? current.filter((id) => id !== item.id)
-                        : [...current, item.id]
-                    );
-                  }}
-                  onOpenTask={(taskId) => {
-                    setSelectedTaskId(taskId);
-                    setFollowUpText("");
-                    setShowJumpToEnd(false);
-                    setShowJumpToTop(false);
-                    // Mark as read
-                    db.transact(db.tx.tasks[taskId].update({ read: true }));
-                  }}
-                  onRetryTranscription={
-                    item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
-                      ? () => retryTranscription(item.id, item.audioFilePath)
-                      : undefined
-                  }
-                  onRetryExtraction={
-                    item.status === NOTE_STATUSES.triageFailed
-                      ? () => retryExtraction(item.id)
-                      : undefined
-                  }
-                />
-              );
-            })}
+                  return (
+                    <NoteListItem
+                      key={item.id}
+                      title={getNoteTitle(item)}
+                      transcript={item.transcript}
+                      status={item.status}
+                      createdAt={item.createdAt}
+                      tasks={noteTasks.map((task) => ({
+                        id: task.id,
+                        title: task.summary || task.input,
+                        status: task.status,
+                        createdAt: task.createdAt,
+                        projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
+                        read: (task as any).read ?? true,
+                      }))}
+                      expanded={expandedNoteIds.includes(item.id)}
+                      onToggle={() => {
+                        setExpandedNoteIds((current) =>
+                          current.includes(item.id)
+                            ? current.filter((id) => id !== item.id)
+                            : [...current, item.id]
+                        );
+                      }}
+                      onOpenTask={(taskId) => {
+                        setSelectedTaskId(taskId);
+                        setFollowUpText("");
+                        setShowJumpToEnd(false);
+                        setShowJumpToTop(false);
+                        db.transact(db.tx.tasks[taskId].update({ read: true }));
+                      }}
+                      onRetryTranscription={
+                        item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
+                          ? () => retryTranscription(item.id, item.audioFilePath)
+                          : undefined
+                      }
+                      onRetryExtraction={
+                        item.status === NOTE_STATUSES.triageFailed
+                          ? () => retryExtraction(item.id)
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </>
+            )}
           </ScrollView>
         )}
 
