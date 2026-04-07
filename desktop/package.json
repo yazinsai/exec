@@ -4,8 +4,8 @@
   "description": "Exec v2 desktop hotkey app — Cmd+Shift+Space to record voice tasks",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron ."
+    "start": "node patch-plist.js && electron .",
+    "dev": "node patch-plist.js && electron ."
   },
   "dependencies": {
     "@instantdb/admin": "^0.18.7",
