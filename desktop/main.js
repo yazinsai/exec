@@ -521,19 +521,26 @@ function rebuildTrayMenu() {
     const time = history.relativeTime(entry.createdAt);
     const label = `${prefix}${transcript}${icon}  ${time}`;
 
-    if (entry.status === "success") {
-      historyItems.push({ label, enabled: false });
-    } else {
-      historyItems.push({
-        label,
-        submenu: [
-          {
-            label: "Reprocess",
-            click: () => reprocessEntry(entry.id),
-          },
-        ],
+    const submenu = [];
+    if (entry.audioPath && fs.existsSync(entry.audioPath)) {
+      submenu.push({
+        label: "Show in Finder",
+        click: () => {
+          const { shell } = require("electron");
+          shell.showItemInFolder(entry.audioPath);
+        },
       });
     }
+    if (entry.status !== "success") {
+      submenu.push({
+        label: "Reprocess",
+        click: () => reprocessEntry(entry.id),
+      });
+    }
+    historyItems.push({
+      label,
+      submenu: submenu.length > 0 ? submenu : [{ label: "No audio file", enabled: false }],
+    });
   }
 
   if (entries.length > 0) {
