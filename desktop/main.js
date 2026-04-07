@@ -486,18 +486,18 @@ function unregisterPauseShortcut() {
 async function ensureMicPermission() {
   const status = systemPreferences.getMediaAccessStatus("microphone");
   if (status === "granted") return true;
-  if (status === "denied") {
-    showOverlay("error", "Mic access denied — check System Settings");
-    hideOverlayAfter(2500);
-    return false;
+
+  if (status === "not-determined") {
+    const granted = await systemPreferences.askForMediaAccess("microphone");
+    if (granted) return true;
   }
-  // "not-determined" or "restricted" — request access
-  const granted = await systemPreferences.askForMediaAccess("microphone");
-  if (!granted) {
-    showOverlay("error", "Mic access required");
-    hideOverlayAfter(2000);
-  }
-  return granted;
+
+  // denied, restricted, or prompt failed — open System Settings
+  showOverlay("error", "Opening mic settings...");
+  hideOverlayAfter(2000);
+  const { shell } = require("electron");
+  shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone");
+  return false;
 }
 
 // --- Hotkey Handler ---
