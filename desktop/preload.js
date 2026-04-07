@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   dismissSave: () => {
     ipcRenderer.send("dismiss-save");
   },
+  onAudioLevels: (callback) => {
+    ipcRenderer.on("audio-levels", (_event, levels) => callback(levels));
+  },
   onHide: (callback) => {
     ipcRenderer.on("overlay-hide", () => callback());
   },

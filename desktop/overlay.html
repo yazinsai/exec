@@ -20,7 +20,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      width: 360px;
+      width: 440px;
       height: 88px;
       padding: 0 28px;
       -webkit-app-region: drag;
@@ -105,6 +105,26 @@
       flex: 1;
     }
 
+    .waveform {
+      display: none;
+      align-items: center;
+      gap: 2px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .waveform.visible {
+      display: flex;
+    }
+
+    .waveform-bar {
+      width: 3px;
+      min-height: 3px;
+      border-radius: 1.5px;
+      background: rgba(255, 255, 255, 0.6);
+      transition: height 0.08s ease;
+    }
+
     .cancel-btn {
       display: none;
       align-items: center;
@@ -182,6 +202,7 @@
   <div class="container" id="container">
     <div class="indicator" id="indicator"></div>
     <span class="label" id="label"></span>
+    <div class="waveform" id="waveform"></div>
     <button class="cancel-btn" id="cancelBtn" title="Cancel recording (Esc)">✕</button>
     <div class="retry-actions" id="retryActions">
       <button class="retry-btn" id="retryBtn">Retry</button>
@@ -193,17 +214,30 @@
     const container = document.getElementById("container");
     const indicator = document.getElementById("indicator");
     const label = document.getElementById("label");
+    const waveform = document.getElementById("waveform");
     const cancelBtn = document.getElementById("cancelBtn");
     const retryActions = document.getElementById("retryActions");
     const retryBtn = document.getElementById("retryBtn");
     const dismissBtn = document.getElementById("dismissBtn");
 
+    // Create waveform bars
+    const BAR_COUNT = 24;
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const bar = document.createElement("div");
+      bar.className = "waveform-bar";
+      waveform.appendChild(bar);
+    }
+    const bars = waveform.querySelectorAll(".waveform-bar");
+
     window.electronAPI.onStateChange(({ state, text }) => {
       indicator.className = "indicator " + state;
       label.textContent = text;
 
+      const isActive = state === "recording" || state === "paused";
       // Show cancel button during recording and paused states
-      cancelBtn.classList.toggle("visible", state === "recording" || state === "paused");
+      cancelBtn.classList.toggle("visible", isActive);
+      // Show waveform during recording/paused
+      waveform.classList.toggle("visible", isActive);
       // Show retry actions only on save failure
       retryActions.classList.toggle("visible", state === "save-failed");
 
@@ -211,6 +245,13 @@
       requestAnimationFrame(() => {
         container.classList.add("visible");
       });
+    });
+
+    window.electronAPI.onAudioLevels((levels) => {
+      for (let i = 0; i < bars.length && i < levels.length; i++) {
+        const h = Math.max(3, levels[i] * 28);
+        bars[i].style.height = h + "px";
+      }
     });
 
     cancelBtn.addEventListener("click", () => {
@@ -230,6 +271,8 @@
       container.classList.remove("visible");
       indicator.className = "indicator";
       label.textContent = "";
+      waveform.classList.remove("visible");
+      bars.forEach((b) => b.style.height = "3px");
       cancelBtn.classList.remove("visible");
       retryActions.classList.remove("visible");
     });

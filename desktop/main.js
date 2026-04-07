@@ -11,7 +11,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { execFile, execSync } = require("child_process");
+const { execFile, execSync, spawn } = require("child_process");
 const history = require("./history");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
@@ -86,9 +86,9 @@ function createOverlay() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   overlay = new BrowserWindow({
-    width: 360,
+    width: 440,
     height: 88,
-    x: Math.round((width - 360) / 2),
+    x: Math.round((width - 440) / 2),
     y: Math.round(height * 0.25),
     frame: false,
     transparent: true,
@@ -189,29 +189,77 @@ function listAudioInputDevices() {
   }
 }
 
+// --- Audio Level Metering ---
+const LEVEL_HISTORY_SIZE = 24; // number of bars in the waveform
+let levelHistory = new Array(LEVEL_HISTORY_SIZE).fill(0);
+let levelInterval = null;
+
+function startLevelMetering(proc) {
+  const sampleRate = 16000;
+  const bytesPerSample = 2; // s16le
+  // Accumulate PCM chunks and compute RMS every ~60ms
+  const chunkDuration = 0.06;
+  const chunkBytes = Math.floor(sampleRate * chunkDuration) * bytesPerSample;
+  let pcmBuffer = Buffer.alloc(0);
+
+  proc.stdout.on("data", (data) => {
+    pcmBuffer = Buffer.concat([pcmBuffer, data]);
+
+    while (pcmBuffer.length >= chunkBytes) {
+      const chunk = pcmBuffer.subarray(0, chunkBytes);
+      pcmBuffer = pcmBuffer.subarray(chunkBytes);
+
+      // Compute RMS
+      let sumSq = 0;
+      for (let i = 0; i < chunk.length; i += 2) {
+        const sample = chunk.readInt16LE(i) / 32768;
+        sumSq += sample * sample;
+      }
+      const rms = Math.sqrt(sumSq / (chunk.length / 2));
+      // Convert to 0-1 range with some scaling (RMS of speech is typically 0.01-0.2)
+      const level = Math.min(1, rms * 8);
+
+      levelHistory.shift();
+      levelHistory.push(level);
+
+      if (overlay && overlay.isVisible()) {
+        overlay.webContents.send("audio-levels", levelHistory);
+      }
+    }
+  });
+}
+
+function stopLevelMetering() {
+  levelHistory = new Array(LEVEL_HISTORY_SIZE).fill(0);
+  if (overlay && overlay.isVisible()) {
+    overlay.webContents.send("audio-levels", levelHistory);
+  }
+}
+
 // --- Audio Recording (macOS using ffmpeg/avfoundation) ---
 function startRecording() {
   if (!audioInputDevice) audioInputDevice = getDefaultInputDevice();
+  console.log("Starting recording with device:", audioInputDevice);
   tempAudioPath = history.makeAudioPath();
 
-  recordingProcess = execFile(
-    "/opt/homebrew/bin/ffmpeg",
-    [
-      "-f", "avfoundation",
-      "-i", audioInputDevice,
-      "-ar", "16000",
-      "-ac", "1",
-      "-y",
-      tempAudioPath,
-    ],
-    { timeout: 120000 },
-    (error) => {
-      if (error && error.killed) return; // Normal — we killed it to stop
-      if (error) {
-        console.error("Recording error:", error.message);
-      }
-    }
-  );
+  // Spawn ffmpeg: write WAV to file + pipe raw PCM to stdout for metering
+  const proc = spawn("/opt/homebrew/bin/ffmpeg", [
+    "-f", "avfoundation",
+    "-i", audioInputDevice,
+    "-ar", "16000",
+    "-ac", "1",
+    "-y", tempAudioPath,
+    "-f", "s16le",
+    "-ar", "16000",
+    "-ac", "1",
+    "pipe:1",
+  ], { timeout: 120000 });
+
+  proc.stderr.on("data", () => {}); // drain stderr to prevent blocking
+  proc.on("error", (err) => console.error("Recording error:", err.message));
+
+  startLevelMetering(proc);
+  recordingProcess = proc;
 }
 
 function stopCurrentRecordingProcess() {
@@ -222,6 +270,7 @@ function stopCurrentRecordingProcess() {
     }
     const proc = recordingProcess;
     recordingProcess = null;
+    stopLevelMetering();
 
     proc.kill("SIGINT");
 
@@ -307,15 +356,16 @@ async function togglePause() {
     isPaused = false;
     if (!audioInputDevice) audioInputDevice = getDefaultInputDevice();
     tempAudioPath = history.makeAudioPath();
-    recordingProcess = execFile(
-      "/opt/homebrew/bin/ffmpeg",
-      ["-f", "avfoundation", "-i", audioInputDevice, "-ar", "16000", "-ac", "1", "-y", tempAudioPath],
-      { timeout: 120000 },
-      (error) => {
-        if (error && error.killed) return;
-        if (error) console.error("Recording error:", error.message);
-      }
-    );
+    const proc = spawn("/opt/homebrew/bin/ffmpeg", [
+      "-f", "avfoundation",
+      "-i", audioInputDevice,
+      "-ar", "16000", "-ac", "1", "-y", tempAudioPath,
+      "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1",
+    ], { timeout: 120000 });
+    proc.stderr.on("data", () => {});
+    proc.on("error", (err) => console.error("Recording error:", err.message));
+    startLevelMetering(proc);
+    recordingProcess = proc;
     showOverlay("recording", "Recording...");
   }
 }
