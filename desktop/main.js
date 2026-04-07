@@ -787,10 +787,19 @@ function createTray() {
 
 
 // --- App Lifecycle ---
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  history.init();
+
+  // Request mic permission before hiding dock (prompt needs a visible app)
+  const micStatus = systemPreferences.getMediaAccessStatus("microphone");
+  if (micStatus !== "granted") {
+    console.log("Mic permission status:", micStatus, "— requesting access...");
+    const granted = await systemPreferences.askForMediaAccess("microphone");
+    console.log("Mic permission granted:", granted);
+  }
+
   // Hide dock icon — this is a background utility
   app.dock?.hide();
-  history.init();
 
   // Check models exist
   const modelsExist =
