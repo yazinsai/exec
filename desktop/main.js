@@ -211,8 +211,7 @@ function transcribeAudio(audioPath) {
     const chunk = samples.subarray(i, i + windowSize);
     vad.acceptWaveform(chunk);
     while (!vad.isEmpty()) {
-      const seg = vad.front();
-      segments.push({ samples: new Float32Array(seg.samples), start: seg.start });
+      segments.push(vad.front(false));
       vad.pop();
     }
   }
