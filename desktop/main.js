@@ -160,6 +160,34 @@ function getDefaultInputDevice() {
 }
 
 let audioInputDevice = null;
+let audioInputDevices = []; // cached list of { name, index }
+
+function listAudioInputDevices() {
+  try {
+    const output = execSync(
+      `/opt/homebrew/bin/ffmpeg -f avfoundation -list_devices true -i "" 2>&1 || true`,
+      { encoding: "utf8", timeout: 5000 }
+    );
+    const devices = [];
+    let inAudio = false;
+    for (const line of output.split("\n")) {
+      if (line.includes("AVFoundation audio devices:")) {
+        inAudio = true;
+        continue;
+      }
+      if (inAudio) {
+        const match = line.match(/\[(\d+)\]\s+(.+)/);
+        if (match) {
+          devices.push({ index: parseInt(match[1]), name: match[2].trim() });
+        }
+      }
+    }
+    return devices;
+  } catch (e) {
+    console.warn("Could not list audio devices:", e.message);
+    return [];
+  }
+}
 
 // --- Audio Recording (macOS using ffmpeg/avfoundation) ---
 function startRecording() {
@@ -574,11 +602,31 @@ function rebuildTrayMenu() {
     });
   }
 
+  // Build input device submenu
+  audioInputDevices = listAudioInputDevices();
+  const currentDevice = audioInputDevice || getDefaultInputDevice();
+  const deviceItems = audioInputDevices.map((dev) => ({
+    label: dev.name,
+    type: "radio",
+    checked: currentDevice === ":" + dev.name,
+    click: () => {
+      audioInputDevice = ":" + dev.name;
+      console.log("Input device changed to:", dev.name);
+      rebuildTrayMenu();
+    },
+  }));
+
   const template = [
     { label: "Exec Desktop", enabled: false },
     { type: "separator" },
     { label: "Record (Cmd+Option+Space)", click: () => handleHotkeyDown() },
     { type: "separator" },
+    {
+      label: "Input Device",
+      submenu: deviceItems.length > 0
+        ? deviceItems
+        : [{ label: "No devices found", enabled: false }],
+    },
     {
       label: "Recording History",
       submenu: entries.length > 0
