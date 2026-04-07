@@ -266,11 +266,23 @@ function cancelRecording() {
     proc.kill("SIGINT");
   }
 
-  // Clean up temp file
-  if (tempAudioPath && fs.existsSync(tempAudioPath)) {
-    try { fs.unlinkSync(tempAudioPath); } catch {}
+  // Add to history instead of deleting
+  if (tempAudioPath) {
+    // Wait briefly for ffmpeg to flush the file
+    setTimeout(() => {
+      history.addEntry({
+        id: `rec-${Date.now()}`,
+        audioPath: tempAudioPath,
+        transcript: null,
+        status: "cancelled",
+        error: null,
+        noteId: null,
+        createdAt: Date.now(),
+      });
+      tempAudioPath = null;
+      rebuildTrayMenu();
+    }, 300);
   }
-  tempAudioPath = null;
 
   showOverlay("error", "Cancelled");
   hideOverlayAfter(800);
@@ -303,8 +315,37 @@ async function handleHotkeyUp() {
       return;
     }
 
-    const transcription = await transcribeAudio(audioPath);
+    let transcription;
+    try {
+      transcription = await transcribeAudio(audioPath);
+    } catch (err) {
+      console.error("Transcription error:", err);
+      history.addEntry({
+        id: `rec-${Date.now()}`,
+        audioPath,
+        transcript: null,
+        status: "failed",
+        error: err.message.slice(0, 100),
+        noteId: null,
+        createdAt: Date.now(),
+      });
+      rebuildTrayMenu();
+      showOverlay("error", "Error: " + err.message.slice(0, 50));
+      hideOverlayAfter(2500);
+      return;
+    }
+
     if (!transcription || transcription.trim().length === 0) {
+      history.addEntry({
+        id: `rec-${Date.now()}`,
+        audioPath,
+        transcript: null,
+        status: "failed",
+        error: "No speech detected",
+        noteId: null,
+        createdAt: Date.now(),
+      });
+      rebuildTrayMenu();
       showOverlay("error", "No speech detected");
       hideOverlayAfter(1500);
       return;
@@ -321,14 +362,32 @@ async function handleHotkeyUp() {
 async function saveNote(transcription, audioPath) {
   showOverlay("creating", "Saving note...");
   try {
-    await createNote(transcription);
+    const noteId = await createNote(transcription);
     pendingSave = null;
+    history.addEntry({
+      id: `rec-${Date.now()}`,
+      audioPath,
+      transcript: transcription,
+      status: "success",
+      error: null,
+      noteId,
+      createdAt: Date.now(),
+    });
+    rebuildTrayMenu();
     showOverlay("done", "Got it ✓");
     hideOverlayAfter(1200);
-    // Clean up temp file
-    try { fs.unlinkSync(audioPath); } catch {}
   } catch (err) {
     console.error("Save failed, keeping recording for retry:", err);
+    history.addEntry({
+      id: `rec-${Date.now()}`,
+      audioPath,
+      transcript: transcription,
+      status: "failed",
+      error: "Save failed: " + err.message.slice(0, 80),
+      noteId: null,
+      createdAt: Date.now(),
+    });
+    rebuildTrayMenu();
     pendingSave = { transcription, audioPath };
     showOverlay("save-failed", "Save failed — tap to retry");
   }
@@ -342,15 +401,123 @@ async function retrySave() {
 
 function dismissSave() {
   if (!pendingSave) return;
-  // Clean up temp file
-  try { fs.unlinkSync(pendingSave.audioPath); } catch {}
   pendingSave = null;
   hideOverlay();
 }
 
+// --- Tray Menu ---
+function rebuildTrayMenu() {
+  if (!tray) return;
+
+  const entries = history.getAll();
+  const historyItems = [];
+
+  for (const entry of entries) {
+    const prefix = entry.status === "cancelled" ? "[cancelled] " : "";
+    const transcript = entry.transcript
+      ? entry.transcript.slice(0, 30) + (entry.transcript.length > 30 ? "..." : "")
+      : "[No transcript]";
+    const icon = entry.status === "success" ? " ✓" : entry.status === "failed" ? " ✗" : "";
+    const time = history.relativeTime(entry.createdAt);
+    const label = `${prefix}${transcript}${icon}  ${time}`;
+
+    if (entry.status === "success") {
+      historyItems.push({ label, enabled: false });
+    } else {
+      historyItems.push({
+        label,
+        submenu: [
+          {
+            label: "Reprocess",
+            click: () => reprocessEntry(entry.id),
+          },
+        ],
+      });
+    }
+  }
+
+  if (entries.length > 0) {
+    historyItems.push({ type: "separator" });
+    historyItems.push({
+      label: "Clear History",
+      click: () => {
+        history.clear();
+        rebuildTrayMenu();
+      },
+    });
+  }
+
+  const template = [
+    { label: "Exec Desktop", enabled: false },
+    { type: "separator" },
+    { label: "Record (Cmd+Option+Space)", click: () => handleHotkeyDown() },
+    { type: "separator" },
+    {
+      label: "Recording History",
+      submenu: entries.length > 0
+        ? historyItems
+        : [{ label: "No recordings yet", enabled: false }],
+    },
+    { type: "separator" },
+    { label: "Quit", click: () => app.quit() },
+  ];
+
+  tray.setContextMenu(Menu.buildFromTemplate(template));
+}
+
+async function reprocessEntry(entryId) {
+  const entries = history.getAll();
+  const entry = entries.find((e) => e.id === entryId);
+  if (!entry) return;
+
+  // Verify audio file exists
+  if (!entry.audioPath || !fs.existsSync(entry.audioPath)) {
+    showOverlay("error", "Audio file missing");
+    hideOverlayAfter(2500);
+    history.removeEntry(entryId);
+    rebuildTrayMenu();
+    return;
+  }
+
+  showOverlay("transcribing", "Reprocessing...");
+
+  try {
+    const transcription = await transcribeAudio(entry.audioPath);
+    if (!transcription || transcription.trim().length === 0) {
+      history.updateEntry(entryId, {
+        status: "failed",
+        error: "No speech detected",
+      });
+      rebuildTrayMenu();
+      showOverlay("error", "No speech detected");
+      hideOverlayAfter(2500);
+      return;
+    }
+
+    const noteId = await createNote(transcription.trim());
+    history.updateEntry(entryId, {
+      status: "success",
+      transcript: transcription.trim(),
+      noteId,
+      error: null,
+    });
+    rebuildTrayMenu();
+    showOverlay("done", "Got it ✓");
+    hideOverlayAfter(1200);
+  } catch (err) {
+    console.error("Reprocess failed:", err);
+    history.updateEntry(entryId, {
+      status: "failed",
+      error: err.message.slice(0, 100),
+    });
+    rebuildTrayMenu();
+    showOverlay("error", "Error: " + err.message.slice(0, 50));
+    hideOverlayAfter(2500);
+  }
+}
+
 // --- Tray Icon ---
 function createTray() {
-  // macOS Template icon (auto-adapts to light/dark menu bar)
   const iconPath = path.join(__dirname, "tray-iconTemplate.png");
   const icon2xPath = path.join(__dirname, "tray-iconTemplate@2x.png");
   let icon;
@@ -358,7 +525,6 @@ function createTray() {
   if (fs.existsSync(icon2xPath)) {
     icon = nativeImage.createFromPath(icon2xPath);
     icon.setTemplateImage(true);
-    // Resize to 18x18 points (36px @2x) for proper menu bar sizing
     icon = icon.resize({ width: 18, height: 18 });
     icon.setTemplateImage(true);
   } else if (fs.existsSync(iconPath)) {
@@ -370,25 +536,7 @@ function createTray() {
 
   tray = new Tray(icon);
   tray.setToolTip("Exec — Cmd+Option+Space to record");
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: "Exec Desktop",
-      enabled: false,
-    },
-    { type: "separator" },
-    {
-      label: "Record (Cmd+Option+Space)",
-      click: () => handleHotkeyDown(),
-    },
-    { type: "separator" },
-    {
-      label: "Quit",
-      click: () => app.quit(),
-    },
-  ]);
-
-  tray.setContextMenu(contextMenu);
+  rebuildTrayMenu();
 }
 
 
