@@ -24,6 +24,14 @@ const rules = {
       delete: "true",
     },
   },
+  dictionaryTerms: {
+    allow: {
+      view: "true",
+      create: "true",
+      delete: "true",
+      update: "true",
+    },
+  },
 } satisfies InstantRules;
 
 export default rules;

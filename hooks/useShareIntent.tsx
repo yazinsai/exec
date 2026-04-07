@@ -1,10 +1,11 @@
-import { useEffect, useCallback, type ReactNode } from "react";
+import { useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useShareIntent as useExpoShareIntent } from "expo-share-intent";
 import { Alert } from "react-native";
 import { id } from "@instantdb/react-native";
 import { db } from "@/lib/db";
 import { importSharedAudio } from "@/lib/audio";
-import { transcribeAudio } from "@/lib/transcription";
+import { transcribeAudio, buildDictionaryPrompt } from "@/lib/transcription";
+import type { DictionaryTerm } from "@/lib/transcription";
 import { summarizeInput } from "@/lib/summarize";
 
 // expo-share-intent uses `path` in unified type but `filePath` on Android
@@ -57,6 +58,13 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
   const { shareIntent, resetShareIntent } = useExpoShareIntent({
     resetOnBackground: false,
   });
+
+  const { data: dictData } = db.useQuery({ dictionaryTerms: {} });
+  const dictionaryTerms = ((dictData as any)?.dictionaryTerms ?? []) as DictionaryTerm[];
+  const dictionaryPrompt = useMemo(
+    () => buildDictionaryPrompt(dictionaryTerms),
+    [dictionaryTerms]
+  );
 
   const handleSharedText = useCallback(
     async (text: string) => {
@@ -137,7 +145,7 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
           }
 
           // Transcribe
-          const transcription = await transcribeAudio(result.filePath);
+          const transcription = await transcribeAudio(result.filePath, dictionaryPrompt || undefined);
           if (!transcription || transcription.trim().length === 0) {
             failed++;
             continue;
@@ -164,7 +172,7 @@ export function ShareIntentHandler({ children }: { children?: ReactNode }) {
 
       resetShareIntent();
     },
-    [resetShareIntent]
+    [resetShareIntent, dictionaryPrompt]
   );
 
   useEffect(() => {

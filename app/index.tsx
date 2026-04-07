@@ -25,7 +25,8 @@ import * as Updates from "expo-updates";
 import { Ionicons } from "@expo/vector-icons";
 import { id } from "@instantdb/react-native";
 import { db } from "@/lib/db";
-import { transcribeAudio } from "@/lib/transcription";
+import { transcribeAudio, buildDictionaryPrompt } from "@/lib/transcription";
+import type { DictionaryTerm } from "@/lib/transcription";
 import { summarizeInput } from "@/lib/summarize";
 import {
   requestAudioPermissions,
@@ -44,6 +45,7 @@ import { NoteListItem } from "@/components/NoteListItem";
 import { TaskListItem } from "@/components/TaskListItem";
 import { RecordFAB } from "@/components/RecordFAB";
 import { RecordingSheet } from "@/components/RecordingSheet";
+import { DictionarySheet } from "@/components/DictionarySheet";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import {
   spacing,
@@ -473,6 +475,9 @@ export default function HomeScreen() {
 
   const insets = useSafeAreaInsets();
 
+  // Dictionary sheet state
+  const [showDictionary, setShowDictionary] = useState(false);
+
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -513,10 +518,18 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // Query dictionary terms for transcription prompt
+  const { data: dictData } = db.useQuery({ dictionaryTerms: {} });
+  const dictionaryTerms = ((dictData as any)?.dictionaryTerms ?? []) as DictionaryTerm[];
+  const dictionaryPrompt = useMemo(
+    () => buildDictionaryPrompt(dictionaryTerms),
+    [dictionaryTerms]
+  );
+
   // Transcribe a note's audio file and update it in InstantDB
   const transcribeNote = useCallback(async (noteId: string, filePath: string) => {
     try {
-      const transcription = await transcribeAudio(filePath);
+      const transcription = await transcribeAudio(filePath, dictionaryPrompt || undefined);
       if (!transcription || transcription.trim().length === 0) {
         await db.transact(
           db.tx.notes[noteId].update({
@@ -556,7 +569,7 @@ export default function HomeScreen() {
         })
       );
     }
-  }, []);
+  }, [dictionaryPrompt]);
 
   // Retry transcription for a failed note
   const retryTranscription = useCallback(async (noteId: string, filePath: string) => {
@@ -944,7 +957,7 @@ export default function HomeScreen() {
 
       const tempId = id();
       const { filePath } = await saveRecordingLocally(recording, tempId);
-      const transcription = await transcribeAudio(filePath);
+      const transcription = await transcribeAudio(filePath, dictionaryPrompt || undefined);
       const trimmed = transcription.trim();
       if (trimmed) {
         const messageId = id();
@@ -965,7 +978,7 @@ export default function HomeScreen() {
       console.error("Failed to transcribe follow-up:", error);
     }
     setIsTranscribingFollowUp(false);
-  }, [selectedTask]);
+  }, [selectedTask, dictionaryPrompt]);
 
   // Cancel task handler
   const cancelTask = useCallback(async (taskId: string, currentStatus?: string) => {
@@ -1086,16 +1099,25 @@ export default function HomeScreen() {
             paddingBottom: spacing.lg,
           }}
         >
-          <Text
-            style={{
-              fontSize: typography.xxl,
-              fontFamily: fontFamily.bold,
-              color: colors.textPrimary,
-              letterSpacing: typography.tracking.tight,
-            }}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <Text
+              style={{
+                fontSize: typography.xxl,
+                fontFamily: fontFamily.bold,
+                color: colors.textPrimary,
+                letterSpacing: typography.tracking.tight,
+              }}
             >
-            Exec
-          </Text>
+              Exec
+            </Text>
+            <Pressable
+              onPress={() => setShowDictionary(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <Ionicons name="book-outline" size={20} color={colors.textTertiary} />
+            </Pressable>
+          </View>
 
           <View
             style={{
@@ -1443,6 +1465,12 @@ export default function HomeScreen() {
         />
 
         {/* Recording bottom sheet */}
+        <DictionarySheet
+          visible={showDictionary}
+          onClose={() => setShowDictionary(false)}
+          terms={dictionaryTerms as (DictionaryTerm & { id: string })[]}
+        />
+
         <RecordingSheet
           isVisible={isActive}
           duration={duration}

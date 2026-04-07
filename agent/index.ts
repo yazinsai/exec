@@ -187,7 +187,8 @@ async function handleNote(noteId: string) {
     })
   );
 
-  const triage = await triageTranscript(note.transcript);
+  const dictTerms = await getDictionaryTerms();
+  const triage = await triageTranscript(note.transcript, dictTerms);
   const now = Date.now();
 
   if (triage.tasks.length === 0) {
@@ -767,6 +768,11 @@ async function recoverStaleTasks() {
   } catch (error: any) {
     console.error("Recovery error:", error.message);
   }
+}
+
+async function getDictionaryTerms(): Promise<string[]> {
+  const { dictionaryTerms } = await db.query({ dictionaryTerms: {} });
+  return (dictionaryTerms || []).map((t: any) => t.term);
 }
 
 async function main() {

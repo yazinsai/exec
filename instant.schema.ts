@@ -61,6 +61,10 @@ const _schema = i.schema({
       content: i.string(),
       createdAt: i.number().indexed(),
     }),
+    dictionaryTerms: i.entity({
+      term: i.string().unique().indexed(),
+      createdAt: i.number().indexed(),
+    }),
   },
   links: {
     noteTasks: {

@@ -1,4 +1,19 @@
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+const MAX_PROMPT_CHARS = 800; // ~200 tokens, safe under 224-token limit
+
+export type DictionaryTerm = { term: string };
+
+export function buildDictionaryPrompt(terms: DictionaryTerm[]): string {
+  const parts: string[] = [];
+  let len = 0;
+  for (const t of terms) {
+    const addition = t.term.length + (parts.length > 0 ? 2 : 0); // ", " separator
+    if (len + addition > MAX_PROMPT_CHARS) break;
+    parts.push(t.term);
+    len += addition;
+  }
+  return parts.join(", ");
+}
 
 /**
  * Transcribe audio using Groq's Whisper API.

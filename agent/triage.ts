@@ -91,26 +91,36 @@ const TRIAGE_SCHEMA = {
   },
 } as const;
 
-export async function triageTranscript(transcript: string): Promise<TriageOutput> {
+export async function triageTranscript(transcript: string, manualDictionaryTerms: string[] = []): Promise<TriageOutput> {
   const indexMarkdown = loadProjectIndexMarkdown();
+  const promptParts = [
+    "Extract child tasks from this voice note.",
+    "",
+    "Return tasks only when they are concrete executable actions.",
+    "Keep independent tasks independent.",
+    "Use dependsOn to model sequential blockers by index.",
+    "If two tasks can run in parallel, keep dependsOn empty for both.",
+    "For project-linked tasks, use the exact project slug from the project index when possible.",
+    "If a task is general and not tied to a project, use null for project.",
+    "If nothing actionable exists, return an empty tasks array.",
+    "",
+    "# Project Index",
+    indexMarkdown || "No project index available.",
+  ];
+
+  if (manualDictionaryTerms.length > 0) {
+    promptParts.push(
+      "",
+      "# Custom Dictionary",
+      "Use these exact spellings when referenced in the transcript:",
+      manualDictionaryTerms.join(", "),
+    );
+  }
+
+  promptParts.push("", "# Voice Note", transcript);
+
   const q = query({
-    prompt: [
-      "Extract child tasks from this voice note.",
-      "",
-      "Return tasks only when they are concrete executable actions.",
-      "Keep independent tasks independent.",
-      "Use dependsOn to model sequential blockers by index.",
-      "If two tasks can run in parallel, keep dependsOn empty for both.",
-      "For project-linked tasks, use the exact project slug from the project index when possible.",
-      "If a task is general and not tied to a project, use null for project.",
-      "If nothing actionable exists, return an empty tasks array.",
-      "",
-      "# Project Index",
-      indexMarkdown || "No project index available.",
-      "",
-      "# Voice Note",
-      transcript,
-    ].join("\n"),
+    prompt: promptParts.join("\n"),
     options: {
       cwd: getProjectsRoot(),
       model: "claude-sonnet-4-6",
