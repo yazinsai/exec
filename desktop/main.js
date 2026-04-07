@@ -196,33 +196,11 @@ function stopRecording() {
   });
 }
 
-// --- WAV Reader (avoids sherpa-onnx readWave external buffer issue in Electron) ---
-function readWav16kMono(filePath) {
-  const buf = fs.readFileSync(filePath);
-  // Parse WAV header: samples start after 44-byte header for standard PCM WAV
-  // Find "data" chunk
-  let dataOffset = 12;
-  while (dataOffset < buf.length - 8) {
-    const chunkId = buf.toString("ascii", dataOffset, dataOffset + 4);
-    const chunkSize = buf.readUInt32LE(dataOffset + 4);
-    if (chunkId === "data") {
-      dataOffset += 8;
-      const pcm16 = new Int16Array(buf.buffer, buf.byteOffset + dataOffset, chunkSize / 2);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 32768.0;
-      }
-      return { samples: float32, sampleRate: 16000 };
-    }
-    dataOffset += 8 + chunkSize;
-  }
-  throw new Error("Invalid WAV file: no data chunk found");
-}
-
 // --- Local Transcription (Parakeet TDT + Silero VAD via sherpa-onnx) ---
 function transcribeAudio(audioPath) {
   initRecognizer();
-  const wave = readWav16kMono(audioPath);
+  // Pass false to disable external buffers (required for Electron)
+  const wave = sherpa_onnx.readWave(audioPath, false);
   const samples = wave.samples;
   const vad = createVad();
 
@@ -233,14 +211,16 @@ function transcribeAudio(audioPath) {
     const chunk = samples.subarray(i, i + windowSize);
     vad.acceptWaveform(chunk);
     while (!vad.isEmpty()) {
-      segments.push(vad.front());
+      const seg = vad.front();
+      segments.push({ samples: new Float32Array(seg.samples), start: seg.start });
       vad.pop();
     }
   }
 
   vad.flush();
   while (!vad.isEmpty()) {
-    segments.push(vad.front());
+    const seg = vad.front();
+    segments.push({ samples: new Float32Array(seg.samples), start: seg.start });
     vad.pop();
   }
 
@@ -249,9 +229,7 @@ function transcribeAudio(audioPath) {
   const texts = [];
   for (const seg of segments) {
     const stream = recognizer.createStream();
-    // Copy segment samples to avoid external buffer issues
-    const segSamples = new Float32Array(seg.samples);
-    stream.acceptWaveform({ samples: segSamples, sampleRate: wave.sampleRate });
+    stream.acceptWaveform({ samples: seg.samples, sampleRate: wave.sampleRate });
     recognizer.decode(stream);
     const result = recognizer.getResult(stream);
     if (result.text.trim()) {
