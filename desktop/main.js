@@ -74,8 +74,10 @@ const db = init({ appId: INSTANT_APP_ID, adminToken: INSTANT_ADMIN_TOKEN });
 let overlay = null;
 let tray = null;
 let isRecording = false;
+let isPaused = false;
 let recordingProcess = null;
 let tempAudioPath = null;
+let audioSegments = []; // paths of recorded segments (for pause/resume)
 let hideTimer = null;
 let pendingSave = null; // { transcription, audioPath } when save fails
 
@@ -165,7 +167,7 @@ function startRecording() {
   );
 }
 
-function stopRecording() {
+function stopCurrentRecordingProcess() {
   return new Promise((resolve) => {
     if (!recordingProcess) {
       resolve(null);
@@ -174,10 +176,8 @@ function stopRecording() {
     const proc = recordingProcess;
     recordingProcess = null;
 
-    // Send SIGINT for graceful stop (sox/ffmpeg flush file)
     proc.kill("SIGINT");
 
-    // Wait a moment for the file to be finalized
     setTimeout(() => {
       if (tempAudioPath && fs.existsSync(tempAudioPath)) {
         const stats = fs.statSync(tempAudioPath);
@@ -192,6 +192,84 @@ function stopRecording() {
       }
     }, 300);
   });
+}
+
+function stopRecording() {
+  return new Promise(async (resolve) => {
+    // Stop any active ffmpeg process
+    const lastPath = await stopCurrentRecordingProcess();
+    if (lastPath) {
+      audioSegments.push(lastPath);
+    }
+
+    if (audioSegments.length === 0) {
+      resolve(null);
+      return;
+    }
+
+    if (audioSegments.length === 1) {
+      const finalPath = audioSegments[0];
+      audioSegments = [];
+      resolve(finalPath);
+      return;
+    }
+
+    // Concatenate multiple segments
+    const concatPath = history.makeAudioPath();
+    const listPath = concatPath + ".txt";
+    const listContent = audioSegments.map((p) => `file '${p}'`).join("\n");
+    fs.writeFileSync(listPath, listContent);
+
+    execFile(
+      "/opt/homebrew/bin/ffmpeg",
+      ["-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-y", concatPath],
+      { timeout: 30000 },
+      (error) => {
+        // Clean up list file and segments
+        try { fs.unlinkSync(listPath); } catch {}
+        for (const seg of audioSegments) {
+          if (seg !== concatPath) {
+            try { fs.unlinkSync(seg); } catch {}
+          }
+        }
+        audioSegments = [];
+
+        if (error) {
+          console.error("Concat error:", error.message);
+          resolve(null);
+        } else {
+          resolve(concatPath);
+        }
+      }
+    );
+  });
+}
+
+// --- Pause / Resume ---
+async function togglePause() {
+  if (!isRecording) return;
+
+  if (!isPaused) {
+    // Pause: stop current ffmpeg, save segment
+    isPaused = true;
+    const segPath = await stopCurrentRecordingProcess();
+    if (segPath) audioSegments.push(segPath);
+    showOverlay("paused", "Paused");
+  } else {
+    // Resume: start new ffmpeg segment
+    isPaused = false;
+    tempAudioPath = history.makeAudioPath();
+    recordingProcess = execFile(
+      "/opt/homebrew/bin/ffmpeg",
+      ["-f", "avfoundation", "-i", ":default", "-ar", "16000", "-ac", "1", "-y", tempAudioPath],
+      { timeout: 120000 },
+      (error) => {
+        if (error && error.killed) return;
+        if (error) console.error("Recording error:", error.message);
+      }
+    );
+    showOverlay("recording", "Recording...");
+  }
 }
 
 // --- Local Transcription (Parakeet TDT + Silero VAD via sherpa-onnx) ---
@@ -259,12 +337,20 @@ async function createNote(transcription) {
 function cancelRecording() {
   if (!isRecording) return;
   isRecording = false;
+  isPaused = false;
+  unregisterPauseShortcut();
 
   if (recordingProcess) {
     const proc = recordingProcess;
     recordingProcess = null;
     proc.kill("SIGINT");
   }
+
+  // Clean up any saved segments
+  for (const seg of audioSegments) {
+    try { fs.unlinkSync(seg); } catch {}
+  }
+  audioSegments = [];
 
   // Add to history instead of deleting
   if (tempAudioPath) {
@@ -288,6 +374,15 @@ function cancelRecording() {
   hideOverlayAfter(800);
 }
 
+// --- Pause shortcut management ---
+function registerPauseShortcut() {
+  globalShortcut.register("Space", togglePause);
+}
+
+function unregisterPauseShortcut() {
+  globalShortcut.unregister("Space");
+}
+
 // --- Hotkey Handler ---
 async function handleHotkeyDown() {
   if (isRecording) {
@@ -297,13 +392,18 @@ async function handleHotkeyDown() {
   }
 
   isRecording = true;
+  isPaused = false;
+  audioSegments = [];
   showOverlay("recording", "Recording...");
   startRecording();
+  registerPauseShortcut();
 }
 
 async function handleHotkeyUp() {
   if (!isRecording) return;
   isRecording = false;
+  isPaused = false;
+  unregisterPauseShortcut();
 
   showOverlay("transcribing", "Transcribing...");
 

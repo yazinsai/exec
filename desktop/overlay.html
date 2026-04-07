@@ -77,6 +77,11 @@
       background: #f59e0b;
     }
 
+    .indicator.paused {
+      background: #f59e0b;
+      animation: none;
+    }
+
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(0.85); }
@@ -197,8 +202,8 @@
       indicator.className = "indicator " + state;
       label.textContent = text;
 
-      // Show cancel button only during recording
-      cancelBtn.classList.toggle("visible", state === "recording");
+      // Show cancel button during recording and paused states
+      cancelBtn.classList.toggle("visible", state === "recording" || state === "paused");
       // Show retry actions only on save failure
       retryActions.classList.toggle("visible", state === "save-failed");
 
