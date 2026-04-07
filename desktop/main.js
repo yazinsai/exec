@@ -36,6 +36,7 @@ let tray = null;
 let isRecording = false;
 let recordingProcess = null;
 let tempAudioPath = null;
+let hideTimer = null;
 
 // --- Overlay Window ---
 function createOverlay() {
@@ -72,6 +73,11 @@ function createOverlay() {
 }
 
 function showOverlay(state, text) {
+  // Clear any pending auto-hide from a previous state
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
   if (!overlay) createOverlay();
   overlay.webContents.send("state-change", { state, text });
   if (!overlay.isVisible()) {
@@ -81,8 +87,17 @@ function showOverlay(state, text) {
 
 function hideOverlay() {
   if (overlay && overlay.isVisible()) {
+    overlay.webContents.send("overlay-hide");
     overlay.hide();
   }
+}
+
+function hideOverlayAfter(ms) {
+  if (hideTimer) clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    hideTimer = null;
+    hideOverlay();
+  }, ms);
 }
 
 // --- Audio Recording (macOS using sox/rec) ---
@@ -192,7 +207,7 @@ function cancelRecording() {
   tempAudioPath = null;
 
   showOverlay("error", "Cancelled");
-  setTimeout(hideOverlay, 800);
+  hideOverlayAfter(800);
 }
 
 // --- Hotkey Handler ---
@@ -218,14 +233,14 @@ async function handleHotkeyUp() {
     const audioPath = await stopRecording();
     if (!audioPath) {
       showOverlay("error", "No audio captured");
-      setTimeout(hideOverlay, 1500);
+      hideOverlayAfter(1500);
       return;
     }
 
     const transcription = await transcribeAudio(audioPath);
     if (!transcription || transcription.trim().length === 0) {
       showOverlay("error", "No speech detected");
-      setTimeout(hideOverlay, 1500);
+      hideOverlayAfter(1500);
       return;
     }
 
@@ -233,7 +248,7 @@ async function handleHotkeyUp() {
     await createNote(transcription.trim());
 
     showOverlay("done", "Got it ✓");
-    setTimeout(hideOverlay, 1200);
+    hideOverlayAfter(1200);
 
     // Clean up temp file
     try {
@@ -242,7 +257,7 @@ async function handleHotkeyUp() {
   } catch (err) {
     console.error("Error processing recording:", err);
     showOverlay("error", "Error: " + err.message.slice(0, 50));
-    setTimeout(hideOverlay, 2500);
+    hideOverlayAfter(2500);
   }
 }
 

@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelRecording: () => {
     ipcRenderer.send("cancel-recording");
   },
+  onHide: (callback) => {
+    ipcRenderer.on("overlay-hide", () => callback());
+  },
 });

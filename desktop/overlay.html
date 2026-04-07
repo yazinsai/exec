@@ -153,6 +153,14 @@
     cancelBtn.addEventListener("click", () => {
       window.electronAPI.cancelRecording();
     });
+
+    // Reset visual state when overlay is hidden so stale content doesn't flash on next show
+    window.electronAPI.onHide(() => {
+      container.classList.remove("visible");
+      indicator.className = "indicator";
+      label.textContent = "";
+      cancelBtn.classList.remove("visible");
+    });
   </script>
 </body>
 </html>
