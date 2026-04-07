@@ -73,6 +73,10 @@
       background: #ef4444;
     }
 
+    .indicator.save-failed {
+      background: #f59e0b;
+    }
+
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(0.85); }
@@ -122,6 +126,51 @@
     .cancel-btn.visible {
       display: flex;
     }
+
+    .retry-actions {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .retry-actions.visible {
+      display: flex;
+    }
+
+    .retry-btn, .dismiss-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      -webkit-app-region: no-drag;
+    }
+
+    .retry-btn {
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .retry-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .dismiss-btn {
+      background: transparent;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .dismiss-btn:hover {
+      color: rgba(255, 255, 255, 0.7);
+    }
   </style>
 </head>
 <body>
@@ -129,6 +178,10 @@
     <div class="indicator" id="indicator"></div>
     <span class="label" id="label"></span>
     <button class="cancel-btn" id="cancelBtn" title="Cancel recording (Esc)">✕</button>
+    <div class="retry-actions" id="retryActions">
+      <button class="retry-btn" id="retryBtn">Retry</button>
+      <button class="dismiss-btn" id="dismissBtn">✕</button>
+    </div>
   </div>
 
   <script>
@@ -136,6 +189,9 @@
     const indicator = document.getElementById("indicator");
     const label = document.getElementById("label");
     const cancelBtn = document.getElementById("cancelBtn");
+    const retryActions = document.getElementById("retryActions");
+    const retryBtn = document.getElementById("retryBtn");
+    const dismissBtn = document.getElementById("dismissBtn");
 
     window.electronAPI.onStateChange(({ state, text }) => {
       indicator.className = "indicator " + state;
@@ -143,6 +199,8 @@
 
       // Show cancel button only during recording
       cancelBtn.classList.toggle("visible", state === "recording");
+      // Show retry actions only on save failure
+      retryActions.classList.toggle("visible", state === "save-failed");
 
       // Show with animation
       requestAnimationFrame(() => {
@@ -154,12 +212,21 @@
       window.electronAPI.cancelRecording();
     });
 
+    retryBtn.addEventListener("click", () => {
+      window.electronAPI.retrySave();
+    });
+
+    dismissBtn.addEventListener("click", () => {
+      window.electronAPI.dismissSave();
+    });
+
     // Reset visual state when overlay is hidden so stale content doesn't flash on next show
     window.electronAPI.onHide(() => {
       container.classList.remove("visible");
       indicator.className = "indicator";
       label.textContent = "";
       cancelBtn.classList.remove("visible");
+      retryActions.classList.remove("visible");
     });
   </script>
 </body>

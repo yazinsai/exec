@@ -7,6 +7,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelRecording: () => {
     ipcRenderer.send("cancel-recording");
   },
+  retrySave: () => {
+    ipcRenderer.send("retry-save");
+  },
+  dismissSave: () => {
+    ipcRenderer.send("dismiss-save");
+  },
   onHide: (callback) => {
     ipcRenderer.on("overlay-hide", () => callback());
   },

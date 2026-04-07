@@ -37,6 +37,7 @@ let isRecording = false;
 let recordingProcess = null;
 let tempAudioPath = null;
 let hideTimer = null;
+let pendingSave = null; // { transcription, audioPath } when save fails
 
 // --- Overlay Window ---
 function createOverlay() {
@@ -244,21 +245,42 @@ async function handleHotkeyUp() {
       return;
     }
 
-    showOverlay("creating", "Saving note...");
-    await createNote(transcription.trim());
-
-    showOverlay("done", "Got it ✓");
-    hideOverlayAfter(1200);
-
-    // Clean up temp file
-    try {
-      fs.unlinkSync(audioPath);
-    } catch {}
+    await saveNote(transcription.trim(), audioPath);
   } catch (err) {
     console.error("Error processing recording:", err);
     showOverlay("error", "Error: " + err.message.slice(0, 50));
     hideOverlayAfter(2500);
   }
+}
+
+async function saveNote(transcription, audioPath) {
+  showOverlay("creating", "Saving note...");
+  try {
+    await createNote(transcription);
+    pendingSave = null;
+    showOverlay("done", "Got it ✓");
+    hideOverlayAfter(1200);
+    // Clean up temp file
+    try { fs.unlinkSync(audioPath); } catch {}
+  } catch (err) {
+    console.error("Save failed, keeping recording for retry:", err);
+    pendingSave = { transcription, audioPath };
+    showOverlay("save-failed", "Save failed — tap to retry");
+  }
+}
+
+async function retrySave() {
+  if (!pendingSave) return;
+  const { transcription, audioPath } = pendingSave;
+  await saveNote(transcription, audioPath);
+}
+
+function dismissSave() {
+  if (!pendingSave) return;
+  // Clean up temp file
+  try { fs.unlinkSync(pendingSave.audioPath); } catch {}
+  pendingSave = null;
+  hideOverlay();
 }
 
 // --- Tray Icon ---
@@ -313,8 +335,10 @@ app.whenReady().then(() => {
   createOverlay();
   createTray();
 
-  // Listen for cancel from overlay UI
+  // Listen for overlay UI actions
   ipcMain.on("cancel-recording", cancelRecording);
+  ipcMain.on("retry-save", retrySave);
+  ipcMain.on("dismiss-save", dismissSave);
 
   // Register Escape as cancel shortcut
   globalShortcut.register("Escape", cancelRecording);
