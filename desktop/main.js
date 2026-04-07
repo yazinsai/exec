@@ -200,13 +200,15 @@ function stopRecording() {
 function transcribeAudio(audioPath) {
   initRecognizer();
   const wave = sherpa_onnx.readWave(audioPath);
+  // Copy samples to avoid "External buffers are not allowed" error
+  const samples = new Float32Array(wave.samples);
   const vad = createVad();
 
   const segments = [];
   const windowSize = 512;
 
-  for (let i = 0; i < wave.samples.length; i += windowSize) {
-    const chunk = wave.samples.subarray(i, i + windowSize);
+  for (let i = 0; i < samples.length; i += windowSize) {
+    const chunk = samples.subarray(i, i + windowSize);
     vad.acceptWaveform(chunk);
     while (!vad.isEmpty()) {
       segments.push(vad.front());
