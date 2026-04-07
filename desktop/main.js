@@ -7,6 +7,7 @@ const {
   Menu,
   nativeImage,
   screen,
+  systemPreferences,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -481,6 +482,24 @@ function unregisterPauseShortcut() {
   globalShortcut.unregister("Space");
 }
 
+// --- Microphone Permission ---
+async function ensureMicPermission() {
+  const status = systemPreferences.getMediaAccessStatus("microphone");
+  if (status === "granted") return true;
+  if (status === "denied") {
+    showOverlay("error", "Mic access denied — check System Settings");
+    hideOverlayAfter(2500);
+    return false;
+  }
+  // "not-determined" or "restricted" — request access
+  const granted = await systemPreferences.askForMediaAccess("microphone");
+  if (!granted) {
+    showOverlay("error", "Mic access required");
+    hideOverlayAfter(2000);
+  }
+  return granted;
+}
+
 // --- Hotkey Handler ---
 async function handleHotkeyDown() {
   if (isRecording) {
@@ -488,6 +507,8 @@ async function handleHotkeyDown() {
     await handleHotkeyUp();
     return;
   }
+
+  if (!(await ensureMicPermission())) return;
 
   isRecording = true;
   isPaused = false;
