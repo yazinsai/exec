@@ -15,19 +15,58 @@ const { execFile } = require("child_process");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
-const { promisify } = require("util");
-const execFileAsync = promisify(execFile);
+const sherpa_onnx = require("sherpa-onnx-node");
 
 const { init, id: instantId } = require("@instantdb/admin");
 
 // --- InstantDB setup ---
 const INSTANT_APP_ID = process.env.INSTANT_APP_ID;
 const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-const WHISPER_MODEL = path.join(
-  os.homedir(),
-  ".local/share/whisper-cpp/models/ggml-large-v3-turbo.bin"
-);
-const WHISPER_CLI = "/opt/homebrew/bin/whisper-cli";
+
+// --- Sherpa-ONNX Model Paths ---
+const MODEL_DIR = path.join(os.homedir(), ".local/share/exec/models");
+const PARAKEET_DIR = path.join(MODEL_DIR, "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8");
+
+let recognizer = null;
+
+function initRecognizer() {
+  if (recognizer) return;
+  recognizer = new sherpa_onnx.OfflineRecognizer({
+    featConfig: { sampleRate: 16000, featureDim: 80 },
+    modelConfig: {
+      transducer: {
+        encoder: path.join(PARAKEET_DIR, "encoder.int8.onnx"),
+        decoder: path.join(PARAKEET_DIR, "decoder.int8.onnx"),
+        joiner: path.join(PARAKEET_DIR, "joiner.int8.onnx"),
+      },
+      tokens: path.join(PARAKEET_DIR, "tokens.txt"),
+      numThreads: 4,
+      provider: "cpu",
+      debug: 0,
+      modelType: "nemo_transducer",
+    },
+  });
+  console.log("Parakeet recognizer initialized");
+}
+
+function createVad() {
+  return new sherpa_onnx.Vad(
+    {
+      sileroVad: {
+        model: path.join(MODEL_DIR, "silero_vad.onnx"),
+        threshold: 0.5,
+        minSpeechDuration: 0.25,
+        minSilenceDuration: 0.5,
+        maxSpeechDuration: 30,
+        windowSize: 512,
+      },
+      sampleRate: 16000,
+      debug: false,
+      numThreads: 1,
+    },
+    60 // bufferSizeInSeconds
+  );
+}
 
 const db = init({ appId: INSTANT_APP_ID, adminToken: INSTANT_ADMIN_TOKEN });
 
@@ -157,17 +196,44 @@ function stopRecording() {
   });
 }
 
-// --- Local Whisper Transcription ---
-async function transcribeAudio(audioPath) {
-  const { stdout } = await execFileAsync(WHISPER_CLI, [
-    "--model", WHISPER_MODEL,
-    "--language", "en",
-    "--no-timestamps",
-    "--no-prints",
-    audioPath,
-  ], { timeout: 60000 });
+// --- Local Transcription (Parakeet TDT + Silero VAD via sherpa-onnx) ---
+function transcribeAudio(audioPath) {
+  initRecognizer();
+  const wave = sherpa_onnx.readWave(audioPath);
+  const vad = createVad();
 
-  return stdout.trim();
+  const segments = [];
+  const windowSize = 512;
+
+  for (let i = 0; i < wave.samples.length; i += windowSize) {
+    const chunk = wave.samples.subarray(i, i + windowSize);
+    vad.acceptWaveform(chunk);
+    while (!vad.isEmpty()) {
+      segments.push(vad.front());
+      vad.pop();
+    }
+  }
+
+  vad.flush();
+  while (!vad.isEmpty()) {
+    segments.push(vad.front());
+    vad.pop();
+  }
+
+  if (segments.length === 0) return "";
+
+  const texts = [];
+  for (const seg of segments) {
+    const stream = recognizer.createStream();
+    stream.acceptWaveform({ samples: seg.samples, sampleRate: wave.sampleRate });
+    recognizer.decode(stream);
+    const result = recognizer.getResult(stream);
+    if (result.text.trim()) {
+      texts.push(result.text.trim());
+    }
+  }
+
+  return texts.join(" ");
 }
 
 // --- InstantDB Note Creation ---
@@ -330,6 +396,16 @@ function createTray() {
 app.whenReady().then(() => {
   // Hide dock icon — this is a background utility
   app.dock?.hide();
+
+  // Check models exist
+  const modelsExist =
+    fs.existsSync(path.join(PARAKEET_DIR, "encoder.int8.onnx")) &&
+    fs.existsSync(path.join(MODEL_DIR, "silero_vad.onnx"));
+
+  if (!modelsExist) {
+    console.error("Models not found. Run: ./desktop/setup-models.sh");
+    console.error("Expected at:", MODEL_DIR);
+  }
 
   createOverlay();
   createTray();
