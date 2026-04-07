@@ -790,12 +790,20 @@ function createTray() {
 app.whenReady().then(async () => {
   history.init();
 
-  // Request mic permission before hiding dock (prompt needs a visible app)
+  // Request mic permission before hiding dock (prompt needs a visible, active app)
   const micStatus = systemPreferences.getMediaAccessStatus("microphone");
+  console.log("Mic permission status:", micStatus);
   if (micStatus !== "granted") {
-    console.log("Mic permission status:", micStatus, "— requesting access...");
+    // App must be visible + frontmost for macOS to show the permission dialog
+    app.dock?.show();
+    app.focus({ steal: true });
     const granted = await systemPreferences.askForMediaAccess("microphone");
     console.log("Mic permission granted:", granted);
+    if (!granted) {
+      // Open System Settings as fallback
+      const { shell } = require("electron");
+      shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone");
+    }
   }
 
   // Hide dock icon — this is a background utility
