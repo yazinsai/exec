@@ -11,7 +11,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { execFile } = require("child_process");
+const { execFile, execSync } = require("child_process");
 const history = require("./history");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
@@ -142,16 +142,35 @@ function hideOverlayAfter(ms) {
   }, ms);
 }
 
-// --- Audio Recording (macOS using sox/rec) ---
+// --- Default Input Device Detection ---
+function getDefaultInputDevice() {
+  try {
+    const output = execSync(
+      `system_profiler SPAudioDataType 2>/dev/null | awk '/^        [^ ]/{name=$0} /Default Input Device: Yes/{gsub(/^        |:$/,"",name); print name}'`,
+      { encoding: "utf8", timeout: 5000 }
+    ).trim();
+    if (output) {
+      console.log("Default input device:", output);
+      return ":" + output;
+    }
+  } catch (e) {
+    console.warn("Could not detect default input device:", e.message);
+  }
+  return ":default";
+}
+
+let audioInputDevice = null;
+
+// --- Audio Recording (macOS using ffmpeg/avfoundation) ---
 function startRecording() {
+  if (!audioInputDevice) audioInputDevice = getDefaultInputDevice();
   tempAudioPath = history.makeAudioPath();
 
-  // Use ffmpeg with avfoundation for macOS audio capture
   recordingProcess = execFile(
     "/opt/homebrew/bin/ffmpeg",
     [
       "-f", "avfoundation",
-      "-i", ":default",
+      "-i", audioInputDevice,
       "-ar", "16000",
       "-ac", "1",
       "-y",
@@ -258,10 +277,11 @@ async function togglePause() {
   } else {
     // Resume: start new ffmpeg segment
     isPaused = false;
+    if (!audioInputDevice) audioInputDevice = getDefaultInputDevice();
     tempAudioPath = history.makeAudioPath();
     recordingProcess = execFile(
       "/opt/homebrew/bin/ffmpeg",
-      ["-f", "avfoundation", "-i", ":default", "-ar", "16000", "-ac", "1", "-y", tempAudioPath],
+      ["-f", "avfoundation", "-i", audioInputDevice, "-ar", "16000", "-ac", "1", "-y", tempAudioPath],
       { timeout: 120000 },
       (error) => {
         if (error && error.killed) return;
