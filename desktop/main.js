@@ -53,9 +53,8 @@ function createOverlay() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
-    movable: false,
+    movable: true,
     hasShadow: false,
-    focusable: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
