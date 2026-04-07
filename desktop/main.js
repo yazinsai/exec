@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { execFile } = require("child_process");
+const history = require("./history");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
@@ -141,10 +142,7 @@ function hideOverlayAfter(ms) {
 
 // --- Audio Recording (macOS using sox/rec) ---
 function startRecording() {
-  tempAudioPath = path.join(
-    os.tmpdir(),
-    `exec-recording-${Date.now()}.wav`
-  );
+  tempAudioPath = history.makeAudioPath();
 
   // Use ffmpeg with avfoundation for macOS audio capture
   recordingProcess = execFile(
@@ -398,6 +396,7 @@ function createTray() {
 app.whenReady().then(() => {
   // Hide dock icon — this is a background utility
   app.dock?.hide();
+  history.init();
 
   // Check models exist
   const modelsExist =
