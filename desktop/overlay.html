@@ -93,6 +93,34 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .cancel-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s ease, color 0.15s ease;
+      -webkit-app-region: no-drag;
+    }
+
+    .cancel-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .cancel-btn.visible {
+      display: flex;
     }
   </style>
 </head>
@@ -100,21 +128,30 @@
   <div class="container" id="container">
     <div class="indicator" id="indicator"></div>
     <span class="label" id="label"></span>
+    <button class="cancel-btn" id="cancelBtn" title="Cancel recording (Esc)">✕</button>
   </div>
 
   <script>
     const container = document.getElementById("container");
     const indicator = document.getElementById("indicator");
     const label = document.getElementById("label");
+    const cancelBtn = document.getElementById("cancelBtn");
 
     window.electronAPI.onStateChange(({ state, text }) => {
       indicator.className = "indicator " + state;
       label.textContent = text;
 
+      // Show cancel button only during recording
+      cancelBtn.classList.toggle("visible", state === "recording");
+
       // Show with animation
       requestAnimationFrame(() => {
         container.classList.add("visible");
       });
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      window.electronAPI.cancelRecording();
     });
   </script>
 </body>

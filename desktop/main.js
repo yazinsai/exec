@@ -174,6 +174,27 @@ async function createNote(transcription) {
   return noteId;
 }
 
+// --- Cancel Recording ---
+function cancelRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+
+  if (recordingProcess) {
+    const proc = recordingProcess;
+    recordingProcess = null;
+    proc.kill("SIGINT");
+  }
+
+  // Clean up temp file
+  if (tempAudioPath && fs.existsSync(tempAudioPath)) {
+    try { fs.unlinkSync(tempAudioPath); } catch {}
+  }
+  tempAudioPath = null;
+
+  showOverlay("error", "Cancelled");
+  setTimeout(hideOverlay, 800);
+}
+
 // --- Hotkey Handler ---
 async function handleHotkeyDown() {
   if (isRecording) {
@@ -276,6 +297,12 @@ app.whenReady().then(() => {
 
   createOverlay();
   createTray();
+
+  // Listen for cancel from overlay UI
+  ipcMain.on("cancel-recording", cancelRecording);
+
+  // Register Escape as cancel shortcut
+  globalShortcut.register("Escape", cancelRecording);
 
   // Register global shortcut
   // We use a single shortcut and track key state via IPC
