@@ -1325,35 +1325,34 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Filters: inbox (state) vs workspace (projects) */}
+        {/* Two-row chrome: state filters, then workspace (projects) */}
         {!isLoading && notes.length > 0 && (
           <View
             style={{
               paddingHorizontal: spacing.md,
-              paddingBottom: spacing.md,
+              paddingBottom: spacing.sm,
               borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: colors.border,
-              gap: spacing.md,
+              gap: spacing.sm,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-              <Text
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: 10,
-                  fontFamily: fontFamily.semibold,
-                  letterSpacing: 0.8,
-                  width: 56,
-                }}
-              >
-                INBOX
-              </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              removeClippedSubviews={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                paddingRight: spacing.md,
+              }}
+            >
               <Pressable
                 onPress={() => setFilterUnread((v) => !v)}
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.xl,
-                  paddingVertical: 11,
-                  borderRadius: 24,
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: 8,
+                  borderRadius: 20,
                   backgroundColor: filterUnread
                     ? colors.primaryLight
                     : colors.backgroundPressed,
@@ -1369,14 +1368,14 @@ export default function HomeScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: spacing.sm,
+                    gap: 6,
                   }}
                 >
                   <View
                     style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 3.5,
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
                       flexShrink: 0,
                       backgroundColor: filterUnread
                         ? colors.black
@@ -1385,74 +1384,199 @@ export default function HomeScreen() {
                   />
                   <Text
                     style={{
-                      fontSize: typography.sm,
+                      fontSize: typography.xs,
                       fontFamily: fontFamily.semibold,
                       color: filterUnread ? colors.black : colors.textPrimary,
                     }}
                   >
-                    Unread only
+                    Unread
                   </Text>
                 </View>
               </Pressable>
-            </View>
 
-            <View
-              style={{
-                height: StyleSheet.hairlineWidth,
-                backgroundColor: colors.border,
-                marginVertical: 2,
-              }}
-            />
-
-            <View style={{ gap: spacing.sm }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.textTertiary,
-                    fontSize: 10,
-                    fontFamily: fontFamily.semibold,
-                    letterSpacing: 0.8,
-                  }}
-                >
-                  WORKSPACE
-                </Text>
-                {(filterUnread || filterProject) && (
+              {stuckAttentionTasks.length > 0 ? (
+                <>
                   <Pressable
-                    onPress={() => {
-                      setFilterUnread(false);
-                      setFilterProject(null);
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: activeWorkFilter === "all",
                     }}
-                    hitSlop={10}
-                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    onPress={() => setActiveWorkFilter("all")}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 8,
+                      borderRadius: 18,
+                      backgroundColor:
+                        activeWorkFilter === "all"
+                          ? colors.primaryLight
+                          : colors.backgroundPressed,
+                      borderWidth: activeWorkFilter === "all" ? 2 : 1,
+                      borderColor:
+                        activeWorkFilter === "all"
+                          ? colors.primaryDark
+                          : colors.border,
+                      ...(activeWorkFilter === "all" ? shadows.gold : {}),
+                      opacity: pressed ? 0.82 : 1,
+                    })}
                   >
                     <Text
                       style={{
                         fontSize: typography.xs,
-                        fontFamily: fontFamily.medium,
-                        color: colors.primary,
+                        fontFamily: fontFamily.semibold,
+                        color:
+                          activeWorkFilter === "all"
+                            ? colors.black
+                            : colors.textPrimary,
                       }}
                     >
-                      Clear filters
+                      All ({stuckAttentionTasks.length})
                     </Text>
                   </Pressable>
-                )}
-              </View>
+                  {stuckFailedCount > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected: activeWorkFilter === "failed",
+                      }}
+                      onPress={() => setActiveWorkFilter("failed")}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: spacing.md,
+                        paddingVertical: 8,
+                        borderRadius: 18,
+                        backgroundColor:
+                          activeWorkFilter === "failed"
+                            ? colors.statusFailed
+                            : colors.backgroundPressed,
+                        borderWidth:
+                          activeWorkFilter === "failed" ? 2 : 1,
+                        borderColor:
+                          activeWorkFilter === "failed"
+                            ? colors.errorLight
+                            : colors.border,
+                        ...(activeWorkFilter === "failed"
+                          ? shadows.sm
+                          : {}),
+                        opacity: pressed ? 0.82 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: typography.xs,
+                          fontFamily: fontFamily.semibold,
+                          color:
+                            activeWorkFilter === "failed"
+                              ? "#fff"
+                              : colors.textPrimary,
+                        }}
+                      >
+                        Failed ({stuckFailedCount})
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {stuckBlockedCount > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected: activeWorkFilter === "blocked",
+                      }}
+                      onPress={() => setActiveWorkFilter("blocked")}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: spacing.md,
+                        paddingVertical: 8,
+                        borderRadius: 18,
+                        backgroundColor:
+                          activeWorkFilter === "blocked"
+                            ? colors.warning
+                            : colors.backgroundPressed,
+                        borderWidth:
+                          activeWorkFilter === "blocked" ? 2 : 1,
+                        borderColor:
+                          activeWorkFilter === "blocked"
+                            ? colors.black
+                            : colors.border,
+                        ...(activeWorkFilter === "blocked"
+                          ? shadows.sm
+                          : {}),
+                        opacity: pressed ? 0.82 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: typography.xs,
+                          fontFamily: fontFamily.semibold,
+                          color:
+                            activeWorkFilter === "blocked"
+                              ? colors.black
+                              : colors.textPrimary,
+                        }}
+                      >
+                        Blocked ({stuckBlockedCount})
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : null}
 
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  attentionFeedOnly
+                    ? "Show full feed including settled notes"
+                    : "Focus on active notes only"
+                }
+                onPress={() => {
+                  setAttentionFeedOnly((v) => !v);
+                  void Haptics.impactAsync(
+                    Haptics.ImpactFeedbackStyle.Light
+                  );
+                }}
+                style={({ pressed }) => ({
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 8,
+                  borderRadius: 18,
+                  backgroundColor: attentionFeedOnly
+                    ? colors.primaryAlpha30
+                    : colors.backgroundPressed,
+                  borderWidth: 1,
+                  borderColor: attentionFeedOnly
+                    ? colors.primaryAlpha30
+                    : colors.border,
+                  opacity: pressed ? 0.82 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.semibold,
+                    color: attentionFeedOnly
+                      ? colors.primaryLight
+                      : colors.textSecondary,
+                  }}
+                >
+                  {attentionFeedOnly ? "Full feed" : "Focus"}
+                </Text>
+              </Pressable>
+            </ScrollView>
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                minHeight: 40,
+              }}
+            >
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 fadingEdgeLength={72}
+                style={{ flex: 1, minWidth: 0 }}
+                removeClippedSubviews={false}
                 contentContainerStyle={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 10,
-                  paddingRight: spacing.lg,
+                  gap: 8,
+                  paddingRight: spacing.sm,
                 }}
               >
                 {visibleProjectSlugs.map((slug) => (
@@ -1462,9 +1586,9 @@ export default function HomeScreen() {
                       setFilterProject((v) => (v === slug ? null : slug))
                     }
                     style={({ pressed }) => ({
-                      paddingHorizontal: 18,
-                      paddingVertical: 10,
-                      borderRadius: 22,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 20,
                       backgroundColor:
                         filterProject === slug
                           ? colors.primaryLight
@@ -1480,7 +1604,7 @@ export default function HomeScreen() {
                   >
                     <Text
                       style={{
-                        fontSize: typography.sm,
+                        fontSize: typography.xs,
                         fontFamily: fontFamily.semibold,
                         color:
                           filterProject === slug
@@ -1496,9 +1620,9 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => setShowAllProjectPills(true)}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 22,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 20,
                       borderWidth: 1,
                       borderColor: colors.border,
                       backgroundColor: colors.backgroundSubtle,
@@ -1507,12 +1631,12 @@ export default function HomeScreen() {
                   >
                     <Text
                       style={{
-                        fontSize: typography.sm,
+                        fontSize: typography.xs,
                         fontFamily: fontFamily.medium,
                         color: colors.textTertiary,
                       }}
                     >
-                      +{projectPillsOverflow} more
+                      +{projectPillsOverflow}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -1520,8 +1644,8 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => setShowAllProjectPills(false)}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
@@ -1532,11 +1656,31 @@ export default function HomeScreen() {
                         color: colors.textTertiary,
                       }}
                     >
-                      Show less
+                      Less
                     </Text>
                   </Pressable>
                 ) : null}
               </ScrollView>
+              {(filterUnread || filterProject) ? (
+                <Pressable
+                  onPress={() => {
+                    setFilterUnread(false);
+                    setFilterProject(null);
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.xs,
+                      fontFamily: fontFamily.semibold,
+                      color: colors.primary,
+                    }}
+                  >
+                    Clear
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         )}
@@ -1570,26 +1714,14 @@ export default function HomeScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
-              paddingTop: spacing.md,
+              paddingTop: spacing.sm,
               paddingHorizontal: spacing.sm,
               paddingBottom: insets.bottom + 96,
-              gap: spacing.lg,
+              gap: spacing.md,
             }}
           >
             {isFiltering ? (
               <>
-                {/* Flat filtered task list */}
-                <Text
-                  style={{
-                    color: colors.textTertiary,
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.semibold,
-                    textTransform: "uppercase",
-                    letterSpacing: typography.tracking.wider,
-                  }}
-                >
-                  {filteredTasks.length} {filteredTasks.length === 1 ? "task" : "tasks"}
-                </Text>
                 {filteredTasks.length === 0 && (
                   <View
                     style={{
@@ -1649,159 +1781,6 @@ export default function HomeScreen() {
               <>
                 {stuckAttentionTasks.length > 0 ? (
                   <View style={{ gap: spacing.sm }}>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing.sm,
-                        flexWrap: "nowrap",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: colors.textTertiary,
-                          fontSize: typography.xs,
-                          fontFamily: fontFamily.semibold,
-                          textTransform: "uppercase",
-                          letterSpacing: typography.tracking.wider,
-                          flexShrink: 0,
-                        }}
-                      >
-                        Needs attention
-                      </Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={{ flexGrow: 1, minWidth: 0 }}
-                        removeClippedSubviews={false}
-                        contentContainerStyle={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: spacing.sm,
-                          paddingRight: spacing.sm,
-                        }}
-                      >
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityState={{
-                            selected: activeWorkFilter === "all",
-                          }}
-                          onPress={() => setActiveWorkFilter("all")}
-                          style={({ pressed }) => ({
-                            paddingHorizontal: spacing.lg,
-                            paddingVertical: 10,
-                            borderRadius: 20,
-                            backgroundColor:
-                              activeWorkFilter === "all"
-                                ? colors.primaryLight
-                                : colors.backgroundPressed,
-                            borderWidth: activeWorkFilter === "all" ? 2 : 1,
-                            borderColor:
-                              activeWorkFilter === "all"
-                                ? colors.primaryDark
-                                : colors.border,
-                            ...(activeWorkFilter === "all" ? shadows.gold : {}),
-                            opacity: pressed ? 0.82 : 1,
-                          })}
-                        >
-                          <Text
-                            style={{
-                              fontSize: typography.sm,
-                              fontFamily: fontFamily.semibold,
-                              color:
-                                activeWorkFilter === "all"
-                                  ? colors.black
-                                  : colors.textPrimary,
-                            }}
-                          >
-                            All ({stuckAttentionTasks.length})
-                          </Text>
-                        </Pressable>
-                        {stuckFailedCount > 0 ? (
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              selected: activeWorkFilter === "failed",
-                            }}
-                            onPress={() => setActiveWorkFilter("failed")}
-                            style={({ pressed }) => ({
-                              paddingHorizontal: spacing.lg,
-                              paddingVertical: 10,
-                              borderRadius: 20,
-                              backgroundColor:
-                                activeWorkFilter === "failed"
-                                  ? colors.statusFailed
-                                  : colors.backgroundPressed,
-                              borderWidth:
-                                activeWorkFilter === "failed" ? 2 : 1,
-                              borderColor:
-                                activeWorkFilter === "failed"
-                                  ? colors.errorLight
-                                  : colors.border,
-                              ...(activeWorkFilter === "failed"
-                                ? shadows.sm
-                                : {}),
-                              opacity: pressed ? 0.82 : 1,
-                            })}
-                          >
-                            <Text
-                              style={{
-                                fontSize: typography.sm,
-                                fontFamily: fontFamily.semibold,
-                                color:
-                                  activeWorkFilter === "failed"
-                                    ? "#fff"
-                                    : colors.textPrimary,
-                              }}
-                            >
-                              Failed ({stuckFailedCount})
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                        {stuckBlockedCount > 0 ? (
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              selected: activeWorkFilter === "blocked",
-                            }}
-                            onPress={() => setActiveWorkFilter("blocked")}
-                            style={({ pressed }) => ({
-                              paddingHorizontal: spacing.lg,
-                              paddingVertical: 10,
-                              borderRadius: 20,
-                              backgroundColor:
-                                activeWorkFilter === "blocked"
-                                  ? colors.warning
-                                  : colors.backgroundPressed,
-                              borderWidth:
-                                activeWorkFilter === "blocked" ? 2 : 1,
-                              borderColor:
-                                activeWorkFilter === "blocked"
-                                  ? colors.black
-                                  : colors.border,
-                              ...(activeWorkFilter === "blocked"
-                                ? shadows.sm
-                                : {}),
-                              opacity: pressed ? 0.82 : 1,
-                            })}
-                          >
-                            <Text
-                              style={{
-                                fontSize: typography.sm,
-                                fontFamily: fontFamily.semibold,
-                                color:
-                                  activeWorkFilter === "blocked"
-                                    ? colors.black
-                                    : colors.textPrimary,
-                              }}
-                            >
-                              Blocked ({stuckBlockedCount})
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </ScrollView>
-                    </View>
-
                     {filteredStuckTasks.length === 0 ? (
                       <Text
                         style={{
@@ -1840,63 +1819,12 @@ export default function HomeScreen() {
                   </View>
                 ) : null}
 
-                {notes.length > 0 ? (
-                  <Pressable
-                    onPress={() => {
-                      setAttentionFeedOnly((v) => !v);
-                      void Haptics.impactAsync(
-                        Haptics.ImpactFeedbackStyle.Light
-                      );
-                    }}
-                    style={({ pressed }) => ({
-                      paddingVertical: spacing.xs,
-                      opacity: pressed ? 0.65 : 1,
-                    })}
-                  >
-                    <Text
-                      style={{
-                        color: colors.textTertiary,
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.medium,
-                      }}
-                    >
-                      {attentionFeedOnly
-                        ? "Show full feed"
-                        : "Hide settled history"}
-                    </Text>
-                  </Pressable>
-                ) : null}
-
                 {activeNotes.length > 0 ? (
-                  <>
-                    <Text
-                      style={{
-                        color: colors.textTertiary,
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
-                        textTransform: "uppercase",
-                        letterSpacing: typography.tracking.wider,
-                      }}
-                    >
-                      Voice notes
-                    </Text>
-                    {activeNotes.map(renderNoteCard)}
-                  </>
+                  <>{activeNotes.map(renderNoteCard)}</>
                 ) : null}
 
                 {!attentionFeedOnly && historyNotes.length > 0 ? (
                   <>
-                    <Text
-                      style={{
-                        color: colors.textTertiary,
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
-                        textTransform: "uppercase",
-                        letterSpacing: typography.tracking.wider,
-                      }}
-                    >
-                      Recent
-                    </Text>
                     {visibleHistory.map(renderNoteCard)}
                     {historyRemaining > 0 ? (
                       <Pressable
