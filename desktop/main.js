@@ -190,18 +190,54 @@ function listAudioInputDevices() {
   }
 }
 
-// --- Audio Level Metering ---
-const LEVEL_HISTORY_SIZE = 24; // number of bars in the waveform
-let levelHistory = new Array(LEVEL_HISTORY_SIZE).fill(0);
+// --- Audio Level Metering (FFT frequency bars) ---
+const NUM_BARS = 24;
+let levelHistory = new Array(NUM_BARS).fill(0);
 let levelInterval = null;
+
+// Minimal radix-2 FFT (in-place, iterative)
+function fft(re, im) {
+  const n = re.length;
+  // Bit-reversal permutation
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1;
+    const angle = -2 * Math.PI / len;
+    const wRe = Math.cos(angle), wIm = Math.sin(angle);
+    for (let i = 0; i < n; i += len) {
+      let curRe = 1, curIm = 0;
+      for (let j = 0; j < half; j++) {
+        const tRe = curRe * re[i + j + half] - curIm * im[i + j + half];
+        const tIm = curRe * im[i + j + half] + curIm * re[i + j + half];
+        re[i + j + half] = re[i + j] - tRe;
+        im[i + j + half] = im[i + j] - tIm;
+        re[i + j] += tRe;
+        im[i + j] += tIm;
+        const nextRe = curRe * wRe - curIm * wIm;
+        curIm = curRe * wIm + curIm * wRe;
+        curRe = nextRe;
+      }
+    }
+  }
+}
 
 function startLevelMetering(proc) {
   const sampleRate = 16000;
   const bytesPerSample = 2; // s16le
-  // Accumulate PCM chunks and compute RMS every ~60ms
-  const chunkDuration = 0.06;
-  const chunkBytes = Math.floor(sampleRate * chunkDuration) * bytesPerSample;
+  const fftSize = 512; // ~32ms window at 16kHz
+  const chunkBytes = fftSize * bytesPerSample;
   let pcmBuffer = Buffer.alloc(0);
+  // Hann window
+  const hann = new Float64Array(fftSize);
+  for (let i = 0; i < fftSize; i++) hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
 
   proc.stdout.on("data", (data) => {
     pcmBuffer = Buffer.concat([pcmBuffer, data]);
@@ -210,21 +246,56 @@ function startLevelMetering(proc) {
       const chunk = pcmBuffer.subarray(0, chunkBytes);
       pcmBuffer = pcmBuffer.subarray(chunkBytes);
 
-      // Compute RMS
-      let sumSq = 0;
-      for (let i = 0; i < chunk.length; i += 2) {
-        const sample = chunk.readInt16LE(i) / 32768;
-        sumSq += sample * sample;
+      // Convert to float samples and apply Hann window
+      const re = new Float64Array(fftSize);
+      const im = new Float64Array(fftSize);
+      for (let i = 0; i < fftSize; i++) {
+        re[i] = (chunk.readInt16LE(i * 2) / 32768) * hann[i];
       }
-      const rms = Math.sqrt(sumSq / (chunk.length / 2));
-      // Convert to 0-1 range — apply log scaling for more responsive waveform
-      const level = Math.min(1, Math.max(0, (Math.log10(rms * 100 + 1) / Math.log10(101))));
 
-      levelHistory.shift();
-      levelHistory.push(level);
+      fft(re, im);
+
+      // Compute magnitude for positive frequencies (bins 1..fftSize/2)
+      const halfN = fftSize / 2;
+      const magnitudes = new Float64Array(halfN);
+      for (let i = 0; i < halfN; i++) {
+        magnitudes[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]) / halfN;
+      }
+
+      // Group into NUM_BARS bands (log-spaced for perceptual frequency distribution)
+      const minFreq = 80;   // Hz — skip sub-bass rumble
+      const maxFreq = 7500; // Hz — audible speech range
+      const minBin = Math.floor(minFreq * fftSize / sampleRate);
+      const maxBin = Math.min(halfN - 1, Math.floor(maxFreq * fftSize / sampleRate));
+      const bars = new Array(NUM_BARS).fill(0);
+
+      for (let b = 0; b < NUM_BARS; b++) {
+        // Log-spaced band edges
+        const loFrac = b / NUM_BARS;
+        const hiFrac = (b + 1) / NUM_BARS;
+        const lo = Math.floor(minBin + (maxBin - minBin) * (Math.pow(2, loFrac) - 1));
+        const hi = Math.floor(minBin + (maxBin - minBin) * (Math.pow(2, hiFrac) - 1));
+        const binLo = Math.max(minBin, lo);
+        const binHi = Math.max(binLo + 1, hi);
+
+        let sum = 0;
+        let count = 0;
+        for (let i = binLo; i < binHi && i < halfN; i++) {
+          sum += magnitudes[i];
+          count++;
+        }
+        const avg = count > 0 ? sum / count : 0;
+        // Log scale for perceptual loudness
+        bars[b] = Math.min(1, Math.max(0, (Math.log10(avg * 500 + 1) / Math.log10(501))));
+      }
+
+      // Smooth with previous frame for less jitter
+      for (let i = 0; i < NUM_BARS; i++) {
+        levelHistory[i] = levelHistory[i] * 0.3 + bars[i] * 0.7;
+      }
 
       if (overlay && overlay.isVisible()) {
-        overlay.webContents.send("audio-levels", levelHistory);
+        overlay.webContents.send("audio-levels", [...levelHistory]);
       }
     }
   });
