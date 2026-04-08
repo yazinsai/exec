@@ -1901,9 +1901,7 @@ export default function HomeScreen() {
                     {historyRemaining > 0 ? (
                       <Pressable
                         onPress={() =>
-                          setVisibleHistoryCount((c) =>
-                            Math.min(c + 10, historyNotes.length)
-                          )
+                          setVisibleHistoryCount(historyNotes.length)
                         }
                         style={({ pressed }) => ({
                           paddingVertical: spacing.md,
