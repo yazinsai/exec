@@ -187,38 +187,54 @@ export function DictionarySheet({ visible, onClose, terms }: DictionarySheetProp
               </View>
             }
             renderItem={({ item }) => (
-              <Pressable
-                onLongPress={() => deleteTerm(item.id, item.term)}
-                style={({ pressed }) => ({
+              <View
+                style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  gap: spacing.sm,
                   paddingVertical: spacing.md,
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
-                  opacity: pressed ? 0.6 : 1,
-                })}
+                }}
               >
-                <Text
-                  style={{
-                    fontSize: typography.base,
-                    fontFamily: fontFamily.medium,
-                    color: colors.textPrimary,
-                  }}
+                <Pressable
+                  onLongPress={() => deleteTerm(item.id, item.term)}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    minWidth: 0,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    opacity: pressed ? 0.65 : 1,
+                  })}
                 >
-                  {item.term}
-                </Text>
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      flex: 1,
+                      fontSize: typography.base,
+                      fontFamily: fontFamily.medium,
+                      color: colors.textPrimary,
+                    }}
+                  >
+                    {item.term}
+                  </Text>
+                </Pressable>
                 <Pressable
                   onPress={() => deleteTerm(item.id, item.term)}
+                  accessibilityLabel={`Remove ${item.term}`}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => ({
+                    padding: spacing.xs,
+                    opacity: pressed ? 0.55 : 1,
+                  })}
                 >
                   <Ionicons
                     name="close-circle"
-                    size={18}
+                    size={22}
                     color={colors.textTertiary}
                   />
                 </Pressable>
-              </Pressable>
+              </View>
             )}
           />
         </SafeAreaView>
