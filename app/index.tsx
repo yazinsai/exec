@@ -1347,11 +1347,13 @@ export default function HomeScreen() {
                   paddingVertical: 11,
                   borderRadius: 24,
                   backgroundColor: filterUnread
-                    ? colors.primary
-                    : colors.backgroundElevated,
+                    ? colors.primaryLight
+                    : colors.backgroundPressed,
                   borderWidth: filterUnread ? 2 : 1,
-                  borderColor: filterUnread ? colors.primary : colors.border,
-                  ...(filterUnread ? shadows.sm : {}),
+                  borderColor: filterUnread
+                    ? colors.primaryDark
+                    : colors.border,
+                  ...(filterUnread ? shadows.gold : {}),
                   opacity: pressed ? 0.82 : 1,
                 })}
               >
@@ -1370,7 +1372,7 @@ export default function HomeScreen() {
                       flexShrink: 0,
                       backgroundColor: filterUnread
                         ? colors.black
-                        : colors.primary,
+                        : colors.primaryLight,
                     }}
                   />
                   <Text
@@ -1457,14 +1459,14 @@ export default function HomeScreen() {
                       borderRadius: 22,
                       backgroundColor:
                         filterProject === slug
-                          ? colors.primary
-                          : colors.backgroundElevated,
+                          ? colors.primaryLight
+                          : colors.backgroundPressed,
                       borderWidth: filterProject === slug ? 2 : 1,
                       borderColor:
                         filterProject === slug
-                          ? colors.primary
+                          ? colors.primaryDark
                           : colors.border,
-                      ...(filterProject === slug ? shadows.sm : {}),
+                      ...(filterProject === slug ? shadows.gold : {}),
                       opacity: pressed ? 0.82 : 1,
                     })}
                   >
@@ -1475,7 +1477,7 @@ export default function HomeScreen() {
                         color:
                           filterProject === slug
                             ? colors.black
-                            : colors.textSecondary,
+                            : colors.textPrimary,
                       }}
                     >
                       {slug}
@@ -1683,14 +1685,14 @@ export default function HomeScreen() {
                             borderRadius: 20,
                             backgroundColor:
                               activeWorkFilter === "all"
-                                ? colors.primary
-                                : colors.backgroundElevated,
+                                ? colors.primaryLight
+                                : colors.backgroundPressed,
                             borderWidth: activeWorkFilter === "all" ? 2 : 1,
                             borderColor:
                               activeWorkFilter === "all"
-                                ? colors.primary
+                                ? colors.primaryDark
                                 : colors.border,
-                            ...(activeWorkFilter === "all" ? shadows.sm : {}),
+                            ...(activeWorkFilter === "all" ? shadows.gold : {}),
                             opacity: pressed ? 0.82 : 1,
                           })}
                         >
@@ -1721,12 +1723,12 @@ export default function HomeScreen() {
                               backgroundColor:
                                 activeWorkFilter === "failed"
                                   ? colors.statusFailed
-                                  : colors.backgroundElevated,
+                                  : colors.backgroundPressed,
                               borderWidth:
                                 activeWorkFilter === "failed" ? 2 : 1,
                               borderColor:
                                 activeWorkFilter === "failed"
-                                  ? colors.statusFailed
+                                  ? colors.errorLight
                                   : colors.border,
                               ...(activeWorkFilter === "failed"
                                 ? shadows.sm
@@ -1762,12 +1764,12 @@ export default function HomeScreen() {
                               backgroundColor:
                                 activeWorkFilter === "blocked"
                                   ? colors.warning
-                                  : colors.backgroundElevated,
+                                  : colors.backgroundPressed,
                               borderWidth:
                                 activeWorkFilter === "blocked" ? 2 : 1,
                               borderColor:
                                 activeWorkFilter === "blocked"
-                                  ? colors.warning
+                                  ? colors.black
                                   : colors.border,
                               ...(activeWorkFilter === "blocked"
                                 ? shadows.sm
