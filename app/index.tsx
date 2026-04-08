@@ -1394,17 +1394,6 @@ export default function HomeScreen() {
                     gap: 6,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      flexShrink: 0,
-                      backgroundColor: filterUnread
-                        ? colors.black
-                        : colors.primaryLight,
-                    }}
-                  />
                   <Text
                     style={{
                       fontSize: typography.sm,
