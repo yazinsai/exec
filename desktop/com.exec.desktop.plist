@@ -6,7 +6,7 @@
     <string>com.exec.desktop</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/rock/ai/projects/exec/desktop/node_modules/.bin/electron</string>
+        <string>/Users/rock/ai/projects/exec/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron</string>
         <string>/Users/rock/ai/projects/exec/desktop</string>
     </array>
     <key>WorkingDirectory</key>
