@@ -757,7 +757,7 @@ export default function HomeScreen() {
     [notes]
   );
 
-  /** WhatsApp-style: inactive = lozenge + border; active = solid fill. Transparent+rgba border vanishes on OLED black. */
+  /** WhatsApp-style pills. Selected uses visible ring — RN can drop fill when borderWidth is 0. */
   const waFilter = useMemo(() => {
     if (isDark) {
       return {
@@ -766,10 +766,13 @@ export default function HomeScreen() {
         offCount: colors.textSecondary,
         onGoldBg: colors.primary,
         onGoldFg: colors.black,
+        ringGold: "#ffffff",
         onFailedBg: colors.statusFailed,
         onFailedFg: "#ffffff",
+        ringFailed: "#fecaca",
         onBlockedBg: colors.warning,
         onBlockedFg: colors.black,
+        ringBlocked: "#ffffff",
       };
     }
     return {
@@ -778,10 +781,13 @@ export default function HomeScreen() {
       offCount: colors.textSecondary,
       onGoldBg: colors.primaryLight,
       onGoldFg: colors.black,
+      ringGold: colors.primaryDark,
       onFailedBg: colors.statusFailed,
       onFailedFg: "#ffffff",
+      ringFailed: "#fecaca",
       onBlockedBg: colors.warning,
       onBlockedFg: colors.black,
+      ringBlocked: "#92400e",
     };
   }, [isDark, colors]);
 
@@ -1398,8 +1404,10 @@ export default function HomeScreen() {
                   backgroundColor: filterUnread
                     ? waFilter.onGoldBg
                     : waFilter.offBg,
-                  borderWidth: filterUnread ? 0 : 1.5,
-                  borderColor: filterUnread ? "transparent" : waFilter.offBorder,
+                  borderWidth: filterUnread ? 2 : 1.5,
+                  borderColor: filterUnread
+                    ? waFilter.ringGold
+                    : waFilter.offBorder,
                   opacity:
                     unreadNoteCount === 0
                       ? 0.4
@@ -1412,9 +1420,10 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <Text style={{ fontSize: typography.sm }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color: filterUnread
                         ? waFilter.onGoldFg
@@ -1425,14 +1434,17 @@ export default function HomeScreen() {
                   </Text>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       fontVariant: ["tabular-nums"],
                       color: filterUnread
                         ? waFilter.onGoldFg
                         : waFilter.offCount,
                     }}
-                  >{` ${unreadNoteCount}`}</Text>
-                </Text>
+                  >
+                    {` ${unreadNoteCount}`}
+                  </Text>
+                </View>
               </Pressable>
 
               <Pressable
@@ -1464,10 +1476,10 @@ export default function HomeScreen() {
                     noteTaskStatusFilter === "failed"
                       ? waFilter.onFailedBg
                       : waFilter.offBg,
-                  borderWidth: noteTaskStatusFilter === "failed" ? 0 : 1.5,
+                  borderWidth: noteTaskStatusFilter === "failed" ? 2 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "failed"
-                      ? "transparent"
+                      ? waFilter.ringFailed
                       : waFilter.offBorder,
                   opacity:
                     attentionFailedNoteCount === 0
@@ -1481,9 +1493,10 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <Text style={{ fontSize: typography.sm }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color:
                         noteTaskStatusFilter === "failed"
@@ -1495,6 +1508,7 @@ export default function HomeScreen() {
                   </Text>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       fontVariant: ["tabular-nums"],
                       color:
@@ -1502,8 +1516,10 @@ export default function HomeScreen() {
                           ? waFilter.onFailedFg
                           : waFilter.offCount,
                     }}
-                  >{` ${attentionFailedNoteCount}`}</Text>
-                </Text>
+                  >
+                    {` ${attentionFailedNoteCount}`}
+                  </Text>
+                </View>
               </Pressable>
 
               <Pressable
@@ -1535,10 +1551,10 @@ export default function HomeScreen() {
                     noteTaskStatusFilter === "blocked"
                       ? waFilter.onBlockedBg
                       : waFilter.offBg,
-                  borderWidth: noteTaskStatusFilter === "blocked" ? 0 : 1.5,
+                  borderWidth: noteTaskStatusFilter === "blocked" ? 2 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "blocked"
-                      ? "transparent"
+                      ? waFilter.ringBlocked
                       : waFilter.offBorder,
                   opacity:
                     attentionBlockedNoteCount === 0
@@ -1552,9 +1568,10 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <Text style={{ fontSize: typography.sm }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color:
                         noteTaskStatusFilter === "blocked"
@@ -1566,6 +1583,7 @@ export default function HomeScreen() {
                   </Text>
                   <Text
                     style={{
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       fontVariant: ["tabular-nums"],
                       color:
@@ -1573,8 +1591,10 @@ export default function HomeScreen() {
                           ? waFilter.onBlockedFg
                           : waFilter.offCount,
                     }}
-                  >{` ${attentionBlockedNoteCount}`}</Text>
-                </Text>
+                  >
+                    {` ${attentionBlockedNoteCount}`}
+                  </Text>
+                </View>
               </Pressable>
             </ScrollView>
 
@@ -1626,9 +1646,9 @@ export default function HomeScreen() {
                         backgroundColor: selected
                           ? waFilter.onGoldBg
                           : waFilter.offBg,
-                        borderWidth: selected ? 0 : 1.5,
+                        borderWidth: selected ? 2 : 1.5,
                         borderColor: selected
-                          ? "transparent"
+                          ? waFilter.ringGold
                           : waFilter.offBorder,
                         opacity:
                           pressed && Platform.OS !== "android" ? 0.9 : 1,
