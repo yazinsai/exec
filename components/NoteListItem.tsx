@@ -100,7 +100,7 @@ function RunningIndicator({ count, colors }: { count: number; colors: ReturnType
           fontFamily: fontFamily.medium,
         }}
       >
-        {count} {count === 1 ? "task" : "tasks"} running
+        {count} Running
       </Text>
     </View>
   );
@@ -116,18 +116,18 @@ function buildCardSubline(
   }
   const parts: string[] = [];
   parts.push(`${counts.total} step${counts.total === 1 ? "" : "s"}`);
-  if (counts.running) parts.push(`${counts.running} running`);
-  if (counts.blocked) parts.push(`${counts.blocked} need attention`);
-  if (counts.failed) parts.push(`${counts.failed} failed`);
+  if (counts.running) parts.push(`${counts.running} Running`);
+  if (counts.blocked) parts.push(`${counts.blocked} Blocked`);
+  if (counts.failed) parts.push(`${counts.failed} Failed`);
   if (
     !counts.running &&
     !counts.blocked &&
     !counts.failed &&
     counts.done === counts.total
   ) {
-    parts.push("all done");
+    parts.push("All done");
   } else if (counts.done > 0 && !counts.running) {
-    parts.push(`${counts.done}/${counts.total} done`);
+    parts.push(`${counts.done}/${counts.total} Done`);
   }
   parts.push(`updated ${relativeTime(createdAt)}`);
   return parts.join(" · ");
@@ -254,7 +254,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      {counts.running} running
+                      {counts.running} Running
                     </Text>
                   </View>
                 ) : null}
@@ -275,7 +275,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      {counts.pending} queued
+                      {counts.pending} Queued
                     </Text>
                   </View>
                 ) : null}
@@ -296,7 +296,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      {counts.blocked} blocked
+                      {counts.blocked} Blocked
                     </Text>
                   </View>
                 ) : null}
@@ -317,7 +317,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      {counts.failed} failed
+                      {counts.failed} Failed
                     </Text>
                   </View>
                 ) : null}
@@ -387,18 +387,13 @@ export function NoteListItem({
                 borderWidth: 1,
                 borderColor: colors.borderLight,
                 overflow: "hidden",
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                gap: spacing.xl,
               }}
             >
               {orderedTasks.map((task, index) => (
-                <View
-                  key={task.id}
-                  style={{
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: colors.borderLight,
-                  }}
-                >
+                <View key={task.id}>
                   <StepTaskRow
                     title={task.title}
                     status={task.status}

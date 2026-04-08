@@ -100,7 +100,7 @@ export function formatTaskStatusLabel(status: string): string {
     case TASK_STATUSES.transcribing:
       return "Transcribing";
     case TASK_STATUSES.transcriptionFailed:
-      return "Transcription Failed";
+      return "Transcription failed";
     default:
       return "Pending";
   }
@@ -118,15 +118,15 @@ export function formatNoteAggregateSummary(
   if (noteStatus === NOTE_STATUSES.empty) return "No child tasks";
 
   const parts: string[] = [];
-  if (counts.running > 0) parts.push(`${counts.running} running`);
-  if (counts.pending > 0) parts.push(`${counts.pending} queued`);
-  if (counts.blocked > 0) parts.push(`${counts.blocked} blocked`);
-  if (counts.done > 0) parts.push(`${counts.done} done`);
-  if (counts.failed > 0) parts.push(`${counts.failed} failed`);
-  if (counts.cancelled > 0) parts.push(`${counts.cancelled} cancelled`);
-  if (counts.transcribing > 0) parts.push(`${counts.transcribing} transcribing`);
+  if (counts.running > 0) parts.push(`${counts.running} Running`);
+  if (counts.pending > 0) parts.push(`${counts.pending} Queued`);
+  if (counts.blocked > 0) parts.push(`${counts.blocked} Blocked`);
+  if (counts.done > 0) parts.push(`${counts.done} Done`);
+  if (counts.failed > 0) parts.push(`${counts.failed} Failed`);
+  if (counts.cancelled > 0) parts.push(`${counts.cancelled} Cancelled`);
+  if (counts.transcribing > 0) parts.push(`${counts.transcribing} Transcribing`);
   if (counts.transcriptionFailed > 0) {
-    parts.push(`${counts.transcriptionFailed} transcription failed`);
+    parts.push(`${counts.transcriptionFailed} Transcription failed`);
   }
 
   if (parts.length === 0) {
@@ -221,32 +221,17 @@ export function describeBlockedSituation(
   return "Waiting";
 }
 
-/** Short label for a step row (no wall-clock time). */
+/**
+ * One-line status for step rows and attention strip — same vocabulary as
+ * run badges (Blocked, Failed, Running, …). Long blocked/failed copy lives
+ * in expanded details only (describeBlockedSituation / error snippets).
+ */
 export function getStepProgressHeadline(
   status: string,
-  blockedReason?: string | null,
-  errorMessage?: string | null
+  _blockedReason?: string | null,
+  _errorMessage?: string | null
 ): string {
-  switch (status) {
-    case TASK_STATUSES.running:
-      return "Running";
-    case TASK_STATUSES.done:
-      return "Done";
-    case TASK_STATUSES.failed:
-      return "Failed";
-    case TASK_STATUSES.cancelled:
-      return "Skipped";
-    case TASK_STATUSES.pending:
-      return "Queued";
-    case TASK_STATUSES.blocked:
-      return describeBlockedSituation(blockedReason, errorMessage);
-    case TASK_STATUSES.transcribing:
-      return "Transcribing";
-    case TASK_STATUSES.transcriptionFailed:
-      return "Transcription failed";
-    default:
-      return "Queued";
-  }
+  return formatTaskStatusLabel(status);
 }
 
 /** Note still has work or errors (shown in “Now”, not buried in history-only). */

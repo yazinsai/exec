@@ -5,26 +5,30 @@ import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
 import {
   TASK_STATUSES,
   describeBlockedSituation,
-  getStepProgressHeadline,
+  formatTaskStatusLabel,
 } from "@/lib/workflow";
 
-function headlineColor(
+function statusPillStyle(
   status: string,
   colors: ReturnType<typeof useColors>
-): string {
+): { bg: string; fg: string } {
   switch (status) {
     case TASK_STATUSES.running:
-      return colors.statusRunning;
+      return { bg: "rgba(59, 130, 246, 0.15)", fg: colors.statusRunning };
     case TASK_STATUSES.done:
-      return colors.statusDone;
+      return { bg: "rgba(34, 197, 94, 0.12)", fg: colors.statusDone };
     case TASK_STATUSES.failed:
-      return colors.statusFailed;
+    case TASK_STATUSES.transcriptionFailed:
+      return { bg: "rgba(239, 68, 68, 0.12)", fg: colors.statusFailed };
     case TASK_STATUSES.blocked:
-      return colors.warning;
+      return { bg: "rgba(245, 158, 11, 0.12)", fg: colors.warning };
     case TASK_STATUSES.cancelled:
-      return colors.textTertiary;
+      return { bg: "rgba(113, 113, 122, 0.2)", fg: colors.textTertiary };
+    case TASK_STATUSES.transcribing:
+      return { bg: "rgba(245, 158, 11, 0.1)", fg: colors.warning };
+    case TASK_STATUSES.pending:
     default:
-      return colors.textSecondary;
+      return { bg: "rgba(113, 113, 122, 0.2)", fg: colors.textSecondary };
   }
 }
 
@@ -66,8 +70,8 @@ export function StepTaskRow({
 }: StepTaskRowProps) {
   const colors = useColors();
   const isUnread = read === false;
-  const headline = getStepProgressHeadline(status, blockedReason, errorMessage);
-  const hColor = headlineColor(status, colors);
+  const statusLabel = formatTaskStatusLabel(status);
+  const pill = statusPillStyle(status, colors);
   const isFailed = status === TASK_STATUSES.failed;
   const isBlocked = status === TASK_STATUSES.blocked;
   const actionable = isFailed || isBlocked;
@@ -90,9 +94,6 @@ export function StepTaskRow({
         ? rawBlockedErr
         : "";
 
-  const bodyIndent =
-    28 + spacing.sm + (isUnread ? 6 + spacing.xs : 0);
-
   const handleMainPress = () => {
     if (actionable) {
       onToggleExpand();
@@ -104,84 +105,81 @@ export function StepTaskRow({
   return (
     <View
       style={{
-        paddingVertical: expanded && actionable ? spacing.md : spacing.sm,
+        paddingVertical: expanded && actionable ? spacing.md : spacing.md,
       }}
     >
       <Pressable
         onPress={handleMainPress}
-        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+        style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: spacing.sm,
-          }}
-        >
+        <View style={{ gap: spacing.sm }}>
           <View
             style={{
-              minWidth: 28,
-              paddingTop: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
             }}
           >
+            {isUnread ? (
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 3.5,
+                  backgroundColor: colors.primary,
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
             <Text
               style={{
                 color: colors.textTertiary,
                 fontSize: typography.xs,
-                fontFamily: fontFamily.medium,
+                fontFamily: fontFamily.semibold,
+                letterSpacing: 0.3,
               }}
             >
-              {stepIndex}/{totalSteps}
-            </Text>
-          </View>
-
-          {isUnread ? (
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: colors.primary,
-                marginTop: 6,
-                flexShrink: 0,
-              }}
-            />
-          ) : null}
-
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              numberOfLines={2}
-              style={{
-                color: colors.textPrimary,
-                fontSize: typography.sm,
-                fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
-                lineHeight: 19,
-              }}
-            >
-              {shortenStepTitle(title)}
+              Step {stepIndex} of {totalSteps}
             </Text>
           </View>
 
           <Text
-            numberOfLines={2}
+            numberOfLines={4}
             style={{
-              flexShrink: 0,
-              maxWidth: "40%",
-              textAlign: "right",
-              color: hColor,
-              fontSize: typography.xs,
-              fontFamily: fontFamily.medium,
-              lineHeight: 15,
-              paddingTop: 1,
+              color: colors.textPrimary,
+              fontSize: typography.base,
+              fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
+              lineHeight: 22,
             }}
           >
-            {headline}
+            {shortenStepTitle(title, 72)}
           </Text>
+
+          <View
+            style={{
+              alignSelf: "flex-start",
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 12,
+              backgroundColor: pill.bg,
+            }}
+          >
+            <Text
+              style={{
+                color: pill.fg,
+                fontSize: 11,
+                fontFamily: fontFamily.semibold,
+                letterSpacing: 0.2,
+              }}
+            >
+              {statusLabel}
+            </Text>
+          </View>
         </View>
       </Pressable>
 
       {expanded && actionable ? (
-        <View style={{ marginTop: spacing.sm, marginLeft: bodyIndent, marginRight: spacing.xs }}>
+        <View style={{ marginTop: spacing.md, paddingLeft: 2 }}>
           <Text
             style={{
               color: colors.textTertiary,
