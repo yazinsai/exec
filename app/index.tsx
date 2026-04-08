@@ -1168,7 +1168,7 @@ export default function HomeScreen() {
               style={({ pressed }) => ({
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5,
+                gap: spacing.xs,
                 paddingHorizontal: spacing.lg,
                 paddingVertical: spacing.md,
                 borderRadius: 22,
