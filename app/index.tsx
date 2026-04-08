@@ -1094,7 +1094,7 @@ export default function HomeScreen() {
             flexDirection: "row",
             alignItems: "flex-start",
             justifyContent: "space-between",
-            paddingHorizontal: spacing.md,
+            paddingHorizontal: spacing.sm,
             paddingTop: spacing.md,
             paddingBottom: spacing.lg,
           }}
@@ -1157,8 +1157,8 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
-              paddingLeft: spacing.md,
-              paddingRight: spacing.lg,
+              paddingLeft: spacing.sm,
+              paddingRight: spacing.md,
               gap: spacing.sm,
               paddingBottom: spacing.sm,
             }}
@@ -1303,7 +1303,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingTop: spacing.sm,
-              paddingHorizontal: spacing.md,
+              paddingHorizontal: spacing.sm,
               paddingBottom: insets.bottom + 64 + 48,
               gap: spacing.lg,
             }}

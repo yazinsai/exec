@@ -144,11 +144,17 @@ export function NoteListItem({
         overflow: "hidden",
       }}
     >
-      <View style={{ paddingHorizontal: spacing.xl }}>
+      <View
+        style={{
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.lg,
+          paddingBottom: expanded ? 0 : spacing.lg,
+        }}
+      >
       <Pressable
         onPress={onToggle}
         style={({ pressed }) => ({
-          paddingVertical: spacing.lg,
+          paddingVertical: spacing.sm,
           opacity: pressed ? 0.8 : 1,
         })}
       >
@@ -251,6 +257,7 @@ export function NoteListItem({
                   }}
                 >
                   <TaskListItem
+                    density="nested"
                     title={task.title}
                     status={task.status}
                     projectLabel={task.projectLabel}
