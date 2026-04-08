@@ -217,8 +217,8 @@ function startLevelMetering(proc) {
         sumSq += sample * sample;
       }
       const rms = Math.sqrt(sumSq / (chunk.length / 2));
-      // Convert to 0-1 range with some scaling (RMS of speech is typically 0.01-0.2)
-      const level = Math.min(1, rms * 8);
+      // Convert to 0-1 range — apply log scaling for more responsive waveform
+      const level = Math.min(1, Math.max(0, (Math.log10(rms * 100 + 1) / Math.log10(101))));
 
       levelHistory.shift();
       levelHistory.push(level);
