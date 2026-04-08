@@ -119,10 +119,10 @@
 
     .waveform-bar {
       width: 3px;
-      min-height: 3px;
+      height: 3px;
       border-radius: 1.5px;
       background: rgba(255, 255, 255, 0.6);
-      transition: height 0.08s ease;
+      transition: height 0.06s ease-out;
     }
 
     .cancel-btn {
@@ -248,8 +248,17 @@
     });
 
     window.electronAPI.onAudioLevels((levels) => {
-      for (let i = 0; i < bars.length && i < levels.length; i++) {
-        const h = Math.max(3, levels[i] * 28);
+      // Mirror: arrange so loudest bands are in center, quieter at edges
+      // Reorder: [0,1,2,...,23] → [11,9,7,5,3,1, 0,2,4,6,8,10, 12,14,16,18,20,22, 23,21,19,17,15,13]
+      // Simpler: left half gets odd indices reversed, right half gets even indices
+      const half = Math.floor(levels.length / 2);
+      const mirrored = new Array(levels.length);
+      for (let i = 0; i < half; i++) {
+        mirrored[half - 1 - i] = levels[i]; // left side (mirrored)
+        mirrored[half + i] = levels[i];     // right side
+      }
+      for (let i = 0; i < bars.length && i < mirrored.length; i++) {
+        const h = Math.max(3, mirrored[i] * 30);
         bars[i].style.height = h + "px";
       }
     });

@@ -285,13 +285,13 @@ function startLevelMetering(proc) {
           count++;
         }
         const avg = count > 0 ? sum / count : 0;
-        // Log scale for perceptual loudness
-        bars[b] = Math.min(1, Math.max(0, (Math.log10(avg * 500 + 1) / Math.log10(501))));
+        // Log scale with aggressive boost for speech levels
+        bars[b] = Math.min(1, Math.max(0, (Math.log10(avg * 5000 + 1) / Math.log10(5001))));
       }
 
       // Smooth with previous frame for less jitter
       for (let i = 0; i < NUM_BARS; i++) {
-        levelHistory[i] = levelHistory[i] * 0.3 + bars[i] * 0.7;
+        levelHistory[i] = levelHistory[i] * 0.15 + bars[i] * 0.85;
       }
 
       if (overlay && overlay.isVisible()) {
