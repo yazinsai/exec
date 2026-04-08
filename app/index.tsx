@@ -44,7 +44,6 @@ import {
 import { Audio } from "expo-av";
 import { NoteListItem } from "@/components/NoteListItem";
 import { TaskListItem } from "@/components/TaskListItem";
-import { AttentionTaskRow } from "@/components/AttentionTaskRow";
 import { RecordFAB } from "@/components/RecordFAB";
 import { RecordingSheet } from "@/components/RecordingSheet";
 import { DictionarySheet } from "@/components/DictionarySheet";
@@ -79,6 +78,11 @@ type Note = InstaQLEntity<AppSchema, "notes", {
     dependencies: { dependsOn: {} };
   };
 }>;
+
+function noteHasTaskWithStatus(note: Note, status: string): boolean {
+  return ((note.tasks ?? []) as Task[]).some((t) => t.status === status);
+}
+
 type Message = InstaQLEntity<AppSchema, "messages">;
 
 function getStatusColor(status: string, colors: ThemeColors): string {
@@ -506,9 +510,10 @@ export default function HomeScreen() {
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
   const [attentionFeedOnly, setAttentionFeedOnly] = useState(false);
-  const [activeWorkFilter, setActiveWorkFilter] = useState<
-    "all" | "failed" | "blocked"
-  >("all");
+  /** Voice notes that contain ≥1 task with this status */
+  const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
+    "failed" | "blocked" | null
+  >(null);
   const [showAllProjectPills, setShowAllProjectPills] = useState(false);
   const releaseInfo = getReleaseInfo();
 
@@ -721,49 +726,30 @@ export default function HomeScreen() {
         );
         if (!hasProject) return false;
       }
+      if (noteTaskStatusFilter === "failed") {
+        if (!noteHasTaskWithStatus(note, TASK_STATUSES.failed)) return false;
+      }
+      if (noteTaskStatusFilter === "blocked") {
+        if (!noteHasTaskWithStatus(note, TASK_STATUSES.blocked)) return false;
+      }
       return true;
     });
-  }, [notes, filterUnread, filterProject]);
+  }, [notes, filterUnread, filterProject, noteTaskStatusFilter]);
 
   const isFiltering = filterUnread || !!filterProject;
 
-  /** Failed + blocked only — stalled / needs-attention inbox (not “in motion”) */
-  const stuckAttentionTasks = useMemo(() => {
-    return allTasks
-      .filter(
-        (t) =>
-          t.status === TASK_STATUSES.failed ||
-          t.status === TASK_STATUSES.blocked
-      )
-      .sort(
-        (a, b) => getTaskSortWeight(a.status) - getTaskSortWeight(b.status)
-      );
-  }, [allTasks]);
-
-  const stuckFailedCount = useMemo(
-    () => stuckAttentionTasks.filter((t) => t.status === TASK_STATUSES.failed)
-      .length,
-    [stuckAttentionTasks]
+  const attentionFailedNoteCount = useMemo(
+    () =>
+      notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.failed))
+        .length,
+    [notes]
   );
-  const stuckBlockedCount = useMemo(
-    () => stuckAttentionTasks.filter((t) => t.status === TASK_STATUSES.blocked)
-      .length,
-    [stuckAttentionTasks]
+  const attentionBlockedNoteCount = useMemo(
+    () =>
+      notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.blocked))
+        .length,
+    [notes]
   );
-
-  const filteredStuckTasks = useMemo(() => {
-    if (activeWorkFilter === "failed") {
-      return stuckAttentionTasks.filter(
-        (t) => t.status === TASK_STATUSES.failed
-      );
-    }
-    if (activeWorkFilter === "blocked") {
-      return stuckAttentionTasks.filter(
-        (t) => t.status === TASK_STATUSES.blocked
-      );
-    }
-    return stuckAttentionTasks;
-  }, [stuckAttentionTasks, activeWorkFilter]);
 
   const { activeNotes, historyNotes } = useMemo(() => {
     return {
@@ -779,13 +765,19 @@ export default function HomeScreen() {
   const historyRemaining = Math.max(0, historyNotes.length - visibleHistory.length);
 
   useEffect(() => {
-    if (activeWorkFilter === "failed" && stuckFailedCount === 0) {
-      setActiveWorkFilter("all");
+    if (
+      noteTaskStatusFilter === "failed" &&
+      attentionFailedNoteCount === 0
+    ) {
+      setNoteTaskStatusFilter(null);
     }
-    if (activeWorkFilter === "blocked" && stuckBlockedCount === 0) {
-      setActiveWorkFilter("all");
+    if (
+      noteTaskStatusFilter === "blocked" &&
+      attentionBlockedNoteCount === 0
+    ) {
+      setNoteTaskStatusFilter(null);
     }
-  }, [activeWorkFilter, stuckFailedCount, stuckBlockedCount]);
+  }, [noteTaskStatusFilter, attentionFailedNoteCount, attentionBlockedNoteCount]);
 
   // Flat task list for filtered view
   const filteredTasks = useMemo(() => {
@@ -1343,39 +1335,55 @@ export default function HomeScreen() {
               contentContainerStyle={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: spacing.sm,
+                gap: 10,
                 paddingRight: spacing.md,
+                paddingVertical: 2,
               }}
             >
               <Pressable
-                onPress={() => setFilterUnread((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: filterUnread }}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(255,255,255,0.12)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                onPress={() => {
+                  setFilterUnread((v) => !v);
+                  void Haptics.selectionAsync();
+                }}
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: 8,
-                  borderRadius: 20,
+                  minHeight: 44,
+                  justifyContent: "center",
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 22,
                   backgroundColor: filterUnread
                     ? colors.primaryLight
-                    : colors.backgroundPressed,
-                  borderWidth: filterUnread ? 2 : 1,
+                    : colors.backgroundElevated,
+                  borderWidth: filterUnread ? 2.5 : 1.5,
                   borderColor: filterUnread
                     ? colors.primaryDark
-                    : colors.border,
+                    : colors.borderLight,
                   ...(filterUnread ? shadows.gold : {}),
-                  opacity: pressed ? 0.82 : 1,
+                  opacity:
+                    pressed && Platform.OS !== "android" ? 0.88 : 1,
+                  transform: pressed ? [{ scale: 0.98 }] : [],
                 })}
               >
                 <View
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 6,
+                    gap: 8,
                   }}
                 >
                   <View
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
                       flexShrink: 0,
                       backgroundColor: filterUnread
                         ? colors.black
@@ -1384,7 +1392,7 @@ export default function HomeScreen() {
                   />
                   <Text
                     style={{
-                      fontSize: typography.xs,
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color: filterUnread ? colors.black : colors.textPrimary,
                     }}
@@ -1394,136 +1402,216 @@ export default function HomeScreen() {
                 </View>
               </Pressable>
 
-              {stuckAttentionTasks.length > 0 ? (
-                <>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: activeWorkFilter === "all",
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: noteTaskStatusFilter === "failed",
+                }}
+                accessibilityHint="Show voice notes that include a failed task"
+                disabled={attentionFailedNoteCount === 0}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(255,255,255,0.15)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                onPress={() => {
+                  setNoteTaskStatusFilter((prev) =>
+                    prev === "failed" ? null : "failed"
+                  );
+                  void Haptics.selectionAsync();
+                }}
+                style={({ pressed }) => ({
+                  minHeight: 44,
+                  justifyContent: "center",
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 22,
+                  backgroundColor:
+                    noteTaskStatusFilter === "failed"
+                      ? colors.statusFailed
+                      : colors.backgroundElevated,
+                  borderWidth: noteTaskStatusFilter === "failed" ? 2.5 : 1.5,
+                  borderColor:
+                    noteTaskStatusFilter === "failed"
+                      ? colors.errorLight
+                      : colors.borderLight,
+                  ...(noteTaskStatusFilter === "failed" ? shadows.sm : {}),
+                  opacity:
+                    attentionFailedNoteCount === 0
+                      ? 0.42
+                      : pressed && Platform.OS !== "android"
+                        ? 0.9
+                        : 1,
+                  transform:
+                    attentionFailedNoteCount > 0 && pressed
+                      ? [{ scale: 0.98 }]
+                      : [],
+                })}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      color:
+                        noteTaskStatusFilter === "failed"
+                          ? "#fff"
+                          : colors.statusFailed,
                     }}
-                    onPress={() => setActiveWorkFilter("all")}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: spacing.md,
-                      paddingVertical: 8,
-                      borderRadius: 18,
+                  >
+                    Failed
+                  </Text>
+                  <View
+                    style={{
+                      minWidth: 28,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
                       backgroundColor:
-                        activeWorkFilter === "all"
-                          ? colors.primaryLight
+                        noteTaskStatusFilter === "failed"
+                          ? "rgba(0,0,0,0.22)"
                           : colors.backgroundPressed,
-                      borderWidth: activeWorkFilter === "all" ? 2 : 1,
-                      borderColor:
-                        activeWorkFilter === "all"
-                          ? colors.primaryDark
-                          : colors.border,
-                      ...(activeWorkFilter === "all" ? shadows.gold : {}),
-                      opacity: pressed ? 0.82 : 1,
-                    })}
+                      borderWidth: noteTaskStatusFilter === "failed" ? 0 : 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                    }}
                   >
                     <Text
                       style={{
                         fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
+                        fontFamily: fontFamily.bold,
+                        fontVariant: ["tabular-nums"],
                         color:
-                          activeWorkFilter === "all"
+                          noteTaskStatusFilter === "failed"
+                            ? "#fff"
+                            : colors.textPrimary,
+                      }}
+                    >
+                      {attentionFailedNoteCount}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: noteTaskStatusFilter === "blocked",
+                }}
+                accessibilityHint="Show voice notes that include a blocked task"
+                disabled={attentionBlockedNoteCount === 0}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(0,0,0,0.08)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                onPress={() => {
+                  setNoteTaskStatusFilter((prev) =>
+                    prev === "blocked" ? null : "blocked"
+                  );
+                  void Haptics.selectionAsync();
+                }}
+                style={({ pressed }) => ({
+                  minHeight: 44,
+                  justifyContent: "center",
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 22,
+                  backgroundColor:
+                    noteTaskStatusFilter === "blocked"
+                      ? colors.warning
+                      : colors.backgroundElevated,
+                  borderWidth: noteTaskStatusFilter === "blocked" ? 2.5 : 1.5,
+                  borderColor:
+                    noteTaskStatusFilter === "blocked"
+                      ? colors.black
+                      : colors.borderLight,
+                  ...(noteTaskStatusFilter === "blocked" ? shadows.sm : {}),
+                  opacity:
+                    attentionBlockedNoteCount === 0
+                      ? 0.42
+                      : pressed && Platform.OS !== "android"
+                        ? 0.9
+                        : 1,
+                  transform:
+                    attentionBlockedNoteCount > 0 && pressed
+                      ? [{ scale: 0.98 }]
+                      : [],
+                })}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      color:
+                        noteTaskStatusFilter === "blocked"
+                          ? colors.black
+                          : colors.warning,
+                    }}
+                  >
+                    Blocked
+                  </Text>
+                  <View
+                    style={{
+                      minWidth: 28,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                      backgroundColor:
+                        noteTaskStatusFilter === "blocked"
+                          ? "rgba(0,0,0,0.12)"
+                          : colors.backgroundPressed,
+                      borderWidth: noteTaskStatusFilter === "blocked" ? 0 : 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.bold,
+                        fontVariant: ["tabular-nums"],
+                        color:
+                          noteTaskStatusFilter === "blocked"
                             ? colors.black
                             : colors.textPrimary,
                       }}
                     >
-                      All ({stuckAttentionTasks.length})
+                      {attentionBlockedNoteCount}
                     </Text>
-                  </Pressable>
-                  {stuckFailedCount > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: activeWorkFilter === "failed",
-                      }}
-                      onPress={() => setActiveWorkFilter("failed")}
-                      style={({ pressed }) => ({
-                        paddingHorizontal: spacing.md,
-                        paddingVertical: 8,
-                        borderRadius: 18,
-                        backgroundColor:
-                          activeWorkFilter === "failed"
-                            ? colors.statusFailed
-                            : colors.backgroundPressed,
-                        borderWidth:
-                          activeWorkFilter === "failed" ? 2 : 1,
-                        borderColor:
-                          activeWorkFilter === "failed"
-                            ? colors.errorLight
-                            : colors.border,
-                        ...(activeWorkFilter === "failed"
-                          ? shadows.sm
-                          : {}),
-                        opacity: pressed ? 0.82 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: typography.xs,
-                          fontFamily: fontFamily.semibold,
-                          color:
-                            activeWorkFilter === "failed"
-                              ? "#fff"
-                              : colors.textPrimary,
-                        }}
-                      >
-                        Failed ({stuckFailedCount})
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {stuckBlockedCount > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: activeWorkFilter === "blocked",
-                      }}
-                      onPress={() => setActiveWorkFilter("blocked")}
-                      style={({ pressed }) => ({
-                        paddingHorizontal: spacing.md,
-                        paddingVertical: 8,
-                        borderRadius: 18,
-                        backgroundColor:
-                          activeWorkFilter === "blocked"
-                            ? colors.warning
-                            : colors.backgroundPressed,
-                        borderWidth:
-                          activeWorkFilter === "blocked" ? 2 : 1,
-                        borderColor:
-                          activeWorkFilter === "blocked"
-                            ? colors.black
-                            : colors.border,
-                        ...(activeWorkFilter === "blocked"
-                          ? shadows.sm
-                          : {}),
-                        opacity: pressed ? 0.82 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: typography.xs,
-                          fontFamily: fontFamily.semibold,
-                          color:
-                            activeWorkFilter === "blocked"
-                              ? colors.black
-                              : colors.textPrimary,
-                        }}
-                      >
-                        Blocked ({stuckBlockedCount})
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </>
-              ) : null}
+                  </View>
+                </View>
+              </Pressable>
 
               <Pressable
                 accessibilityRole="button"
+                accessibilityState={{ selected: attentionFeedOnly }}
                 accessibilityLabel={
                   attentionFeedOnly
                     ? "Show full feed including settled notes"
                     : "Focus on active notes only"
                 }
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(255,255,255,0.1)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                 onPress={() => {
                   setAttentionFeedOnly((v) => !v);
                   void Haptics.impactAsync(
@@ -1531,22 +1619,25 @@ export default function HomeScreen() {
                   );
                 }}
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: 8,
-                  borderRadius: 18,
+                  minHeight: 44,
+                  justifyContent: "center",
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 22,
                   backgroundColor: attentionFeedOnly
                     ? colors.primaryAlpha30
-                    : colors.backgroundPressed,
-                  borderWidth: 1,
+                    : colors.backgroundElevated,
+                  borderWidth: attentionFeedOnly ? 2 : 1.5,
                   borderColor: attentionFeedOnly
-                    ? colors.primaryAlpha30
-                    : colors.border,
-                  opacity: pressed ? 0.82 : 1,
+                    ? colors.primary
+                    : colors.borderLight,
+                  opacity: pressed && Platform.OS !== "android" ? 0.88 : 1,
+                  transform: pressed ? [{ scale: 0.98 }] : [],
                 })}
               >
                 <Text
                   style={{
-                    fontSize: typography.xs,
+                    fontSize: typography.sm,
                     fontFamily: fontFamily.semibold,
                     color: attentionFeedOnly
                       ? colors.primaryLight
@@ -1563,7 +1654,7 @@ export default function HomeScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
-                minHeight: 40,
+                minHeight: 48,
               }}
             >
               <ScrollView
@@ -1575,64 +1666,87 @@ export default function HomeScreen() {
                 contentContainerStyle={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 8,
+                  gap: 10,
                   paddingRight: spacing.sm,
+                  paddingVertical: 2,
                 }}
               >
-                {visibleProjectSlugs.map((slug) => (
-                  <Pressable
-                    key={slug}
-                    onPress={() =>
-                      setFilterProject((v) => (v === slug ? null : slug))
-                    }
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor:
-                        filterProject === slug
-                          ? colors.primaryLight
-                          : colors.backgroundPressed,
-                      borderWidth: filterProject === slug ? 2 : 1,
-                      borderColor:
-                        filterProject === slug
-                          ? colors.primaryDark
-                          : colors.border,
-                      ...(filterProject === slug ? shadows.gold : {}),
-                      opacity: pressed ? 0.82 : 1,
-                    })}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
-                        color:
-                          filterProject === slug
-                            ? colors.black
-                            : colors.textPrimary,
+                {visibleProjectSlugs.map((slug) => {
+                  const selected = filterProject === slug;
+                  return (
+                    <Pressable
+                      key={slug}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      android_ripple={
+                        Platform.OS === "android"
+                          ? { color: "rgba(255,255,255,0.1)" }
+                          : undefined
+                      }
+                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                      onPress={() => {
+                        setFilterProject((v) => (v === slug ? null : slug));
+                        void Haptics.selectionAsync();
                       }}
+                      style={({ pressed }) => ({
+                        minHeight: 44,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        paddingHorizontal: selected ? 14 : 16,
+                        paddingVertical: 10,
+                        borderRadius: 22,
+                        backgroundColor: selected
+                          ? colors.primaryLight
+                          : colors.backgroundElevated,
+                        borderWidth: selected ? 2.5 : 1.5,
+                        borderColor: selected
+                          ? colors.primaryDark
+                          : colors.borderLight,
+                        ...(selected ? shadows.gold : {}),
+                        opacity:
+                          pressed && Platform.OS !== "android" ? 0.9 : 1,
+                        transform: pressed ? [{ scale: 0.98 }] : [],
+                      })}
                     >
-                      {slug}
-                    </Text>
-                  </Pressable>
-                ))}
+                      {selected ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={18}
+                          color={colors.black}
+                        />
+                      ) : null}
+                      <Text
+                        style={{
+                          fontSize: typography.sm,
+                          fontFamily: fontFamily.semibold,
+                          color: selected ? colors.black : colors.textPrimary,
+                        }}
+                      >
+                        {slug}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
                 {!showAllProjectPills && projectPillsOverflow > 0 ? (
                   <Pressable
                     onPress={() => setShowAllProjectPills(true)}
                     style={({ pressed }) => ({
+                      minHeight: 44,
+                      justifyContent: "center",
                       paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      borderWidth: 1,
+                      paddingVertical: 10,
+                      borderRadius: 22,
+                      borderWidth: 1.5,
                       borderColor: colors.border,
                       backgroundColor: colors.backgroundSubtle,
-                      opacity: pressed ? 0.8 : 1,
+                      opacity: pressed ? 0.85 : 1,
                     })}
                   >
                     <Text
                       style={{
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.medium,
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.semibold,
                         color: colors.textTertiary,
                       }}
                     >
@@ -1644,14 +1758,15 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => setShowAllProjectPills(false)}
                     style={({ pressed }) => ({
+                      minHeight: 44,
+                      justifyContent: "center",
                       paddingHorizontal: 12,
-                      paddingVertical: 8,
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
                     <Text
                       style={{
-                        fontSize: typography.xs,
+                        fontSize: typography.sm,
                         fontFamily: fontFamily.medium,
                         color: colors.textTertiary,
                       }}
@@ -1661,18 +1776,19 @@ export default function HomeScreen() {
                   </Pressable>
                 ) : null}
               </ScrollView>
-              {(filterUnread || filterProject) ? (
+              {filterUnread || filterProject || noteTaskStatusFilter ? (
                 <Pressable
                   onPress={() => {
                     setFilterUnread(false);
                     setFilterProject(null);
+                    setNoteTaskStatusFilter(null);
                   }}
-                  hitSlop={8}
+                  hitSlop={10}
                   style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                 >
                   <Text
                     style={{
-                      fontSize: typography.xs,
+                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color: colors.primary,
                     }}
@@ -1779,43 +1895,26 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                {stuckAttentionTasks.length > 0 ? (
-                  <View style={{ gap: spacing.sm }}>
-                    {filteredStuckTasks.length === 0 ? (
-                      <Text
-                        style={{
-                          color: colors.textTertiary,
-                          fontSize: typography.sm,
-                          fontFamily: fontFamily.regular,
-                        }}
-                      >
-                        Nothing in this filter.
-                      </Text>
-                    ) : (
-                      filteredStuckTasks.map((task) => (
-                        <AttentionTaskRow
-                          key={task.id}
-                          title={task.summary || task.input}
-                          status={task.status}
-                          projectLabel={
-                            (task as any).project?.slug ||
-                            (task as any).projectSlug ||
-                            null
-                          }
-                          blockedReason={(task as any).blockedReason}
-                          errorMessage={(task as any).errorMessage}
-                          onPress={() => {
-                            setSelectedTaskId(task.id);
-                            setFollowUpText("");
-                            setShowJumpToEnd(false);
-                            setShowJumpToTop(false);
-                            db.transact(
-                              db.tx.tasks[task.id].update({ read: true })
-                            );
-                          }}
-                        />
-                      ))
-                    )}
+                {notes.length > 0 &&
+                filteredNotes.length === 0 &&
+                !isFiltering ? (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      paddingVertical: spacing.xl,
+                      paddingHorizontal: spacing.lg,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.regular,
+                        textAlign: "center",
+                      }}
+                    >
+                      No voice notes match these filters.
+                    </Text>
                   </View>
                 ) : null}
 
