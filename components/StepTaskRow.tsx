@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, spacing, typography } from "@/constants/Colors";
@@ -34,12 +33,14 @@ export interface StepTaskRowProps {
   stepIndex: number;
   totalSteps: number;
   projectLabel?: string | null;
-  /** Hide slug when every step in the note shares the same project */
   showProject?: boolean;
   blockedReason?: string | null;
   errorMessage?: string | null;
   resultSnippet?: string | null;
   read?: boolean;
+  /** Failed/blocked row expanded — reason + actions visible */
+  expanded: boolean;
+  onToggleExpand: () => void;
   onPress: () => void;
   onRetry?: () => void;
   onAskExec?: () => void;
@@ -56,24 +57,26 @@ export function StepTaskRow({
   errorMessage,
   resultSnippet,
   read = true,
+  expanded,
+  onToggleExpand,
   onPress,
   onRetry,
   onAskExec,
 }: StepTaskRowProps) {
   const colors = useColors();
-  const [whyOpen, setWhyOpen] = useState(false);
   const isUnread = read === false;
   const headline = getStepProgressHeadline(status, blockedReason, errorMessage);
   const hColor = headlineColor(status, colors);
   const isFailed = status === TASK_STATUSES.failed;
   const isBlocked = status === TASK_STATUSES.blocked;
+  const actionable = isFailed || isBlocked;
+
   const explainFailed = (errorMessage || "").trim() || (resultSnippet || "").trim();
   const explainBlocked = describeBlockedSituation(blockedReason, errorMessage);
-  const explain =
+  const reasonLabel = isFailed ? "Why failed" : isBlocked ? "Why blocked" : "Details";
+  const reasonBody =
     isFailed && explainFailed
-      ? explainFailed.length > 220
-        ? `${explainFailed.slice(0, 220)}…`
-        : explainFailed
+      ? explainFailed
       : isBlocked
         ? explainBlocked
         : "";
@@ -81,14 +84,22 @@ export function StepTaskRow({
   const bodyIndent =
     28 + spacing.sm + (isUnread ? 6 + spacing.xs : 0);
 
+  const handleMainPress = () => {
+    if (actionable) {
+      onToggleExpand();
+    } else {
+      onPress();
+    }
+  };
+
   return (
     <View
       style={{
-        paddingVertical: spacing.md,
+        paddingVertical: expanded && actionable ? spacing.md : spacing.sm,
       }}
     >
       <Pressable
-        onPress={onPress}
+        onPress={handleMainPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
       >
         <View
@@ -101,7 +112,7 @@ export function StepTaskRow({
           <View
             style={{
               minWidth: 28,
-              paddingTop: 2,
+              paddingTop: 1,
             }}
           >
             <Text
@@ -122,7 +133,7 @@ export function StepTaskRow({
                 height: 6,
                 borderRadius: 3,
                 backgroundColor: colors.primary,
-                marginTop: 7,
+                marginTop: 6,
                 flexShrink: 0,
               }}
             />
@@ -135,37 +146,24 @@ export function StepTaskRow({
                 color: colors.textPrimary,
                 fontSize: typography.sm,
                 fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
-                lineHeight: 20,
+                lineHeight: 19,
               }}
             >
               {title}
             </Text>
-            {showProject && projectLabel ? (
-              <Text
-                numberOfLines={1}
-                style={{
-                  color: colors.textTertiary,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.regular,
-                  marginTop: 3,
-                }}
-              >
-                {projectLabel}
-              </Text>
-            ) : null}
           </View>
 
           <Text
-            numberOfLines={3}
+            numberOfLines={2}
             style={{
               flexShrink: 0,
-              maxWidth: "42%",
+              maxWidth: "40%",
               textAlign: "right",
               color: hColor,
               fontSize: typography.xs,
               fontFamily: fontFamily.medium,
-              lineHeight: 16,
-              paddingTop: 2,
+              lineHeight: 15,
+              paddingTop: 1,
             }}
           >
             {headline}
@@ -173,79 +171,75 @@ export function StepTaskRow({
         </View>
       </Pressable>
 
-      {(isFailed || isBlocked) && explain ? (
-        <Pressable
-          onPress={() => setWhyOpen((v) => !v)}
-          style={({ pressed }) => ({
-            marginTop: spacing.sm,
-            marginLeft: bodyIndent,
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
+      {expanded && actionable ? (
+        <View style={{ marginTop: spacing.sm, marginLeft: bodyIndent, marginRight: spacing.xs }}>
           <Text
             style={{
-              color: colors.primary,
-              fontSize: typography.xs,
-              fontFamily: fontFamily.medium,
+              color: colors.textTertiary,
+              fontSize: 10,
+              fontFamily: fontFamily.semibold,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              marginBottom: 4,
             }}
           >
-            {whyOpen ? "Hide why" : "Why?"}
+            {reasonLabel}
           </Text>
-        </Pressable>
-      ) : null}
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.xs,
+              fontFamily: fontFamily.regular,
+              lineHeight: 18,
+            }}
+          >
+            {reasonBody
+              ? reasonBody.length > 500
+                ? `${reasonBody.slice(0, 500)}…`
+                : reasonBody
+              : isFailed
+                ? "No error details on file yet — open the thread for logs."
+                : isBlocked
+                  ? "Open the thread for full context."
+                  : ""}
+          </Text>
 
-      {whyOpen && explain ? (
-        <Text
-          style={{
-            marginTop: spacing.xs,
-            marginLeft: bodyIndent,
-            marginRight: spacing.xs,
-            color: colors.textSecondary,
-            fontSize: typography.xs,
-            fontFamily: fontFamily.regular,
-            lineHeight: 18,
-          }}
-        >
-          {explain}
-        </Text>
-      ) : null}
-
-      {isFailed ? (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: spacing.md,
-            marginTop: spacing.sm,
-            marginLeft: bodyIndent,
-          }}
-        >
-          {onRetry ? (
-            <Pressable onPress={onRetry} hitSlop={6}>
-              <Text
-                style={{
-                  color: colors.primary,
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.semibold,
-                }}
-              >
-                Retry
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={onPress} hitSlop={6}>
+          {showProject && projectLabel ? (
             <Text
+              numberOfLines={1}
               style={{
-                color: colors.textSecondary,
+                marginTop: spacing.sm,
+                color: colors.textTertiary,
                 fontSize: typography.xs,
-                fontFamily: fontFamily.medium,
+                fontFamily: fontFamily.regular,
               }}
             >
-              Details
+              {projectLabel}
             </Text>
-          </Pressable>
-          {onAskExec ? (
-            <Pressable onPress={onAskExec} hitSlop={6}>
+          ) : null}
+
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: spacing.md,
+              marginTop: spacing.md,
+            }}
+          >
+            {isFailed && onRetry ? (
+              <Pressable onPress={onRetry} hitSlop={6}>
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.semibold,
+                  }}
+                >
+                  Retry
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onPress} hitSlop={6}>
               <Text
                 style={{
                   color: colors.textSecondary,
@@ -253,10 +247,23 @@ export function StepTaskRow({
                   fontFamily: fontFamily.medium,
                 }}
               >
-                Ask Exec
+                Open thread
               </Text>
             </Pressable>
-          ) : null}
+            {onAskExec ? (
+              <Pressable onPress={onAskExec} hitSlop={6}>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.medium,
+                  }}
+                >
+                  Ask Exec
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       ) : null}
     </View>

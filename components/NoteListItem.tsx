@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
@@ -162,6 +162,11 @@ export function NoteListItem({
     .filter(Boolean);
   const showProjectPerRow =
     orderedTasks.length === 1 || new Set(projectSlugs).size > 1;
+
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!expanded) setExpandedStepId(null);
+  }, [expanded]);
 
   return (
     <View
@@ -381,6 +386,12 @@ export function NoteListItem({
                     errorMessage={task.errorMessage}
                     resultSnippet={task.resultSnippet}
                     read={task.read}
+                    expanded={expandedStepId === task.id}
+                    onToggleExpand={() =>
+                      setExpandedStepId((id) =>
+                        id === task.id ? null : task.id
+                      )
+                    }
                     onPress={() => onOpenTask(task.id)}
                     onRetry={
                       task.status === TASK_STATUSES.failed && onRetryTask

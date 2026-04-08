@@ -728,6 +728,21 @@ export default function HomeScreen() {
       );
   }, [allTasks]);
 
+  const issueAttentionTasks = useMemo(
+    () =>
+      attentionTaskList.filter(
+        (t) =>
+          t.status === TASK_STATUSES.failed ||
+          t.status === TASK_STATUSES.blocked
+      ),
+    [attentionTaskList]
+  );
+  const runningAttentionTasks = useMemo(
+    () =>
+      attentionTaskList.filter((t) => t.status === TASK_STATUSES.running),
+    [attentionTaskList]
+  );
+
   const { activeNotes, historyNotes } = useMemo(() => {
     return {
       activeNotes: filteredNotes.filter((n) => !noteIsSettledForHistory(n)),
@@ -1500,22 +1515,16 @@ export default function HomeScreen() {
             ) : (
               <>
                 {attentionTotal > 0 ? (
-                  <Pressable
-                    onPress={() => {
-                      setAttentionFeedOnly((v) => !v);
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={({ pressed }) => ({
+                  <View
+                    style={{
                       paddingVertical: spacing.md,
                       paddingHorizontal: spacing.md,
                       borderRadius: radii.md,
-                      backgroundColor: attentionFeedOnly
-                        ? colors.primaryAlpha20
-                        : colors.backgroundElevated,
+                      backgroundColor: colors.backgroundElevated,
                       borderWidth: 1,
-                      borderColor: attentionFeedOnly ? colors.primary : colors.border,
-                      opacity: pressed ? 0.9 : 1,
-                    })}
+                      borderColor: colors.border,
+                      gap: spacing.sm,
+                    }}
                   >
                     <Text
                       style={{
@@ -1528,45 +1537,133 @@ export default function HomeScreen() {
                     >
                       Now
                     </Text>
-                    <Text
-                      style={{
-                        marginTop: 6,
-                        color: colors.textPrimary,
-                        fontSize: typography.sm,
-                        fontFamily: fontFamily.medium,
+
+                    {issueAttentionTasks.length > 0 ? (
+                      <>
+                        <Text
+                          style={{
+                            color: colors.textPrimary,
+                            fontSize: typography.sm,
+                            fontFamily: fontFamily.semibold,
+                            lineHeight: 20,
+                          }}
+                        >
+                          {issueAttentionTasks.length}{" "}
+                          {issueAttentionTasks.length === 1
+                            ? "issue needs your attention"
+                            : "issues need your attention"}
+                        </Text>
+                        {issueAttentionTasks.slice(0, 2).map((t) => (
+                          <Text
+                            key={t.id}
+                            numberOfLines={1}
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: typography.xs,
+                              fontFamily: fontFamily.regular,
+                              lineHeight: 17,
+                            }}
+                          >
+                            • {t.summary || t.input}
+                          </Text>
+                        ))}
+                        <Pressable
+                          onPress={() => {
+                            const t = issueAttentionTasks[0];
+                            setSelectedTaskId(t.id);
+                            setFollowUpText("");
+                            setShowJumpToEnd(false);
+                            setShowJumpToTop(false);
+                            db.transact(db.tx.tasks[t.id].update({ read: true }));
+                            void Haptics.impactAsync(
+                              Haptics.ImpactFeedbackStyle.Light
+                            );
+                          }}
+                          style={({ pressed }) => ({
+                            alignSelf: "flex-start",
+                            marginTop: 2,
+                            paddingVertical: spacing.sm,
+                            paddingHorizontal: spacing.md,
+                            borderRadius: radii.md,
+                            backgroundColor: colors.primaryAlpha20,
+                            opacity: pressed ? 0.85 : 1,
+                          })}
+                        >
+                          <Text
+                            style={{
+                              color: colors.primary,
+                              fontSize: typography.xs,
+                              fontFamily: fontFamily.semibold,
+                            }}
+                          >
+                            Review issues
+                          </Text>
+                        </Pressable>
+                        {issueAttentionTasks.length > 2 ? (
+                          <Text
+                            style={{
+                              color: colors.textTertiary,
+                              fontSize: typography.xs,
+                              fontFamily: fontFamily.regular,
+                            }}
+                          >
+                            {issueAttentionTasks.length - 2} other issues in the
+                            list below
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : null}
+
+                    {runningAttentionTasks.length > 0 ? (
+                      <Text
+                        numberOfLines={2}
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: typography.xs,
+                          fontFamily: fontFamily.regular,
+                          lineHeight: 17,
+                          marginTop: issueAttentionTasks.length > 0 ? spacing.xs : 0,
+                        }}
+                      >
+                        {runningAttentionTasks.length}{" "}
+                        {runningAttentionTasks.length === 1 ? "task" : "tasks"}{" "}
+                        running
+                        {runningAttentionTasks[0]
+                          ? ` · ${(runningAttentionTasks[0].summary || runningAttentionTasks[0].input).slice(0, 72)}${(runningAttentionTasks[0].summary || runningAttentionTasks[0].input).length > 72 ? "…" : ""}`
+                          : ""}
+                      </Text>
+                    ) : null}
+
+                    <Pressable
+                      onPress={() => {
+                        setAttentionFeedOnly((v) => !v);
+                        void Haptics.impactAsync(
+                          Haptics.ImpactFeedbackStyle.Light
+                        );
                       }}
+                      style={({ pressed }) => ({
+                        marginTop: spacing.xs,
+                        paddingVertical: spacing.xs,
+                        opacity: pressed ? 0.65 : 1,
+                      })}
                     >
-                      {[
-                        attentionCounts.running > 0
-                          ? `${attentionCounts.running} running`
-                          : null,
-                        attentionCounts.blocked > 0
-                          ? `${attentionCounts.blocked} blocked`
-                          : null,
-                        attentionCounts.failed > 0
-                          ? `${attentionCounts.failed} failed`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                    <Text
-                      style={{
-                        marginTop: 4,
-                        color: colors.textTertiary,
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.regular,
-                      }}
-                    >
-                      {attentionFeedOnly
-                        ? "Tap to show full feed"
-                        : "Tap to hide settled history"}
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={{
+                          color: colors.textTertiary,
+                          fontSize: typography.xs,
+                          fontFamily: fontFamily.medium,
+                        }}
+                      >
+                        {attentionFeedOnly
+                          ? "Show full feed"
+                          : "Hide settled history"}
+                      </Text>
+                    </Pressable>
+                  </View>
                 ) : null}
 
                 {attentionTaskList.length > 0 ? (
-                  <View style={{ gap: spacing.sm }}>
+                  <View style={{ gap: spacing.xs }}>
                     <Text
                       style={{
                         color: colors.textTertiary,
