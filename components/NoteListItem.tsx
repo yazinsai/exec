@@ -417,12 +417,6 @@ export function NoteListItem({
                         ? () => onRetryTask(task.id)
                         : undefined
                     }
-                    onAskExec={
-                      task.status === TASK_STATUSES.failed ||
-                      task.status === TASK_STATUSES.blocked
-                        ? () => onOpenTask(task.id)
-                        : undefined
-                    }
                   />
                 </View>
               ))}

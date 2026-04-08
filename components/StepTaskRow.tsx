@@ -48,7 +48,6 @@ export interface StepTaskRowProps {
   onToggleExpand: () => void;
   onPress: () => void;
   onRetry?: () => void;
-  onAskExec?: () => void;
 }
 
 export function StepTaskRow({
@@ -66,7 +65,6 @@ export function StepTaskRow({
   onToggleExpand,
   onPress,
   onRetry,
-  onAskExec,
 }: StepTaskRowProps) {
   const colors = useColors();
   const isUnread = read === false;
@@ -273,19 +271,6 @@ export function StepTaskRow({
                 Open thread
               </Text>
             </Pressable>
-            {onAskExec ? (
-              <Pressable onPress={onAskExec} hitSlop={6}>
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.medium,
-                  }}
-                >
-                  Ask Exec
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
         </View>
       ) : null}
