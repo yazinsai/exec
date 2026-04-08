@@ -1,7 +1,5 @@
 import React, { Component, type ReactNode } from "react";
 import { View, Text, ScrollView, Pressable, Platform } from "react-native";
-import { db } from "@/lib/db";
-import { id } from "@instantdb/react-native";
 
 interface Props {
   children: ReactNode;
@@ -22,37 +20,13 @@ export class CrashReporter extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ error, errorInfo });
 
-    // Report to InstantDB so we can read it remotely
-    const taskId = id();
-    const msgId = id();
-    const crashReport = [
-      `CRASH REPORT (${Platform.OS})`,
-      `Error: ${error.message}`,
-      `Stack: ${error.stack?.slice(0, 2000)}`,
-      `Component Stack: ${errorInfo.componentStack?.slice(0, 1000)}`,
-    ].join("\n\n");
-
-    db.transact([
-      db.tx.tasks[taskId].update({
-        input: `[CRASH] ${error.message.slice(0, 100)}`,
-        status: "failed",
-        result: crashReport,
-        source: Platform.OS === "web" ? "mac" : "phone",
-        errorMessage: error.message,
-        read: false,
-        createdAt: Date.now(),
-        completedAt: Date.now(),
-      }),
-      db.tx.messages[msgId]
-        .update({
-          role: "assistant",
-          content: crashReport,
-          createdAt: Date.now(),
-        })
-        .link({ task: taskId }),
-    ]).catch(() => {
-      // If DB write fails, at least we have the fallback UI
-    });
+    // Log crash details to console only — writing to DB creates noise
+    // (migration converts orphaned tasks into notes, flooding the list)
+    console.error(
+      `[CRASH] ${Platform.OS}: ${error.message}`,
+      error.stack?.slice(0, 2000),
+      errorInfo.componentStack?.slice(0, 1000)
+    );
   }
 
   render() {
