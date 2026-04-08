@@ -751,10 +751,8 @@ export default function HomeScreen() {
   );
   const unreadNoteCount = useMemo(
     () =>
-      notes.filter((n) =>
-        (n.tasks ?? []).some((t) => (t as any).read === false)
-      ).length,
-    [notes]
+      allTasks.filter((t) => (t as any).read === false).length,
+    [allTasks]
   );
 
   /** WhatsApp-style pills. Selected uses visible ring — RN can drop fill when borderWidth is 0. */
