@@ -23,6 +23,7 @@
     "@react-native-community/netinfo": "11.4.1",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "@types/markdown-it": "^14.1.2",
     "expo": "~54.0.8",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.13",

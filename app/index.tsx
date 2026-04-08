@@ -21,6 +21,7 @@ import {
 } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Markdown from "react-native-markdown-display";
+import MarkdownIt from "markdown-it";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import * as Updates from "expo-updates";
@@ -65,6 +66,8 @@ import {
 import type { InstaQLEntity } from "@instantdb/react-native";
 import type { AppSchema } from "@/instant.schema";
 import type { ThemeColors } from "@/constants/Colors";
+
+const markdownItInstance = MarkdownIt({ typographer: true, linkify: true });
 
 type Task = InstaQLEntity<AppSchema, "tasks", {
   messages: {};
@@ -1267,6 +1270,7 @@ export default function HomeScreen() {
     },
     link: {
       color: colors.primary,
+      textDecorationLine: "underline" as const,
     },
     blockquote: {
       backgroundColor: colors.backgroundPressed,
@@ -2365,7 +2369,7 @@ export default function HomeScreen() {
                             </Pressable>
                           </View>
                         </View>
-                        <Markdown style={mdStyles}>
+                        <Markdown style={mdStyles} markdownit={markdownItInstance}>
                           {selectedTask.result}
                         </Markdown>
                       </View>
@@ -2417,6 +2421,7 @@ export default function HomeScreen() {
                                 },
                                 strong: { fontFamily: fontFamily.bold },
                               }}
+                              markdownit={markdownItInstance}
                             >
                               {msg.content}
                             </Markdown>
