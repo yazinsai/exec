@@ -487,7 +487,8 @@ async function handleTask(taskId: string) {
     queryOptions.resume = resumeSessionId;
   }
 
-  const q = query({ prompt, options: queryOptions as any });
+  let activePrompt = prompt;
+  let q = query({ prompt: activePrompt, options: queryOptions as any });
   let sessionId: string | undefined = resumeSessionId;
   let lastLiveOutputTime = 0;
   const activityItems: {
@@ -519,7 +520,7 @@ async function handleTask(taskId: string) {
     );
   }
 
-  try {
+  async function runQuery() {
     for await (const message of q) {
       if (abortController.signal.aborted) break;
 
@@ -566,6 +567,14 @@ async function handleTask(taskId: string) {
         const resultText = success ? resultMessage.result || "" : "";
         const errors = success ? [] : resultMessage.errors || [];
 
+        // If the error is about oversized images, throw so the catch block
+        // can attempt compaction / fallback instead of marking the task failed.
+        if (!success && errors.some((e: string) =>
+          /image.*exceeds.*dimension|dimension.*limit|exceeds.*2000|image.*2000/i.test(e)
+        )) {
+          throw new Error(errors.join("\n"));
+        }
+
         if (resultText) {
           await db.transact(
             db.tx.messages[id()]
@@ -608,8 +617,48 @@ async function handleTask(taskId: string) {
         await db.transact(txs);
       }
     }
+  }
+
+  try {
+    await runQuery();
   } catch (error: any) {
-    if (error.name === "AbortError" || abortController.signal.aborted) {
+    // Session has oversized images — try compacting the session to strip them,
+    // then retry. If /compact itself fails, fall back to a fresh session with
+    // text-only context from stored messages.
+    if (
+      resumeSessionId &&
+      /image.*exceeds.*dimension|dimension.*limit|exceeds.*2000|image.*2000/i.test(error.message || "")
+    ) {
+      console.log(`Task ${taskId}: session has oversized images, attempting /compact`);
+      try {
+        const compactQuery = query({
+          prompt: "/compact",
+          options: { ...queryOptions, maxTurns: 1 } as any,
+        });
+        for await (const msg of compactQuery) {
+          if ("session_id" in msg && msg.session_id) sessionId = msg.session_id;
+        }
+        console.log(`Task ${taskId}: compaction succeeded, retrying with compacted session`);
+        q = query({ prompt: activePrompt, options: { ...queryOptions, resume: sessionId } as any });
+        await runQuery();
+      } catch {
+        // /compact hit the same image error — fall back to text-only context
+        console.log(`Task ${taskId}: compaction also failed, retrying with text context`);
+        const allMessages = [...(task.messages || [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+        const thread = allMessages.map((m: any) => `**${m.role}**: ${m.content}`).join("\n\n");
+        const contextParts = [
+          `# Original Task\n\n${task.input}`,
+          thread && `# Conversation History\n\n${thread}`,
+          task.result && `# Last Result\n\n${task.result}`,
+          `# New Request\n\n${activePrompt}`,
+        ].filter(Boolean);
+        const freshPrompt = contextParts.join("\n\n---\n\n");
+        delete queryOptions.resume;
+        sessionId = undefined;
+        q = query({ prompt: freshPrompt, options: queryOptions as any });
+        await runQuery();
+      }
+    } else if (error.name === "AbortError" || abortController.signal.aborted) {
       const r = await db.query({ tasks: { $: { where: { id: taskId } }, project: {} } });
       // typed as any to tolerate new reverse-link schema additions
       const currentTask = r.tasks[0] as any;
