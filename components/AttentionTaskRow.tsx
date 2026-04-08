@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
+import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
 import {
   TASK_STATUSES,
   describeBlockedSituation,
@@ -60,30 +61,34 @@ function buildCompactStatusLine(
   if (status === TASK_STATUSES.failed) {
     const err = (errorMessage || "").trim();
     if (!err) return { line: headline, tapForMore: false, fullDetail: "" };
+    const friendly = summarizeErrorForFeed(err);
     const dash = `${headline} — `;
-    const budget = 88 - dash.length;
-    if (err.length <= budget) {
-      return { line: dash + err, tapForMore: false, fullDetail: err };
-    }
-    return {
-      line: `${dash}${err.slice(0, Math.max(24, budget - 1))}…`,
-      tapForMore: true,
-      fullDetail: err,
-    };
+    const budget = Math.max(24, 88 - dash.length);
+    const body =
+      friendly.length <= budget
+        ? friendly
+        : `${friendly.slice(0, Math.max(12, budget - 1))}…`;
+    const line = dash + body;
+    const tapForMore = err !== friendly || err.length > friendly.length + 8;
+    return { line, tapForMore, fullDetail: err };
   }
 
   if (status === TASK_STATUSES.blocked) {
-    const detail = describeBlockedSituation(blockedReason, errorMessage);
+    const structural = describeBlockedSituation(blockedReason, errorMessage);
+    const rawErr = (errorMessage || "").trim();
+    const friendly = rawErr ? summarizeErrorForFeed(rawErr) : structural;
     const dash = `${headline} — `;
     const budget = 88 - dash.length;
-    if (detail.length <= budget) {
-      return { line: dash + detail, tapForMore: false, fullDetail: detail };
-    }
-    return {
-      line: `${dash}${detail.slice(0, Math.max(20, budget - 1))}…`,
-      tapForMore: true,
-      fullDetail: detail,
-    };
+    const seg =
+      friendly.length <= budget
+        ? friendly
+        : `${friendly.slice(0, Math.max(16, budget - 1))}…`;
+    const line = dash + seg;
+    const fullDetail = [structural, rawErr].filter(Boolean).join("\n\n");
+    const tapForMore =
+      Boolean(rawErr && rawErr !== friendly) ||
+      fullDetail.length > friendly.length + 24;
+    return { line, tapForMore, fullDetail: fullDetail || structural };
   }
 
   return { line: headline, tapForMore: false, fullDetail: "" };
@@ -142,7 +147,7 @@ export function AttentionTaskRow({
               lineHeight: 19,
             }}
           >
-            {title}
+            {shortenStepTitle(title, 64)}
           </Text>
           <Text
             numberOfLines={1}

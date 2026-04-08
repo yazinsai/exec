@@ -225,7 +225,10 @@ export function NoteListItem({
               {subline}
             </Text>
 
-            {(counts.failed > 0 || counts.blocked > 0 || counts.running > 0) && (
+            {(counts.failed > 0 ||
+              counts.blocked > 0 ||
+              counts.running > 0 ||
+              counts.pending > 0) && (
               <View
                 style={{
                   flexDirection: "row",
@@ -251,7 +254,28 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      In progress
+                      {counts.running} running
+                    </Text>
+                  </View>
+                ) : null}
+                {counts.pending > 0 ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: "rgba(113, 113, 122, 0.2)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 10,
+                        fontFamily: fontFamily.semibold,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      {counts.pending} queued
                     </Text>
                   </View>
                 ) : null}
@@ -272,7 +296,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      Needs attention
+                      {counts.blocked} blocked
                     </Text>
                   </View>
                 ) : null}
@@ -293,7 +317,7 @@ export function NoteListItem({
                         letterSpacing: 0.2,
                       }}
                     >
-                      Failed
+                      {counts.failed} failed
                     </Text>
                   </View>
                 ) : null}

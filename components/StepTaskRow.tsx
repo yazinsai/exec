@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, spacing, typography } from "@/constants/Colors";
+import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
 import {
   TASK_STATUSES,
   describeBlockedSituation,
@@ -71,14 +72,22 @@ export function StepTaskRow({
   const isBlocked = status === TASK_STATUSES.blocked;
   const actionable = isFailed || isBlocked;
 
-  const explainFailed = (errorMessage || "").trim() || (resultSnippet || "").trim();
+  const rawFailed = ((errorMessage || "").trim() || (resultSnippet || "").trim());
+  const friendlyFailed = rawFailed ? summarizeErrorForFeed(rawFailed) : "";
   const explainBlocked = describeBlockedSituation(blockedReason, errorMessage);
+  const rawBlockedErr = (errorMessage || "").trim();
+  const friendlyBlockedErr = rawBlockedErr
+    ? summarizeErrorForFeed(rawBlockedErr)
+    : "";
   const reasonLabel = isFailed ? "Why failed" : isBlocked ? "Why blocked" : "Details";
-  const reasonBody =
-    isFailed && explainFailed
-      ? explainFailed
-      : isBlocked
-        ? explainBlocked
+  const primaryReason = isFailed
+    ? friendlyFailed || rawFailed
+    : friendlyBlockedErr || explainBlocked;
+  const rawTechnical =
+    isFailed && rawFailed && rawFailed !== friendlyFailed
+      ? rawFailed
+      : isBlocked && rawBlockedErr && rawBlockedErr !== friendlyBlockedErr
+        ? rawBlockedErr
         : "";
 
   const bodyIndent =
@@ -149,7 +158,7 @@ export function StepTaskRow({
                 lineHeight: 19,
               }}
             >
-              {title}
+              {shortenStepTitle(title)}
             </Text>
           </View>
 
@@ -193,16 +202,32 @@ export function StepTaskRow({
               lineHeight: 18,
             }}
           >
-            {reasonBody
-              ? reasonBody.length > 500
-                ? `${reasonBody.slice(0, 500)}…`
-                : reasonBody
+            {primaryReason
+              ? primaryReason.length > 500
+                ? `${primaryReason.slice(0, 500)}…`
+                : primaryReason
               : isFailed
                 ? "No error details on file yet — open the thread for logs."
                 : isBlocked
                   ? "Open the thread for full context."
                   : ""}
           </Text>
+          {rawTechnical ? (
+            <Text
+              style={{
+                marginTop: spacing.sm,
+                color: colors.textTertiary,
+                fontSize: 10,
+                fontFamily: fontFamily.regular,
+                lineHeight: 15,
+              }}
+            >
+              Technical detail{"\n"}
+              {rawTechnical.length > 600
+                ? `${rawTechnical.slice(0, 600)}…`
+                : rawTechnical}
+            </Text>
+          ) : null}
 
           {showProject && projectLabel ? (
             <Text

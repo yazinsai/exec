@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Alert,
+  StyleSheet,
 } from "react-native";
 import Constants from "expo-constants";
 import {
@@ -55,6 +56,7 @@ import {
   fontFamily,
   shadows,
 } from "@/constants/Colors";
+import { shortenRunTitle } from "@/lib/displayCopy";
 import {
   getTaskSortWeight,
   NOTE_STATUSES,
@@ -431,13 +433,14 @@ function relativeTime(timestamp: number): string {
 }
 
 function getNoteTitle(note: Pick<Note, "summary" | "transcript" | "status">): string {
-  if (note.summary) return note.summary;
-  if (note.transcript.trim()) return note.transcript.trim();
-  if (note.status === NOTE_STATUSES.transcribing) return "Transcribing...";
-  if (note.status === NOTE_STATUSES.pending || note.status === NOTE_STATUSES.triaging) {
-    return "Processing note";
-  }
-  return "Voice note";
+  let base: string;
+  if (note.summary) base = note.summary;
+  else if (note.transcript.trim()) base = note.transcript.trim();
+  else if (note.status === NOTE_STATUSES.transcribing) base = "Transcribing…";
+  else if (note.status === NOTE_STATUSES.pending || note.status === NOTE_STATUSES.triaging) {
+    base = "Processing note";
+  } else base = "Voice note";
+  return shortenRunTitle(base);
 }
 
 function getReleaseInfo() {
@@ -506,6 +509,7 @@ export default function HomeScreen() {
   const [activeWorkFilter, setActiveWorkFilter] = useState<
     "all" | "failed" | "blocked"
   >("all");
+  const [showAllProjectPills, setShowAllProjectPills] = useState(false);
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isPaused || isSaving;
@@ -685,6 +689,22 @@ export default function HomeScreen() {
     return Array.from(slugs).sort();
   }, [allTasks]);
 
+  const MAX_PROJECT_PILLS = 4;
+  const visibleProjectSlugs = useMemo(() => {
+    if (showAllProjectPills || projectSlugs.length <= MAX_PROJECT_PILLS) {
+      return projectSlugs;
+    }
+    return projectSlugs.slice(0, MAX_PROJECT_PILLS);
+  }, [projectSlugs, showAllProjectPills]);
+  const projectPillsOverflow = Math.max(
+    0,
+    projectSlugs.length - MAX_PROJECT_PILLS
+  );
+
+  useEffect(() => {
+    setShowAllProjectPills(false);
+  }, [projectSlugs.join("\0")]);
+
   // Apply filters to notes
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
@@ -707,7 +727,7 @@ export default function HomeScreen() {
 
   const isFiltering = filterUnread || !!filterProject;
 
-  /** Failed + blocked only (not running) — Active work inbox */
+  /** Failed + blocked only — stalled / needs-attention inbox (not “in motion”) */
   const stuckAttentionTasks = useMemo(() => {
     return allTasks
       .filter(
@@ -1297,126 +1317,212 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Filter bar */}
+        {/* Filters: inbox (state) vs workspace (projects) */}
         {!isLoading && notes.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingLeft: spacing.sm,
-              paddingRight: spacing.md,
-              gap: spacing.sm,
-              paddingBottom: spacing.sm,
+          <View
+            style={{
+              paddingHorizontal: spacing.md,
+              paddingBottom: spacing.md,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: colors.border,
+              gap: spacing.md,
             }}
-            fadingEdgeLength={40}
           >
-            {/* Unread toggle */}
-            <Pressable
-              onPress={() => setFilterUnread((v) => !v)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-                paddingHorizontal: spacing.lg,
-                paddingVertical: spacing.md,
-                borderRadius: 22,
-                backgroundColor: filterUnread
-                  ? colors.primary
-                  : colors.backgroundElevated,
-                borderWidth: 1,
-                borderColor: filterUnread
-                  ? colors.primary
-                  : colors.border,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: filterUnread
-                    ? colors.black
-                    : colors.primary,
-                }}
-              />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
               <Text
                 style={{
-                  fontSize: typography.xs,
-                  fontFamily: fontFamily.medium,
-                  color: filterUnread
-                    ? colors.black
-                    : colors.textSecondary,
+                  color: colors.textTertiary,
+                  fontSize: 10,
+                  fontFamily: fontFamily.semibold,
+                  letterSpacing: 0.8,
+                  width: 56,
                 }}
               >
-                Unread
+                INBOX
               </Text>
-            </Pressable>
-
-            {/* Project chips */}
-            {projectSlugs.map((slug) => (
               <Pressable
-                key={slug}
-                onPress={() =>
-                  setFilterProject((v) => (v === slug ? null : slug))
-                }
+                onPress={() => setFilterUnread((v) => !v)}
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  borderRadius: 22,
-                  backgroundColor:
-                    filterProject === slug
-                      ? colors.primary
-                      : colors.backgroundElevated,
-                  borderWidth: 1,
-                  borderColor:
-                    filterProject === slug
-                      ? colors.primary
-                      : colors.border,
-                  opacity: pressed ? 0.7 : 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.sm,
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: 11,
+                  borderRadius: 24,
+                  backgroundColor: filterUnread
+                    ? colors.primary
+                    : colors.backgroundElevated,
+                  borderWidth: filterUnread ? 2 : 1,
+                  borderColor: filterUnread ? colors.primary : colors.border,
+                  ...(filterUnread ? shadows.sm : {}),
+                  opacity: pressed ? 0.82 : 1,
                 })}
               >
+                <View
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 3.5,
+                    backgroundColor: filterUnread
+                      ? colors.black
+                      : colors.primary,
+                  }}
+                />
                 <Text
                   style={{
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.medium,
-                    color:
-                      filterProject === slug
-                        ? colors.black
-                        : colors.textSecondary,
+                    fontSize: typography.sm,
+                    fontFamily: fontFamily.semibold,
+                    color: filterUnread ? colors.black : colors.textPrimary,
                   }}
                 >
-                  {slug}
+                  Unread only
                 </Text>
               </Pressable>
-            ))}
+            </View>
 
-            {/* Clear all filters */}
-            {(filterUnread || filterProject) && (
-              <Pressable
-                onPress={() => {
-                  setFilterUnread(false);
-                  setFilterProject(null);
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: colors.border,
+                marginVertical: 2,
+              }}
+            />
+
+            <View style={{ gap: spacing.sm }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
-                style={({ pressed }) => ({
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  borderRadius: 22,
-                  opacity: pressed ? 0.5 : 0.7,
-                })}
               >
                 <Text
                   style={{
-                    fontSize: typography.xs,
-                    fontFamily: fontFamily.regular,
                     color: colors.textTertiary,
+                    fontSize: 10,
+                    fontFamily: fontFamily.semibold,
+                    letterSpacing: 0.8,
                   }}
                 >
-                  Clear
+                  WORKSPACE
                 </Text>
-              </Pressable>
-            )}
-          </ScrollView>
+                {(filterUnread || filterProject) && (
+                  <Pressable
+                    onPress={() => {
+                      setFilterUnread(false);
+                      setFilterProject(null);
+                    }}
+                    hitSlop={10}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.medium,
+                        color: colors.primary,
+                      }}
+                    >
+                      Clear filters
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                fadingEdgeLength={72}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  paddingRight: spacing.lg,
+                }}
+              >
+                {visibleProjectSlugs.map((slug) => (
+                  <Pressable
+                    key={slug}
+                    onPress={() =>
+                      setFilterProject((v) => (v === slug ? null : slug))
+                    }
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 18,
+                      paddingVertical: 10,
+                      borderRadius: 22,
+                      backgroundColor:
+                        filterProject === slug
+                          ? colors.primary
+                          : colors.backgroundElevated,
+                      borderWidth: filterProject === slug ? 2 : 1,
+                      borderColor:
+                        filterProject === slug
+                          ? colors.primary
+                          : colors.border,
+                      ...(filterProject === slug ? shadows.sm : {}),
+                      opacity: pressed ? 0.82 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.semibold,
+                        color:
+                          filterProject === slug
+                            ? colors.black
+                            : colors.textSecondary,
+                      }}
+                    >
+                      {slug}
+                    </Text>
+                  </Pressable>
+                ))}
+                {!showAllProjectPills && projectPillsOverflow > 0 ? (
+                  <Pressable
+                    onPress={() => setShowAllProjectPills(true)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 22,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.backgroundSubtle,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.medium,
+                        color: colors.textTertiary,
+                      }}
+                    >
+                      +{projectPillsOverflow} more
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {showAllProjectPills && projectSlugs.length > MAX_PROJECT_PILLS ? (
+                  <Pressable
+                    onPress={() => setShowAllProjectPills(false)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.medium,
+                        color: colors.textTertiary,
+                      }}
+                    >
+                      Show less
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </ScrollView>
+            </View>
+          </View>
         )}
 
         {isLoading ? (
@@ -1545,7 +1651,7 @@ export default function HomeScreen() {
                           flexShrink: 0,
                         }}
                       >
-                        Active work
+                        Needs attention
                       </Text>
                       <ScrollView
                         horizontal
