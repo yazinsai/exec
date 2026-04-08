@@ -1499,37 +1499,6 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                <View
-                  style={{
-                    paddingVertical: spacing.lg,
-                    paddingHorizontal: spacing.md,
-                    marginBottom: spacing.sm,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.lg,
-                      fontFamily: fontFamily.semibold,
-                      color: colors.textPrimary,
-                    }}
-                  >
-                    Capture
-                  </Text>
-                  <Text
-                    style={{
-                      marginTop: 6,
-                      fontSize: typography.xs,
-                      fontFamily: fontFamily.regular,
-                      color: colors.textTertiary,
-                      lineHeight: 18,
-                    }}
-                  >
-                    Tap the mic below — voice becomes tasks.
-                  </Text>
-                </View>
-
                 {attentionTotal > 0 ? (
                   <Pressable
                     onPress={() => {
