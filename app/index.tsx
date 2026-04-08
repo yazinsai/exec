@@ -757,25 +757,31 @@ export default function HomeScreen() {
     [notes]
   );
 
-  /** Dark #000 + #111 chips/borders read as flat; bump contrast for pills + badges */
-  const filterChip = useMemo(() => {
+  /** WhatsApp-style: inactive = outline only; active = solid fill, no inner count pill */
+  const waFilter = useMemo(() => {
     if (isDark) {
       return {
-        inactiveBg: "#2c2c2e",
-        inactiveBorder: "rgba(255,255,255,0.34)",
-        badgeMutedBg: "rgba(255,255,255,0.14)",
-        badgeMutedBorder: "rgba(255,255,255,0.3)",
-        goldSelectedBg: colors.primary,
-        goldSelectedBorder: "#ffffff",
+        offBg: "transparent",
+        offBorder: "rgba(255,255,255,0.42)",
+        offCount: colors.textSecondary,
+        onGoldBg: colors.primary,
+        onGoldFg: colors.black,
+        onFailedBg: colors.statusFailed,
+        onFailedFg: "#ffffff",
+        onBlockedBg: colors.warning,
+        onBlockedFg: colors.black,
       };
     }
     return {
-      inactiveBg: colors.backgroundElevated,
-      inactiveBorder: colors.borderLight,
-      badgeMutedBg: colors.backgroundPressed,
-      badgeMutedBorder: colors.border,
-      goldSelectedBg: colors.primaryLight,
-      goldSelectedBorder: colors.primaryDark,
+      offBg: "#ffffff",
+      offBorder: "rgba(0,0,0,0.12)",
+      offCount: colors.textSecondary,
+      onGoldBg: colors.primaryLight,
+      onGoldFg: colors.black,
+      onFailedBg: colors.statusFailed,
+      onFailedFg: "#ffffff",
+      onBlockedBg: colors.warning,
+      onBlockedFg: colors.black,
     };
   }, [isDark, colors]);
 
@@ -1363,7 +1369,7 @@ export default function HomeScreen() {
               contentContainerStyle={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 18,
+                gap: 10,
                 paddingRight: spacing.md,
                 paddingVertical: 2,
               }}
@@ -1384,22 +1390,19 @@ export default function HomeScreen() {
                   void Haptics.selectionAsync();
                 }}
                 style={({ pressed }) => ({
-                  minHeight: 44,
+                  minHeight: 40,
                   justifyContent: "center",
                   paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 22,
+                  paddingVertical: 9,
+                  borderRadius: 20,
                   backgroundColor: filterUnread
-                    ? filterChip.goldSelectedBg
-                    : filterChip.inactiveBg,
-                  borderWidth: filterUnread ? 2.5 : 1.5,
-                  borderColor: filterUnread
-                    ? filterChip.goldSelectedBorder
-                    : filterChip.inactiveBorder,
-                  ...(filterUnread ? shadows.gold : {}),
+                    ? waFilter.onGoldBg
+                    : waFilter.offBg,
+                  borderWidth: filterUnread ? 0 : 1.5,
+                  borderColor: filterUnread ? "transparent" : waFilter.offBorder,
                   opacity:
                     unreadNoteCount === 0
-                      ? 0.42
+                      ? 0.4
                       : pressed && Platform.OS !== "android"
                         ? 0.88
                         : 1,
@@ -1409,52 +1412,27 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
+                <Text style={{ fontSize: typography.sm }}>
                   <Text
                     style={{
-                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
-                      color: filterUnread ? colors.black : colors.textPrimary,
+                      color: filterUnread
+                        ? waFilter.onGoldFg
+                        : colors.textPrimary,
                     }}
                   >
                     Unread
                   </Text>
-                  <View
+                  <Text
                     style={{
-                      minWidth: 28,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      backgroundColor: filterUnread
-                        ? "rgba(0,0,0,0.2)"
-                        : filterChip.badgeMutedBg,
-                      borderWidth: filterUnread ? 0 : 1,
-                      borderColor: filterUnread
-                        ? "transparent"
-                        : filterChip.badgeMutedBorder,
-                      alignItems: "center",
+                      fontFamily: fontFamily.semibold,
+                      fontVariant: ["tabular-nums"],
+                      color: filterUnread
+                        ? waFilter.onGoldFg
+                        : waFilter.offCount,
                     }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.bold,
-                        fontVariant: ["tabular-nums"],
-                        color: filterUnread
-                          ? colors.black
-                          : colors.textPrimary,
-                      }}
-                    >
-                      {unreadNoteCount}
-                    </Text>
-                  </View>
-                </View>
+                  >{` ${unreadNoteCount}`}</Text>
+                </Text>
               </Pressable>
 
               <Pressable
@@ -1477,26 +1455,23 @@ export default function HomeScreen() {
                   void Haptics.selectionAsync();
                 }}
                 style={({ pressed }) => ({
-                  minHeight: 44,
+                  minHeight: 40,
                   justifyContent: "center",
                   paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 22,
+                  paddingVertical: 9,
+                  borderRadius: 20,
                   backgroundColor:
                     noteTaskStatusFilter === "failed"
-                      ? colors.statusFailed
-                      : filterChip.inactiveBg,
-                  borderWidth: noteTaskStatusFilter === "failed" ? 2.5 : 1.5,
+                      ? waFilter.onFailedBg
+                      : waFilter.offBg,
+                  borderWidth: noteTaskStatusFilter === "failed" ? 0 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "failed"
-                      ? isDark
-                        ? "#fecaca"
-                        : colors.errorLight
-                      : filterChip.inactiveBorder,
-                  ...(noteTaskStatusFilter === "failed" ? shadows.sm : {}),
+                      ? "transparent"
+                      : waFilter.offBorder,
                   opacity:
                     attentionFailedNoteCount === 0
-                      ? 0.42
+                      ? 0.4
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -1506,58 +1481,29 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
+                <Text style={{ fontSize: typography.sm }}>
                   <Text
                     style={{
-                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color:
                         noteTaskStatusFilter === "failed"
-                          ? "#fff"
+                          ? waFilter.onFailedFg
                           : colors.statusFailed,
                     }}
                   >
                     Failed
                   </Text>
-                  <View
+                  <Text
                     style={{
-                      minWidth: 28,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      backgroundColor:
+                      fontFamily: fontFamily.semibold,
+                      fontVariant: ["tabular-nums"],
+                      color:
                         noteTaskStatusFilter === "failed"
-                          ? "rgba(0,0,0,0.22)"
-                          : filterChip.badgeMutedBg,
-                      borderWidth: noteTaskStatusFilter === "failed" ? 0 : 1,
-                      borderColor:
-                        noteTaskStatusFilter === "failed"
-                          ? "transparent"
-                          : filterChip.badgeMutedBorder,
-                      alignItems: "center",
+                          ? waFilter.onFailedFg
+                          : waFilter.offCount,
                     }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.bold,
-                        fontVariant: ["tabular-nums"],
-                        color:
-                          noteTaskStatusFilter === "failed"
-                            ? "#fff"
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {attentionFailedNoteCount}
-                    </Text>
-                  </View>
-                </View>
+                  >{` ${attentionFailedNoteCount}`}</Text>
+                </Text>
               </Pressable>
 
               <Pressable
@@ -1580,26 +1526,23 @@ export default function HomeScreen() {
                   void Haptics.selectionAsync();
                 }}
                 style={({ pressed }) => ({
-                  minHeight: 44,
+                  minHeight: 40,
                   justifyContent: "center",
                   paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 22,
+                  paddingVertical: 9,
+                  borderRadius: 20,
                   backgroundColor:
                     noteTaskStatusFilter === "blocked"
-                      ? colors.warning
-                      : filterChip.inactiveBg,
-                  borderWidth: noteTaskStatusFilter === "blocked" ? 2.5 : 1.5,
+                      ? waFilter.onBlockedBg
+                      : waFilter.offBg,
+                  borderWidth: noteTaskStatusFilter === "blocked" ? 0 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "blocked"
-                      ? isDark
-                        ? "#ffffff"
-                        : colors.black
-                      : filterChip.inactiveBorder,
-                  ...(noteTaskStatusFilter === "blocked" ? shadows.sm : {}),
+                      ? "transparent"
+                      : waFilter.offBorder,
                   opacity:
                     attentionBlockedNoteCount === 0
-                      ? 0.42
+                      ? 0.4
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -1609,58 +1552,29 @@ export default function HomeScreen() {
                       : [],
                 })}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
+                <Text style={{ fontSize: typography.sm }}>
                   <Text
                     style={{
-                      fontSize: typography.sm,
                       fontFamily: fontFamily.semibold,
                       color:
                         noteTaskStatusFilter === "blocked"
-                          ? colors.black
+                          ? waFilter.onBlockedFg
                           : colors.warning,
                     }}
                   >
                     Blocked
                   </Text>
-                  <View
+                  <Text
                     style={{
-                      minWidth: 28,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      backgroundColor:
+                      fontFamily: fontFamily.semibold,
+                      fontVariant: ["tabular-nums"],
+                      color:
                         noteTaskStatusFilter === "blocked"
-                          ? "rgba(0,0,0,0.12)"
-                          : filterChip.badgeMutedBg,
-                      borderWidth: noteTaskStatusFilter === "blocked" ? 0 : 1,
-                      borderColor:
-                        noteTaskStatusFilter === "blocked"
-                          ? "transparent"
-                          : filterChip.badgeMutedBorder,
-                      alignItems: "center",
+                          ? waFilter.onBlockedFg
+                          : waFilter.offCount,
                     }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.bold,
-                        fontVariant: ["tabular-nums"],
-                        color:
-                          noteTaskStatusFilter === "blocked"
-                            ? colors.black
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {attentionBlockedNoteCount}
-                    </Text>
-                  </View>
-                </View>
+                  >{` ${attentionBlockedNoteCount}`}</Text>
+                </Text>
               </Pressable>
             </ScrollView>
 
@@ -1704,38 +1618,30 @@ export default function HomeScreen() {
                         void Haptics.selectionAsync();
                       }}
                       style={({ pressed }) => ({
-                        minHeight: 44,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                        paddingHorizontal: selected ? 14 : 16,
-                        paddingVertical: 10,
-                        borderRadius: 22,
+                        minHeight: 40,
+                        justifyContent: "center",
+                        paddingHorizontal: 14,
+                        paddingVertical: 9,
+                        borderRadius: 20,
                         backgroundColor: selected
-                          ? filterChip.goldSelectedBg
-                          : filterChip.inactiveBg,
-                        borderWidth: selected ? 2.5 : 1.5,
+                          ? waFilter.onGoldBg
+                          : waFilter.offBg,
+                        borderWidth: selected ? 0 : 1.5,
                         borderColor: selected
-                          ? filterChip.goldSelectedBorder
-                          : filterChip.inactiveBorder,
-                        ...(selected ? shadows.gold : {}),
+                          ? "transparent"
+                          : waFilter.offBorder,
                         opacity:
                           pressed && Platform.OS !== "android" ? 0.9 : 1,
                         transform: pressed ? [{ scale: 0.98 }] : [],
                       })}
                     >
-                      {selected ? (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={18}
-                          color={colors.black}
-                        />
-                      ) : null}
                       <Text
                         style={{
                           fontSize: typography.sm,
                           fontFamily: fontFamily.semibold,
-                          color: selected ? colors.black : colors.textPrimary,
+                          color: selected
+                            ? waFilter.onGoldFg
+                            : colors.textPrimary,
                         }}
                       >
                         {slug}
@@ -1747,25 +1653,26 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => setShowAllProjectPills(true)}
                     style={({ pressed }) => ({
-                      minHeight: 44,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
                       justifyContent: "center",
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 22,
+                      alignItems: "center",
                       borderWidth: 1.5,
-                      borderColor: filterChip.inactiveBorder,
-                      backgroundColor: filterChip.inactiveBg,
+                      borderColor: waFilter.offBorder,
+                      backgroundColor: waFilter.offBg,
                       opacity: pressed ? 0.85 : 1,
                     })}
                   >
                     <Text
                       style={{
-                        fontSize: typography.sm,
-                        fontFamily: fontFamily.semibold,
-                        color: isDark ? colors.textSecondary : colors.textTertiary,
+                        fontSize: typography.lg,
+                        fontFamily: fontFamily.medium,
+                        color: colors.textSecondary,
+                        marginTop: -2,
                       }}
                     >
-                      +{projectPillsOverflow}
+                      +
                     </Text>
                   </Pressable>
                 ) : null}
