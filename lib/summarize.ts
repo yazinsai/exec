@@ -21,7 +21,7 @@ export async function summarizeInput(input: string): Promise<string | null> {
           {
             role: "system",
             content:
-              "Summarize the user's voice command into a short title (max 60 chars). Be concise and specific. Return only the title, nothing else. No quotes.",
+              "Generate a short, descriptive title (max 60 chars) that captures the actual subject matter of the user's voice command. Focus on WHAT the command is about semantically — the topic, project, or goal — not HOW it's structured (e.g. never say 'two sequential tasks' or 'multi-step request'). Examples: 'Twitter morning paper pipeline', 'Fix auth middleware bug', 'Deploy landing page to production'. Return only the title, nothing else. No quotes.",
           },
           { role: "user", content: input },
         ],

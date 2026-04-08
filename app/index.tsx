@@ -57,7 +57,6 @@ import {
 } from "@/constants/Colors";
 import { shortenRunTitle } from "@/lib/displayCopy";
 import {
-  getTaskSortWeight,
   NOTE_STATUSES,
   noteIsSettledForHistory,
   TASK_STATUSES,
@@ -1226,11 +1225,6 @@ export default function HomeScreen() {
 
   const renderNoteCard = (item: Note) => {
     const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
-      const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
-      if (weightDiff !== 0) return weightDiff;
-      const extractionDiff =
-        ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
-      if (extractionDiff !== 0) return extractionDiff;
       return a.createdAt - b.createdAt;
     });
     const audioPath = (item as any).audioFilePath as string | undefined;
