@@ -1343,9 +1343,6 @@ export default function HomeScreen() {
               <Pressable
                 onPress={() => setFilterUnread((v) => !v)}
                 style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.sm,
                   paddingHorizontal: spacing.xl,
                   paddingVertical: 11,
                   borderRadius: 24,
@@ -1360,23 +1357,32 @@ export default function HomeScreen() {
               >
                 <View
                   style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 3.5,
-                    backgroundColor: filterUnread
-                      ? colors.black
-                      : colors.primary,
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: typography.sm,
-                    fontFamily: fontFamily.semibold,
-                    color: filterUnread ? colors.black : colors.textPrimary,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.sm,
                   }}
                 >
-                  Unread only
-                </Text>
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 3.5,
+                      flexShrink: 0,
+                      backgroundColor: filterUnread
+                        ? colors.black
+                        : colors.primary,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      color: filterUnread ? colors.black : colors.textPrimary,
+                    }}
+                  >
+                    Unread only
+                  </Text>
+                </View>
               </Pressable>
             </View>
 
