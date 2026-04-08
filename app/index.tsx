@@ -757,12 +757,12 @@ export default function HomeScreen() {
     [notes]
   );
 
-  /** WhatsApp-style: inactive = outline only; active = solid fill, no inner count pill */
+  /** WhatsApp-style: inactive = lozenge + border; active = solid fill. Transparent+rgba border vanishes on OLED black. */
   const waFilter = useMemo(() => {
     if (isDark) {
       return {
-        offBg: "transparent",
-        offBorder: "rgba(255,255,255,0.42)",
+        offBg: "#2c2c2e",
+        offBorder: "#5c5c5e",
         offCount: colors.textSecondary,
         onGoldBg: colors.primary,
         onGoldFg: colors.black,
