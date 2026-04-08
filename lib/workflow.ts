@@ -158,3 +158,123 @@ export function getTaskSortWeight(status: string): number {
       return 8;
   }
 }
+
+/** Running / blocked / failed — for home “attention” strip */
+export function computeAttentionCounts(tasks: { status?: string | null }[]): {
+  running: number;
+  blocked: number;
+  failed: number;
+} {
+  let running = 0;
+  let blocked = 0;
+  let failed = 0;
+  for (const t of tasks) {
+    switch (t.status) {
+      case TASK_STATUSES.running:
+        running += 1;
+        break;
+      case TASK_STATUSES.blocked:
+        blocked += 1;
+        break;
+      case TASK_STATUSES.failed:
+        failed += 1;
+        break;
+      default:
+        break;
+    }
+  }
+  return { running, blocked, failed };
+}
+
+function humanizeReasonKey(key: string): string {
+  return key
+    .split(/_/g)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/**
+ * Human copy for dependency / agent blockedReason codes.
+ * Never return a bare “blocked” — always a concrete phrase.
+ */
+export function describeBlockedSituation(
+  blockedReason: string | null | undefined,
+  errorMessage: string | null | undefined
+): string {
+  const r = (blockedReason || "").trim();
+  if (r === "waiting_on_dependencies") return "Waiting on earlier step";
+  if (r === "dependency_failed") return "Earlier step failed";
+  if (r === "dependency_cancelled") return "Earlier step cancelled";
+  if (r === "waiting_on_user" || r === "needs_user" || r === "needs_user_input") {
+    return "Needs your input";
+  }
+  if (r === "waiting_on_device" || r === "simulator" || r === "ios_simulator") {
+    return "Waiting on simulator / device";
+  }
+  if (r === "waiting_on_permissions" || r === "missing_permissions") {
+    return "Missing permissions";
+  }
+  if (r) return humanizeReasonKey(r);
+  const em = (errorMessage || "").trim();
+  if (em) return em.length > 80 ? `${em.slice(0, 80)}…` : em;
+  return "Waiting";
+}
+
+/** Short label for a step row (no wall-clock time). */
+export function getStepProgressHeadline(
+  status: string,
+  blockedReason?: string | null,
+  errorMessage?: string | null
+): string {
+  switch (status) {
+    case TASK_STATUSES.running:
+      return "Running";
+    case TASK_STATUSES.done:
+      return "Done";
+    case TASK_STATUSES.failed:
+      return "Failed";
+    case TASK_STATUSES.cancelled:
+      return "Skipped";
+    case TASK_STATUSES.pending:
+      return "Queued";
+    case TASK_STATUSES.blocked:
+      return describeBlockedSituation(blockedReason, errorMessage);
+    case TASK_STATUSES.transcribing:
+      return "Transcribing";
+    case TASK_STATUSES.transcriptionFailed:
+      return "Transcription failed";
+    default:
+      return "Queued";
+  }
+}
+
+/** Note still has work or errors (shown in “Now”, not buried in history-only). */
+export function noteIsSettledForHistory(note: {
+  status: string;
+  tasks?: { status?: string | null }[];
+}): boolean {
+  if (
+    note.status === NOTE_STATUSES.transcribing ||
+    note.status === NOTE_STATUSES.pending ||
+    note.status === NOTE_STATUSES.triaging
+  ) {
+    return false;
+  }
+  if (
+    note.status === NOTE_STATUSES.transcriptionFailed ||
+    note.status === NOTE_STATUSES.triageFailed
+  ) {
+    return false;
+  }
+  const tasks = note.tasks ?? [];
+  if (tasks.length === 0) {
+    return (
+      note.status === NOTE_STATUSES.ready || note.status === NOTE_STATUSES.empty
+    );
+  }
+  return tasks.every(
+    (t) =>
+      t.status === TASK_STATUSES.done || t.status === TASK_STATUSES.cancelled
+  );
+}

@@ -3,7 +3,7 @@ import { Pressable, Text, View, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
-import { TaskListItem } from "@/components/TaskListItem";
+import { StepTaskRow } from "@/components/StepTaskRow";
 import {
   computeTaskStatusCounts,
   formatNoteAggregateSummary,
@@ -18,6 +18,10 @@ type ChildTask = {
   createdAt: number;
   projectLabel?: string | null;
   read?: boolean;
+  blockedReason?: string | null;
+  errorMessage?: string | null;
+  extractionIndex?: number | null;
+  resultSnippet?: string | null;
 };
 
 interface NoteListItemProps {
@@ -29,6 +33,7 @@ interface NoteListItemProps {
   expanded: boolean;
   onToggle: () => void;
   onOpenTask: (taskId: string) => void;
+  onRetryTask?: (taskId: string) => void;
   onRetryTranscription?: () => void;
   onRetryExtraction?: () => void;
 }
@@ -101,6 +106,33 @@ function RunningIndicator({ count, colors }: { count: number; colors: ReturnType
   );
 }
 
+function buildCardSubline(
+  counts: ReturnType<typeof computeTaskStatusCounts>,
+  createdAt: number,
+  aggregate: string
+): string {
+  if (counts.total === 0) {
+    return `${aggregate} · updated ${relativeTime(createdAt)}`;
+  }
+  const parts: string[] = [];
+  parts.push(`${counts.total} step${counts.total === 1 ? "" : "s"}`);
+  if (counts.running) parts.push(`${counts.running} running`);
+  if (counts.blocked) parts.push(`${counts.blocked} need attention`);
+  if (counts.failed) parts.push(`${counts.failed} failed`);
+  if (
+    !counts.running &&
+    !counts.blocked &&
+    !counts.failed &&
+    counts.done === counts.total
+  ) {
+    parts.push("all done");
+  } else if (counts.done > 0 && !counts.running) {
+    parts.push(`${counts.done}/${counts.total} done`);
+  }
+  parts.push(`updated ${relativeTime(createdAt)}`);
+  return parts.join(" · ");
+}
+
 export function NoteListItem({
   title,
   transcript,
@@ -110,6 +142,7 @@ export function NoteListItem({
   expanded,
   onToggle,
   onOpenTask,
+  onRetryTask,
   onRetryTranscription,
   onRetryExtraction,
 }: NoteListItemProps) {
@@ -118,21 +151,17 @@ export function NoteListItem({
   const hasRunning = counts.running > 0;
   const unreadCount = tasks.filter((t) => t.read === false).length;
   const aggregate = formatNoteAggregateSummary(status, counts);
+  const subline = buildCardSubline(counts, createdAt, aggregate);
 
-  // Build compact meta: "4 / 5 done • 2h ago" or status summary for non-done states
-  const taskSummary = counts.total > 0
-    ? (counts.running > 0
-        ? `${counts.running} running`
-        : counts.failed > 0
-          ? `${counts.failed} failed`
-          : counts.blocked > 0
-            ? `${counts.blocked} blocked`
-            : `${counts.done} / ${counts.total} done`)
-    : aggregate;
-  const metaParts = [
-    taskSummary,
-    relativeTime(createdAt),
-  ].filter(Boolean);
+  const orderedTasks = [...tasks].sort(
+    (a, b) => (a.extractionIndex ?? 999) - (b.extractionIndex ?? 999)
+  );
+  const totalSteps = orderedTasks.length;
+  const projectSlugs = orderedTasks
+    .map((t) => (t.projectLabel || "").trim())
+    .filter(Boolean);
+  const showProjectPerRow =
+    orderedTasks.length === 1 || new Set(projectSlugs).size > 1;
 
   return (
     <View
@@ -172,12 +201,99 @@ export function NoteListItem({
               style={{
                 color: colors.textPrimary,
                 fontSize: typography.md,
-                fontFamily: fontFamily.medium,
-                lineHeight: 21,
+                fontFamily: fontFamily.semibold,
+                lineHeight: 22,
               }}
             >
               {title}
             </Text>
+            <Text
+              numberOfLines={2}
+              style={{
+                marginTop: 4,
+                color: colors.textSecondary,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.regular,
+                lineHeight: 16,
+              }}
+            >
+              {subline}
+            </Text>
+
+            {(counts.failed > 0 || counts.blocked > 0 || counts.running > 0) && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: spacing.sm,
+                }}
+              >
+                {counts.running > 0 ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: "rgba(59, 130, 246, 0.15)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.statusRunning,
+                        fontSize: 10,
+                        fontFamily: fontFamily.semibold,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      In progress
+                    </Text>
+                  </View>
+                ) : null}
+                {counts.blocked > 0 ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: "rgba(245, 158, 11, 0.12)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.warning,
+                        fontSize: 10,
+                        fontFamily: fontFamily.semibold,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      Needs attention
+                    </Text>
+                  </View>
+                ) : null}
+                {counts.failed > 0 ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: "rgba(239, 68, 68, 0.12)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.statusFailed,
+                        fontSize: 10,
+                        fontFamily: fontFamily.semibold,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      Failed
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
 
             {hasRunning && !expanded && (
               <RunningIndicator count={counts.running} colors={colors} />
@@ -190,23 +306,8 @@ export function NoteListItem({
               alignItems: "flex-start",
               gap: 6,
               flexShrink: 0,
-              maxWidth: "46%",
             }}
           >
-            <Text
-              numberOfLines={2}
-              style={{
-                color: colors.textSecondary,
-                fontSize: typography.xs,
-                fontFamily: fontFamily.regular,
-                lineHeight: 15,
-                textAlign: "right",
-                flex: 1,
-                minWidth: 72,
-              }}
-            >
-              {metaParts.join(" • ")}
-            </Text>
             {unreadCount > 0 && !expanded && (
               <View
                 style={{
@@ -217,7 +318,7 @@ export function NoteListItem({
                   alignItems: "center",
                   justifyContent: "center",
                   paddingHorizontal: 5,
-                  marginTop: 1,
+                  marginTop: 2,
                 }}
               >
                 <Text
@@ -236,7 +337,7 @@ export function NoteListItem({
               name={expanded ? "chevron-up" : "chevron-down"}
               size={18}
               color={colors.textTertiary}
-              style={{ marginTop: 1 }}
+              style={{ marginTop: 2 }}
             />
           </View>
         </View>
@@ -261,7 +362,7 @@ export function NoteListItem({
                 paddingVertical: spacing.sm,
               }}
             >
-              {tasks.map((task, index) => (
+              {orderedTasks.map((task, index) => (
                 <View
                   key={task.id}
                   style={{
@@ -269,14 +370,29 @@ export function NoteListItem({
                     borderTopColor: colors.borderLight,
                   }}
                 >
-                  <TaskListItem
-                    density="nested"
+                  <StepTaskRow
                     title={task.title}
                     status={task.status}
+                    stepIndex={index + 1}
+                    totalSteps={totalSteps}
                     projectLabel={task.projectLabel}
-                    createdAt={task.createdAt}
+                    showProject={showProjectPerRow}
+                    blockedReason={task.blockedReason}
+                    errorMessage={task.errorMessage}
+                    resultSnippet={task.resultSnippet}
                     read={task.read}
                     onPress={() => onOpenTask(task.id)}
+                    onRetry={
+                      task.status === TASK_STATUSES.failed && onRetryTask
+                        ? () => onRetryTask(task.id)
+                        : undefined
+                    }
+                    onAskExec={
+                      task.status === TASK_STATUSES.failed ||
+                      task.status === TASK_STATUSES.blocked
+                        ? () => onOpenTask(task.id)
+                        : undefined
+                    }
                   />
                 </View>
               ))}

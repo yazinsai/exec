@@ -43,6 +43,7 @@ import {
 import { Audio } from "expo-av";
 import { NoteListItem } from "@/components/NoteListItem";
 import { TaskListItem } from "@/components/TaskListItem";
+import { AttentionTaskRow } from "@/components/AttentionTaskRow";
 import { RecordFAB } from "@/components/RecordFAB";
 import { RecordingSheet } from "@/components/RecordingSheet";
 import { DictionarySheet } from "@/components/DictionarySheet";
@@ -55,8 +56,11 @@ import {
   shadows,
 } from "@/constants/Colors";
 import {
+  computeAttentionCounts,
   getTaskSortWeight,
   NOTE_STATUSES,
+  noteIsSettledForHistory,
+  TASK_STATUSES,
 } from "@/lib/workflow";
 import type { InstaQLEntity } from "@instantdb/react-native";
 import type { AppSchema } from "@/instant.schema";
@@ -498,6 +502,8 @@ export default function HomeScreen() {
   const [showJumpToTop, setShowJumpToTop] = useState(false);
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterProject, setFilterProject] = useState<string | null>(null);
+  const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
+  const [attentionFeedOnly, setAttentionFeedOnly] = useState(false);
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isPaused || isSaving;
@@ -698,6 +704,42 @@ export default function HomeScreen() {
   }, [notes, filterUnread, filterProject]);
 
   const isFiltering = filterUnread || !!filterProject;
+
+  const attentionCounts = useMemo(
+    () => computeAttentionCounts(allTasks),
+    [allTasks]
+  );
+  const attentionTotal =
+    attentionCounts.running + attentionCounts.blocked + attentionCounts.failed;
+
+  const attentionTaskList = useMemo(() => {
+    return allTasks
+      .filter((t) =>
+        (
+          [
+            TASK_STATUSES.running,
+            TASK_STATUSES.blocked,
+            TASK_STATUSES.failed,
+          ] as string[]
+        ).includes(t.status)
+      )
+      .sort(
+        (a, b) => getTaskSortWeight(a.status) - getTaskSortWeight(b.status)
+      );
+  }, [allTasks]);
+
+  const { activeNotes, historyNotes } = useMemo(() => {
+    return {
+      activeNotes: filteredNotes.filter((n) => !noteIsSettledForHistory(n)),
+      historyNotes: filteredNotes.filter((n) => noteIsSettledForHistory(n)),
+    };
+  }, [filteredNotes]);
+
+  const visibleHistory = useMemo(
+    () => historyNotes.slice(0, visibleHistoryCount),
+    [historyNotes, visibleHistoryCount]
+  );
+  const historyRemaining = Math.max(0, historyNotes.length - visibleHistory.length);
 
   // Flat task list for filtered view
   const filteredTasks = useMemo(() => {
@@ -981,6 +1023,22 @@ export default function HomeScreen() {
   }, [selectedTask, dictionaryPrompt]);
 
   // Cancel task handler
+  const retryTask = useCallback(async (taskId: string) => {
+    try {
+      await db.transact(
+        db.tx.tasks[taskId].update({
+          status: TASK_STATUSES.pending,
+          blockedReason: "",
+          errorMessage: "",
+          cancelRequested: false,
+        })
+      );
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("retryTask", e);
+    }
+  }, []);
+
   const cancelTask = useCallback(async (taskId: string, currentStatus?: string) => {
     try {
       await db.transact(
@@ -1080,6 +1138,68 @@ export default function HomeScreen() {
     hr: {
       backgroundColor: colors.border,
     },
+  };
+
+  const renderNoteCard = (item: Note) => {
+    const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
+      const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
+      if (weightDiff !== 0) return weightDiff;
+      const extractionDiff =
+        ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
+      if (extractionDiff !== 0) return extractionDiff;
+      return a.createdAt - b.createdAt;
+    });
+    const audioPath = (item as any).audioFilePath as string | undefined;
+
+    return (
+      <NoteListItem
+        key={item.id}
+        title={getNoteTitle(item)}
+        transcript={item.transcript}
+        status={item.status}
+        createdAt={item.createdAt}
+        tasks={noteTasks.map((task) => ({
+          id: task.id,
+          title: task.summary || task.input,
+          status: task.status,
+          createdAt: task.createdAt,
+          projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
+          read: (task as any).read ?? true,
+          blockedReason: (task as any).blockedReason ?? null,
+          errorMessage: (task as any).errorMessage ?? null,
+          extractionIndex: (task as any).extractionIndex ?? null,
+          resultSnippet: (task as any).result
+            ? String((task as any).result).slice(0, 400)
+            : null,
+        }))}
+        expanded={expandedNoteIds.includes(item.id)}
+        onToggle={() => {
+          setExpandedNoteIds((current) =>
+            current.includes(item.id)
+              ? current.filter((id) => id !== item.id)
+              : [...current, item.id]
+          );
+        }}
+        onOpenTask={(taskId) => {
+          setSelectedTaskId(taskId);
+          setFollowUpText("");
+          setShowJumpToEnd(false);
+          setShowJumpToTop(false);
+          db.transact(db.tx.tasks[taskId].update({ read: true }));
+        }}
+        onRetryTask={retryTask}
+        onRetryTranscription={
+          item.status === NOTE_STATUSES.transcriptionFailed && audioPath
+            ? () => retryTranscription(item.id, audioPath)
+            : undefined
+        }
+        onRetryExtraction={
+          item.status === NOTE_STATUSES.triageFailed
+            ? () => retryExtraction(item.id)
+            : undefined
+        }
+      />
+    );
   };
 
   return (
@@ -1302,9 +1422,9 @@ export default function HomeScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
-              paddingTop: spacing.sm,
+              paddingTop: spacing.md,
               paddingHorizontal: spacing.sm,
-              paddingBottom: insets.bottom + 64 + 48,
+              paddingBottom: insets.bottom + 112,
               gap: spacing.lg,
             }}
           >
@@ -1379,76 +1499,219 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                {/* Default grouped-by-note view */}
-                {notes.length > 0 && (
+                <View
+                  style={{
+                    paddingVertical: spacing.lg,
+                    paddingHorizontal: spacing.md,
+                    marginBottom: spacing.sm,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  }}
+                >
                   <Text
                     style={{
-                      color: colors.textTertiary,
-                      fontSize: typography.xs,
+                      fontSize: typography.lg,
                       fontFamily: fontFamily.semibold,
-                      textTransform: "uppercase",
-                      letterSpacing: typography.tracking.wider,
+                      color: colors.textPrimary,
                     }}
                   >
-                    Voice Notes
+                    Capture
                   </Text>
-                )}
-                {notes.map((item) => {
-                  const noteTasks = ([...(item.tasks ?? [])] as Task[]).sort((a, b) => {
-                    const weightDiff = getTaskSortWeight(a.status) - getTaskSortWeight(b.status);
-                    if (weightDiff !== 0) return weightDiff;
-                    const extractionDiff = ((a as any).extractionIndex ?? 999) - ((b as any).extractionIndex ?? 999);
-                    if (extractionDiff !== 0) return extractionDiff;
-                    return a.createdAt - b.createdAt;
-                  });
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      fontSize: typography.xs,
+                      fontFamily: fontFamily.regular,
+                      color: colors.textTertiary,
+                      lineHeight: 18,
+                    }}
+                  >
+                    Tap the mic below — voice becomes tasks.
+                  </Text>
+                </View>
 
-                  return (
-                    <NoteListItem
-                      key={item.id}
-                      title={getNoteTitle(item)}
-                      transcript={item.transcript}
-                      status={item.status}
-                      createdAt={item.createdAt}
-                      tasks={noteTasks.map((task) => ({
-                        id: task.id,
-                        title: task.summary || task.input,
-                        status: task.status,
-                        createdAt: task.createdAt,
-                        projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
-                        read: (task as any).read ?? true,
-                      }))}
-                      expanded={expandedNoteIds.includes(item.id)}
-                      onToggle={() => {
-                        setExpandedNoteIds((current) =>
-                          current.includes(item.id)
-                            ? current.filter((id) => id !== item.id)
-                            : [...current, item.id]
-                        );
+                {attentionTotal > 0 ? (
+                  <Pressable
+                    onPress={() => {
+                      setAttentionFeedOnly((v) => !v);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={({ pressed }) => ({
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.md,
+                      borderRadius: radii.md,
+                      backgroundColor: attentionFeedOnly
+                        ? colors.primaryAlpha20
+                        : colors.backgroundElevated,
+                      borderWidth: 1,
+                      borderColor: attentionFeedOnly ? colors.primary : colors.border,
+                      opacity: pressed ? 0.9 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.semibold,
+                        letterSpacing: typography.tracking.wider,
+                        textTransform: "uppercase",
                       }}
-                      onOpenTask={(taskId) => {
-                        setSelectedTaskId(taskId);
-                        setFollowUpText("");
-                        setShowJumpToEnd(false);
-                        setShowJumpToTop(false);
-                        db.transact(db.tx.tasks[taskId].update({ read: true }));
+                    >
+                      Now
+                    </Text>
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        color: colors.textPrimary,
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.medium,
                       }}
-                      onRetryTranscription={
-                        item.status === NOTE_STATUSES.transcriptionFailed && item.audioFilePath
-                          ? () => retryTranscription(item.id, item.audioFilePath)
-                          : undefined
-                      }
-                      onRetryExtraction={
-                        item.status === NOTE_STATUSES.triageFailed
-                          ? () => retryExtraction(item.id)
-                          : undefined
-                      }
-                    />
-                  );
-                })}
+                    >
+                      {[
+                        attentionCounts.running > 0
+                          ? `${attentionCounts.running} running`
+                          : null,
+                        attentionCounts.blocked > 0
+                          ? `${attentionCounts.blocked} blocked`
+                          : null,
+                        attentionCounts.failed > 0
+                          ? `${attentionCounts.failed} failed`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Text>
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        color: colors.textTertiary,
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.regular,
+                      }}
+                    >
+                      {attentionFeedOnly
+                        ? "Tap to show full feed"
+                        : "Tap to hide settled history"}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {attentionTaskList.length > 0 ? (
+                  <View style={{ gap: spacing.sm }}>
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.semibold,
+                        textTransform: "uppercase",
+                        letterSpacing: typography.tracking.wider,
+                      }}
+                    >
+                      Active work
+                    </Text>
+                    {attentionTaskList.map((task) => (
+                      <AttentionTaskRow
+                        key={task.id}
+                        title={task.summary || task.input}
+                        status={task.status}
+                        projectLabel={
+                          (task as any).project?.slug ||
+                          (task as any).projectSlug ||
+                          null
+                        }
+                        blockedReason={(task as any).blockedReason}
+                        errorMessage={(task as any).errorMessage}
+                        onPress={() => {
+                          setSelectedTaskId(task.id);
+                          setFollowUpText("");
+                          setShowJumpToEnd(false);
+                          setShowJumpToTop(false);
+                          db.transact(db.tx.tasks[task.id].update({ read: true }));
+                        }}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+
+                {activeNotes.length > 0 ? (
+                  <>
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.semibold,
+                        textTransform: "uppercase",
+                        letterSpacing: typography.tracking.wider,
+                      }}
+                    >
+                      Voice notes
+                    </Text>
+                    {activeNotes.map(renderNoteCard)}
+                  </>
+                ) : null}
+
+                {!attentionFeedOnly && historyNotes.length > 0 ? (
+                  <>
+                    <Text
+                      style={{
+                        color: colors.textTertiary,
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.semibold,
+                        textTransform: "uppercase",
+                        letterSpacing: typography.tracking.wider,
+                      }}
+                    >
+                      Recent
+                    </Text>
+                    {visibleHistory.map(renderNoteCard)}
+                    {historyRemaining > 0 ? (
+                      <Pressable
+                        onPress={() =>
+                          setVisibleHistoryCount((c) =>
+                            Math.min(c + 10, historyNotes.length)
+                          )
+                        }
+                        style={({ pressed }) => ({
+                          paddingVertical: spacing.md,
+                          alignItems: "center",
+                          opacity: pressed ? 0.7 : 1,
+                        })}
+                      >
+                        <Text
+                          style={{
+                            color: colors.primary,
+                            fontSize: typography.sm,
+                            fontFamily: fontFamily.semibold,
+                          }}
+                        >
+                          Show {historyRemaining} more
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                ) : null}
               </>
             )}
           </ScrollView>
         )}
+
+        {/* Mic dock — separates capture from the scroll feed */}
+        {!isLoading ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: insets.bottom + 76,
+              backgroundColor: colors.background,
+              opacity: 0.97,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+            }}
+          />
+        ) : null}
 
         {/* FAB */}
         <RecordFAB

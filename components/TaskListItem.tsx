@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-import { View, Text, Pressable, Animated, Easing } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, fontFamily, radii } from "@/constants/Colors";
 import { formatTaskStatusLabel, TASK_STATUSES } from "@/lib/workflow";

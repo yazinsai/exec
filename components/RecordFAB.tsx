@@ -57,7 +57,7 @@ export function RecordFAB({
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: bottomInset + 16,
+        bottom: bottomInset + 22,
         left: 0,
         right: 0,
         alignItems: "center",
