@@ -1157,10 +1157,12 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
-              paddingHorizontal: spacing.xl,
+              paddingLeft: spacing.xl,
+              paddingRight: spacing.xxl,
               gap: spacing.sm,
               paddingBottom: spacing.sm,
             }}
+            fadingEdgeLength={40}
           >
             {/* Unread toggle */}
             <Pressable
@@ -1301,8 +1303,8 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingTop: spacing.sm,
-              paddingBottom: insets.bottom + 64 + 32,
-              gap: spacing.md,
+              paddingBottom: insets.bottom + 64 + 48,
+              gap: spacing.lg,
             }}
           >
             {isFiltering ? (
@@ -1536,7 +1538,7 @@ export default function HomeScreen() {
                           letterSpacing: typography.tracking.wider,
                         }}
                       >
-                        {selectedTask.status}
+                        {STATUS_LABELS[selectedTask.status] ?? selectedTask.status}
                       </Text>
                     </View>
 
@@ -1561,7 +1563,7 @@ export default function HomeScreen() {
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={{
                     padding: spacing.xl,
-                    paddingBottom: 100,
+                    paddingBottom: 80,
                   }}
                   showsVerticalScrollIndicator={false}
                   onScroll={(e) => {
@@ -1761,7 +1763,7 @@ export default function HomeScreen() {
                         style={{
                           alignSelf: isUser ? "flex-end" : "flex-start",
                           maxWidth: "85%",
-                          marginBottom: spacing.sm,
+                          marginBottom: spacing.md,
                         }}
                       >
                         <View
@@ -1770,8 +1772,8 @@ export default function HomeScreen() {
                               ? colors.primaryAlpha20
                               : colors.backgroundElevated,
                             borderRadius: radii.lg,
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: spacing.sm,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.md,
                             borderWidth: 1,
                             borderColor: isUser
                               ? colors.primaryAlpha30
@@ -1839,9 +1841,9 @@ export default function HomeScreen() {
                         <Text
                           style={{
                             color: colors.textMuted,
-                            fontSize: 10,
+                            fontSize: typography.xs,
                             fontFamily: fontFamily.regular,
-                            marginTop: 2,
+                            marginTop: spacing.xs,
                             alignSelf: isUser ? "flex-end" : "flex-start",
                             paddingHorizontal: spacing.xs,
                           }}
@@ -2053,6 +2055,8 @@ export default function HomeScreen() {
                           flex: 1,
                           backgroundColor: colors.backgroundElevated,
                           borderRadius: radii.lg,
+                          borderWidth: 1,
+                          borderColor: colors.borderLight,
                           paddingHorizontal: spacing.md,
                           paddingVertical: Platform.OS === "ios" ? 10 : 8,
                           color: colors.textPrimary,

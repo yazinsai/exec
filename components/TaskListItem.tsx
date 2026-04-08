@@ -104,7 +104,7 @@ export function TaskListItem({
         alignSelf: "stretch",
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: spacing.md,
         paddingVertical: spacing.lg,
         borderRadius: radii.sm,
         backgroundColor: isRunning
