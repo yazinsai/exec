@@ -1094,7 +1094,7 @@ export default function HomeScreen() {
             flexDirection: "row",
             alignItems: "flex-start",
             justifyContent: "space-between",
-            paddingHorizontal: spacing.xl,
+            paddingHorizontal: spacing.md,
             paddingTop: spacing.md,
             paddingBottom: spacing.lg,
           }}
@@ -1157,8 +1157,8 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
-              paddingLeft: spacing.xl,
-              paddingRight: spacing.xxl,
+              paddingLeft: spacing.md,
+              paddingRight: spacing.lg,
               gap: spacing.sm,
               paddingBottom: spacing.sm,
             }}
@@ -1283,7 +1283,7 @@ export default function HomeScreen() {
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              paddingHorizontal: spacing.xxl,
+              paddingHorizontal: spacing.lg,
             }}
           >
             <Text
@@ -1303,6 +1303,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingTop: spacing.sm,
+              paddingHorizontal: spacing.md,
               paddingBottom: insets.bottom + 64 + 48,
               gap: spacing.lg,
             }}
@@ -1317,7 +1318,6 @@ export default function HomeScreen() {
                     fontFamily: fontFamily.semibold,
                     textTransform: "uppercase",
                     letterSpacing: typography.tracking.wider,
-                    paddingHorizontal: spacing.xl,
                   }}
                 >
                   {filteredTasks.length} {filteredTasks.length === 1 ? "task" : "tasks"}
@@ -1343,7 +1343,6 @@ export default function HomeScreen() {
                 )}
                 <View
                   style={{
-                    marginHorizontal: spacing.xl,
                     backgroundColor: colors.backgroundElevated,
                     borderRadius: radii.md,
                     borderWidth: 1,
@@ -1389,7 +1388,6 @@ export default function HomeScreen() {
                       fontFamily: fontFamily.semibold,
                       textTransform: "uppercase",
                       letterSpacing: typography.tracking.wider,
-                      paddingHorizontal: spacing.xl,
                     }}
                   >
                     Voice Notes

@@ -26,7 +26,7 @@ function relativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
-function getStatusDotColor(status: string, colors: ReturnType<typeof useColors>) {
+function getStatusColor(status: string, colors: ReturnType<typeof useColors>) {
   switch (status) {
     case TASK_STATUSES.running:
       return colors.statusRunning;
@@ -44,43 +44,6 @@ function getStatusDotColor(status: string, colors: ReturnType<typeof useColors>)
   }
 }
 
-function PulsingDot({ color }: { color: string }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [opacity]);
-
-  return (
-    <Animated.View
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: color,
-        opacity,
-      }}
-    />
-  );
-}
-
 export function TaskListItem({
   title,
   status,
@@ -93,15 +56,12 @@ export function TaskListItem({
   const isRunning = status === TASK_STATUSES.running;
   const isDone = status === TASK_STATUSES.done;
   const isUnread = read === false;
-  const dotColor = getStatusDotColor(status, colors);
-  const metaParts = [projectLabel, formatTaskStatusLabel(status)].filter(Boolean);
+  const statusColor = getStatusColor(status, colors);
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        position: "relative",
-        alignSelf: "stretch",
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: spacing.md,
@@ -113,31 +73,24 @@ export function TaskListItem({
         opacity: pressed ? 0.7 : isDone ? 0.6 : 1,
       })}
     >
-      <View
-        style={{
-          width: 20,
-          alignItems: "center",
-          justifyContent: "center",
-          marginRight: spacing.sm,
-        }}
-      >
-        {isRunning ? (
-          <PulsingDot color={dotColor} />
-        ) : (
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: dotColor,
-            }}
-          />
-        )}
-      </View>
+      {/* Unread indicator */}
+      {isUnread && (
+        <View
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 3.5,
+            backgroundColor: colors.primary,
+            marginRight: spacing.xs,
+            flexShrink: 0,
+          }}
+        />
+      )}
 
-      <View style={{ flex: 1, paddingRight: 72 }}>
+      {/* Title + project label */}
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text
-          numberOfLines={1}
+          numberOfLines={2}
           style={{
             color: isDone ? colors.textTertiary : colors.textPrimary,
             fontSize: typography.base,
@@ -148,47 +101,48 @@ export function TaskListItem({
         >
           {title}
         </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            color: isRunning ? colors.statusRunning : colors.textTertiary,
-            fontSize: typography.xs,
-            fontFamily: fontFamily.regular,
-            marginTop: spacing.xs,
-          }}
-        >
-          {metaParts.join(" • ")}
-        </Text>
+        {projectLabel && (
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.textTertiary,
+              fontSize: typography.xs,
+              fontFamily: fontFamily.regular,
+              marginTop: 2,
+            }}
+          >
+            {projectLabel}
+          </Text>
+        )}
       </View>
 
+      {/* Right side: timestamp + status */}
       <View
         style={{
-          position: "absolute",
-          right: spacing.sm,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 6,
+          alignItems: "flex-end",
+          marginLeft: spacing.md,
+          flexShrink: 0,
         }}
       >
         <Text
           style={{
-            color: colors.textTertiary,
-            fontSize: typography.xs,
+            color: colors.textSecondary,
+            fontSize: typography.sm,
             fontFamily: fontFamily.regular,
           }}
         >
           {relativeTime(createdAt)}
         </Text>
-        {isUnread && (
-          <View
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: 3.5,
-              backgroundColor: colors.primary,
-            }}
-          />
-        )}
+        <Text
+          style={{
+            color: statusColor,
+            fontSize: typography.xs,
+            fontFamily: fontFamily.medium,
+            marginTop: 2,
+          }}
+        >
+          {formatTaskStatusLabel(status)}
+        </Text>
       </View>
     </Pressable>
   );

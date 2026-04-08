@@ -118,9 +118,19 @@ export function NoteListItem({
   const hasRunning = counts.running > 0;
   const unreadCount = tasks.filter((t) => t.read === false).length;
   const aggregate = formatNoteAggregateSummary(status, counts);
+
+  // Build compact meta: "4 / 5 done • 2h ago" or status summary for non-done states
+  const taskSummary = counts.total > 0
+    ? (counts.running > 0
+        ? `${counts.running} running`
+        : counts.failed > 0
+          ? `${counts.failed} failed`
+          : counts.blocked > 0
+            ? `${counts.blocked} blocked`
+            : `${counts.done} / ${counts.total} done`)
+    : aggregate;
   const metaParts = [
-    aggregate,
-    `${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`,
+    taskSummary,
     relativeTime(createdAt),
   ].filter(Boolean);
 
@@ -134,10 +144,10 @@ export function NoteListItem({
         overflow: "hidden",
       }}
     >
+      <View style={{ paddingHorizontal: spacing.xl }}>
       <Pressable
         onPress={onToggle}
         style={({ pressed }) => ({
-          paddingHorizontal: spacing.xl,
           paddingVertical: spacing.lg,
           opacity: pressed ? 0.8 : 1,
         })}
@@ -218,19 +228,18 @@ export function NoteListItem({
       {expanded && (
         <View
           style={{
-            paddingHorizontal: spacing.xl,
             paddingBottom: spacing.lg,
           }}
         >
           {tasks.length > 0 ? (
             <View
               style={{
-                marginTop: spacing.md,
+                marginTop: spacing.sm,
                 backgroundColor: colors.backgroundSubtle,
                 borderRadius: radii.md,
                 borderWidth: 1,
                 borderColor: colors.borderLight,
-                paddingHorizontal: spacing.sm,
+                overflow: "hidden",
               }}
             >
               {tasks.map((task, index) => (
@@ -325,6 +334,7 @@ export function NoteListItem({
           )}
         </View>
       )}
+      </View>
     </View>
   );
 }
