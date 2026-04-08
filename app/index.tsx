@@ -474,7 +474,7 @@ function getReleaseInfo() {
 }
 
 export default function HomeScreen() {
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [expandedNoteIds, setExpandedNoteIds] = useState<string[]>([]);
   const [followUpText, setFollowUpText] = useState("");
@@ -756,6 +756,28 @@ export default function HomeScreen() {
       ).length,
     [notes]
   );
+
+  /** Dark #000 + #111 chips/borders read as flat; bump contrast for pills + badges */
+  const filterChip = useMemo(() => {
+    if (isDark) {
+      return {
+        inactiveBg: "#2c2c2e",
+        inactiveBorder: "rgba(255,255,255,0.34)",
+        badgeMutedBg: "rgba(255,255,255,0.14)",
+        badgeMutedBorder: "rgba(255,255,255,0.3)",
+        goldSelectedBg: colors.primary,
+        goldSelectedBorder: "#ffffff",
+      };
+    }
+    return {
+      inactiveBg: colors.backgroundElevated,
+      inactiveBorder: colors.borderLight,
+      badgeMutedBg: colors.backgroundPressed,
+      badgeMutedBorder: colors.border,
+      goldSelectedBg: colors.primaryLight,
+      goldSelectedBorder: colors.primaryDark,
+    };
+  }, [isDark, colors]);
 
   const { activeNotes, historyNotes } = useMemo(() => {
     return {
@@ -1368,12 +1390,12 @@ export default function HomeScreen() {
                   paddingVertical: 8,
                   borderRadius: 22,
                   backgroundColor: filterUnread
-                    ? colors.primaryLight
-                    : colors.backgroundElevated,
+                    ? filterChip.goldSelectedBg
+                    : filterChip.inactiveBg,
                   borderWidth: filterUnread ? 2.5 : 1.5,
                   borderColor: filterUnread
-                    ? colors.primaryDark
-                    : colors.borderLight,
+                    ? filterChip.goldSelectedBorder
+                    : filterChip.inactiveBorder,
                   ...(filterUnread ? shadows.gold : {}),
                   opacity:
                     unreadNoteCount === 0
@@ -1410,10 +1432,12 @@ export default function HomeScreen() {
                       paddingVertical: 4,
                       borderRadius: 12,
                       backgroundColor: filterUnread
-                        ? "rgba(0,0,0,0.12)"
-                        : colors.backgroundPressed,
+                        ? "rgba(0,0,0,0.2)"
+                        : filterChip.badgeMutedBg,
                       borderWidth: filterUnread ? 0 : 1,
-                      borderColor: colors.border,
+                      borderColor: filterUnread
+                        ? "transparent"
+                        : filterChip.badgeMutedBorder,
                       alignItems: "center",
                     }}
                   >
@@ -1461,12 +1485,14 @@ export default function HomeScreen() {
                   backgroundColor:
                     noteTaskStatusFilter === "failed"
                       ? colors.statusFailed
-                      : colors.backgroundElevated,
+                      : filterChip.inactiveBg,
                   borderWidth: noteTaskStatusFilter === "failed" ? 2.5 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "failed"
-                      ? colors.errorLight
-                      : colors.borderLight,
+                      ? isDark
+                        ? "#fecaca"
+                        : colors.errorLight
+                      : filterChip.inactiveBorder,
                   ...(noteTaskStatusFilter === "failed" ? shadows.sm : {}),
                   opacity:
                     attentionFailedNoteCount === 0
@@ -1508,9 +1534,12 @@ export default function HomeScreen() {
                       backgroundColor:
                         noteTaskStatusFilter === "failed"
                           ? "rgba(0,0,0,0.22)"
-                          : colors.backgroundPressed,
+                          : filterChip.badgeMutedBg,
                       borderWidth: noteTaskStatusFilter === "failed" ? 0 : 1,
-                      borderColor: colors.border,
+                      borderColor:
+                        noteTaskStatusFilter === "failed"
+                          ? "transparent"
+                          : filterChip.badgeMutedBorder,
                       alignItems: "center",
                     }}
                   >
@@ -1559,12 +1588,14 @@ export default function HomeScreen() {
                   backgroundColor:
                     noteTaskStatusFilter === "blocked"
                       ? colors.warning
-                      : colors.backgroundElevated,
+                      : filterChip.inactiveBg,
                   borderWidth: noteTaskStatusFilter === "blocked" ? 2.5 : 1.5,
                   borderColor:
                     noteTaskStatusFilter === "blocked"
-                      ? colors.black
-                      : colors.borderLight,
+                      ? isDark
+                        ? "#ffffff"
+                        : colors.black
+                      : filterChip.inactiveBorder,
                   ...(noteTaskStatusFilter === "blocked" ? shadows.sm : {}),
                   opacity:
                     attentionBlockedNoteCount === 0
@@ -1606,9 +1637,12 @@ export default function HomeScreen() {
                       backgroundColor:
                         noteTaskStatusFilter === "blocked"
                           ? "rgba(0,0,0,0.12)"
-                          : colors.backgroundPressed,
+                          : filterChip.badgeMutedBg,
                       borderWidth: noteTaskStatusFilter === "blocked" ? 0 : 1,
-                      borderColor: colors.border,
+                      borderColor:
+                        noteTaskStatusFilter === "blocked"
+                          ? "transparent"
+                          : filterChip.badgeMutedBorder,
                       alignItems: "center",
                     }}
                   >
@@ -1678,12 +1712,12 @@ export default function HomeScreen() {
                         paddingVertical: 10,
                         borderRadius: 22,
                         backgroundColor: selected
-                          ? colors.primaryLight
-                          : colors.backgroundElevated,
+                          ? filterChip.goldSelectedBg
+                          : filterChip.inactiveBg,
                         borderWidth: selected ? 2.5 : 1.5,
                         borderColor: selected
-                          ? colors.primaryDark
-                          : colors.borderLight,
+                          ? filterChip.goldSelectedBorder
+                          : filterChip.inactiveBorder,
                         ...(selected ? shadows.gold : {}),
                         opacity:
                           pressed && Platform.OS !== "android" ? 0.9 : 1,
@@ -1719,8 +1753,8 @@ export default function HomeScreen() {
                       paddingVertical: 10,
                       borderRadius: 22,
                       borderWidth: 1.5,
-                      borderColor: colors.border,
-                      backgroundColor: colors.backgroundSubtle,
+                      borderColor: filterChip.inactiveBorder,
+                      backgroundColor: filterChip.inactiveBg,
                       opacity: pressed ? 0.85 : 1,
                     })}
                   >
@@ -1728,7 +1762,7 @@ export default function HomeScreen() {
                       style={{
                         fontSize: typography.sm,
                         fontFamily: fontFamily.semibold,
-                        color: colors.textTertiary,
+                        color: isDark ? colors.textSecondary : colors.textTertiary,
                       }}
                     >
                       +{projectPillsOverflow}
