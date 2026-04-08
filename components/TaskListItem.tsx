@@ -61,15 +61,16 @@ export function TaskListItem({
   const isUnread = read === false;
   const statusColor = getStatusColor(status, colors);
   const nested = density === "nested";
+  const metaFont = nested ? typography.xs : typography.sm;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: "row",
-        alignItems: nested ? "flex-start" : "center",
-        paddingHorizontal: nested ? spacing.sm : spacing.md,
-        paddingVertical: nested ? spacing.xl : spacing.lg,
+        alignItems: "flex-start",
+        paddingHorizontal: nested ? 0 : spacing.md,
+        paddingVertical: spacing.lg,
         borderRadius: radii.sm,
         backgroundColor: isRunning
           ? "rgba(59, 130, 246, 0.08)"
@@ -86,69 +87,82 @@ export function TaskListItem({
             borderRadius: 3,
             backgroundColor: colors.primary,
             marginRight: spacing.xs,
-            marginTop: nested ? 7 : 0,
+            marginTop: nested ? 6 : 7,
             flexShrink: 0,
           }}
         />
       )}
 
-      {/* Title + project label */}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          numberOfLines={2}
+        <View
           style={{
-            color: isDone ? colors.textTertiary : colors.textPrimary,
-            fontSize: typography.base,
-            fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
-            lineHeight: 21,
-            textDecorationLine: isDone ? "line-through" : "none",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: spacing.sm,
           }}
         >
-          {title}
-        </Text>
-        {projectLabel && (
+          <Text
+            numberOfLines={2}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              color: isDone ? colors.textTertiary : colors.textPrimary,
+              fontSize: typography.base,
+              fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
+              lineHeight: 21,
+              textDecorationLine: isDone ? "line-through" : "none",
+            }}
+          >
+            {title}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexShrink: 0,
+              flexWrap: "nowrap",
+              gap: nested ? 4 : 6,
+              marginTop: nested ? 1 : 2,
+              maxWidth: nested ? "38%" : "40%",
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.textSecondary,
+                fontSize: metaFont,
+                fontFamily: fontFamily.regular,
+              }}
+            >
+              {relativeTime(createdAt)}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: statusColor,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.medium,
+              }}
+            >
+              {formatTaskStatusLabel(status)}
+            </Text>
+          </View>
+        </View>
+
+        {projectLabel ? (
           <Text
             numberOfLines={1}
             style={{
               color: colors.textTertiary,
               fontSize: typography.xs,
               fontFamily: fontFamily.regular,
-              marginTop: 2,
+              marginTop: nested ? 4 : 2,
             }}
           >
             {projectLabel}
           </Text>
-        )}
-      </View>
-
-      {/* Right side: timestamp + status */}
-      <View
-        style={{
-          alignItems: "flex-end",
-          marginLeft: nested ? spacing.sm : spacing.md,
-          marginTop: nested ? 2 : 0,
-          flexShrink: 0,
-        }}
-      >
-        <Text
-          style={{
-            color: colors.textSecondary,
-            fontSize: typography.sm,
-            fontFamily: fontFamily.regular,
-          }}
-        >
-          {relativeTime(createdAt)}
-        </Text>
-        <Text
-          style={{
-            color: statusColor,
-            fontSize: typography.xs,
-            fontFamily: fontFamily.medium,
-            marginTop: 2,
-          }}
-        >
-          {formatTaskStatusLabel(status)}
-        </Text>
+        ) : null}
       </View>
     </Pressable>
   );

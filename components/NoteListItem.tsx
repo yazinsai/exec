@@ -146,22 +146,22 @@ export function NoteListItem({
     >
       <View
         style={{
-          paddingHorizontal: spacing.xl,
-          paddingTop: spacing.lg,
-          paddingBottom: expanded ? 0 : spacing.lg,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: expanded ? 0 : spacing.md,
         }}
       >
       <Pressable
         onPress={onToggle}
         style={({ pressed }) => ({
-          paddingVertical: spacing.sm,
+          paddingVertical: spacing.xs,
           opacity: pressed ? 0.8 : 1,
         })}
       >
         <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
             gap: spacing.sm,
           }}
@@ -179,25 +179,34 @@ export function NoteListItem({
               {title}
             </Text>
 
-            <Text
-              numberOfLines={1}
-              style={{
-                color: colors.textSecondary,
-                fontSize: typography.xs,
-                fontFamily: fontFamily.regular,
-                lineHeight: 16,
-                marginTop: 6,
-              }}
-            >
-              {metaParts.join(" • ")}
-            </Text>
-
             {hasRunning && !expanded && (
               <RunningIndicator count={counts.running} colors={colors} />
             )}
           </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 6,
+              flexShrink: 0,
+              maxWidth: "46%",
+            }}
+          >
+            <Text
+              numberOfLines={2}
+              style={{
+                color: colors.textSecondary,
+                fontSize: typography.xs,
+                fontFamily: fontFamily.regular,
+                lineHeight: 15,
+                textAlign: "right",
+                flex: 1,
+                minWidth: 72,
+              }}
+            >
+              {metaParts.join(" • ")}
+            </Text>
             {unreadCount > 0 && !expanded && (
               <View
                 style={{
@@ -208,6 +217,7 @@ export function NoteListItem({
                   alignItems: "center",
                   justifyContent: "center",
                   paddingHorizontal: 5,
+                  marginTop: 1,
                 }}
               >
                 <Text
@@ -226,6 +236,7 @@ export function NoteListItem({
               name={expanded ? "chevron-up" : "chevron-down"}
               size={18}
               color={colors.textTertiary}
+              style={{ marginTop: 1 }}
             />
           </View>
         </View>
@@ -234,7 +245,7 @@ export function NoteListItem({
       {expanded && (
         <View
           style={{
-            paddingBottom: spacing.lg,
+            paddingBottom: spacing.md,
           }}
         >
           {tasks.length > 0 ? (
@@ -246,6 +257,8 @@ export function NoteListItem({
                 borderWidth: 1,
                 borderColor: colors.borderLight,
                 overflow: "hidden",
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
               }}
             >
               {tasks.map((task, index) => (
