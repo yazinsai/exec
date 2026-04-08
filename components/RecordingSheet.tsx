@@ -18,7 +18,7 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { Waveform } from "./Waveform";
-import { useColors } from "@/hooks/useThemeColors";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
 
 const SHEET_HEIGHT = 280;
@@ -56,7 +56,7 @@ export function RecordingSheet({
   onResume,
   onDelete,
 }: RecordingSheetProps) {
-  const colors = useColors();
+  const { colors, isDark } = useThemeColors();
   const translateY = useSharedValue(SHEET_HEIGHT);
   const backdropOpacity = useSharedValue(0);
 
@@ -284,22 +284,35 @@ export function RecordingSheet({
                 <Pressable
                   onPress={isPaused ? onResume : onPause}
                   hitSlop={12}
+                  accessibilityLabel={isPaused ? "Resume recording" : "Pause recording"}
                   style={({ pressed }) => ({
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    borderWidth: isDark ? 2.5 : 1.5,
+                    borderColor: isPaused
+                      ? isDark
+                        ? "#ffffff"
+                        : colors.primaryDark
+                      : isDark
+                        ? "rgba(255,255,255,0.38)"
+                        : colors.border,
                     backgroundColor: isPaused
                       ? colors.primary
-                      : colors.backgroundPressed,
+                      : isDark
+                        ? "#2c2c2e"
+                        : colors.backgroundPressed,
                     alignItems: "center",
                     justifyContent: "center",
-                    opacity: pressed ? 0.7 : 1,
+                    opacity: pressed ? 0.82 : 1,
                   })}
                 >
                   <Ionicons
                     name={isPaused ? "play" : "pause"}
                     size={22}
-                    color={isPaused ? colors.black : colors.textPrimary}
+                    color={
+                      isPaused ? (isDark ? colors.white : colors.black) : colors.textPrimary
+                    }
                   />
                 </Pressable>
 
