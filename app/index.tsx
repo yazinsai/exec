@@ -1572,7 +1572,7 @@ export default function HomeScreen() {
             contentContainerStyle={{
               paddingTop: spacing.md,
               paddingHorizontal: spacing.sm,
-              paddingBottom: insets.bottom + 112,
+              paddingBottom: insets.bottom + 96,
               gap: spacing.lg,
             }}
           >
@@ -1928,24 +1928,6 @@ export default function HomeScreen() {
             )}
           </ScrollView>
         )}
-
-        {/* Mic dock — separates capture from the scroll feed */}
-        {!isLoading ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: insets.bottom + 76,
-              backgroundColor: colors.background,
-              opacity: 0.97,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-            }}
-          />
-        ) : null}
 
         {/* FAB */}
         <RecordFAB
