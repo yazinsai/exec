@@ -510,7 +510,7 @@ export default function HomeScreen() {
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
   /** Voice notes that contain ≥1 task with this status */
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
-    "failed" | "blocked" | null
+    "running" | "failed" | "blocked" | null
   >(null);
   const [showAllProjectPills, setShowAllProjectPills] = useState(false);
   const releaseInfo = getReleaseInfo();
@@ -724,6 +724,9 @@ export default function HomeScreen() {
         );
         if (!hasProject) return false;
       }
+      if (noteTaskStatusFilter === "running") {
+        if (!noteHasTaskWithStatus(note, TASK_STATUSES.running)) return false;
+      }
       if (noteTaskStatusFilter === "failed") {
         if (!noteHasTaskWithStatus(note, TASK_STATUSES.failed)) return false;
       }
@@ -736,6 +739,12 @@ export default function HomeScreen() {
 
   const isFiltering = filterUnread || !!filterProject;
 
+  const runningNoteCount = useMemo(
+    () =>
+      notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.running))
+        .length,
+    [notes]
+  );
   const attentionFailedNoteCount = useMemo(
     () =>
       notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.failed))
@@ -764,6 +773,9 @@ export default function HomeScreen() {
         onGoldBg: colors.primary,
         onGoldFg: colors.black,
         ringGold: "#ffffff",
+        onRunningBg: colors.statusRunning,
+        onRunningFg: "#ffffff",
+        ringRunning: "#93c5fd",
         onFailedBg: colors.statusFailed,
         onFailedFg: "#ffffff",
         ringFailed: "#fecaca",
@@ -779,6 +791,9 @@ export default function HomeScreen() {
       onGoldBg: colors.primaryLight,
       onGoldFg: colors.black,
       ringGold: colors.primaryDark,
+      onRunningBg: colors.statusRunning,
+      onRunningFg: "#ffffff",
+      ringRunning: "#1e40af",
       onFailedBg: colors.statusFailed,
       onFailedFg: "#ffffff",
       ringFailed: "#fecaca",
@@ -1435,6 +1450,81 @@ export default function HomeScreen() {
                     }}
                   >
                     {` ${unreadNoteCount}`}
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: noteTaskStatusFilter === "running",
+                }}
+                accessibilityHint="Show voice notes that include a running task"
+                disabled={runningNoteCount === 0}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(255,255,255,0.15)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                onPress={() => {
+                  setNoteTaskStatusFilter((prev) =>
+                    prev === "running" ? null : "running"
+                  );
+                  void Haptics.selectionAsync();
+                }}
+                style={({ pressed }) => ({
+                  minHeight: 40,
+                  justifyContent: "center",
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: 20,
+                  backgroundColor:
+                    noteTaskStatusFilter === "running"
+                      ? waFilter.onRunningBg
+                      : waFilter.offBg,
+                  borderWidth: noteTaskStatusFilter === "running" ? 2 : 1.5,
+                  borderColor:
+                    noteTaskStatusFilter === "running"
+                      ? waFilter.ringRunning
+                      : waFilter.offBorder,
+                  opacity:
+                    runningNoteCount === 0
+                      ? 0.4
+                      : pressed && Platform.OS !== "android"
+                        ? 0.9
+                        : 1,
+                  transform:
+                    runningNoteCount > 0 && pressed
+                      ? [{ scale: 0.98 }]
+                      : [],
+                })}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      color:
+                        noteTaskStatusFilter === "running"
+                          ? waFilter.onRunningFg
+                          : colors.statusRunning,
+                    }}
+                  >
+                    Running
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      fontVariant: ["tabular-nums"],
+                      color:
+                        noteTaskStatusFilter === "running"
+                          ? waFilter.onRunningFg
+                          : waFilter.offCount,
+                    }}
+                  >
+                    {` ${runningNoteCount}`}
                   </Text>
                 </View>
               </Pressable>
