@@ -103,14 +103,14 @@ export function StepTaskRow({
   return (
     <View
       style={{
-        paddingVertical: expanded && actionable ? spacing.md : spacing.md,
+        paddingVertical: expanded && actionable ? spacing.sm : spacing.xs,
       }}
     >
       <Pressable
         onPress={handleMainPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
       >
-        <View style={{ gap: spacing.sm }}>
+        <View style={{ gap: spacing.xs }}>
           <View
             style={{
               flexDirection: "row",

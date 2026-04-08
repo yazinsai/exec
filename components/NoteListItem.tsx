@@ -354,7 +354,7 @@ export function NoteListItem({
                 overflow: "hidden",
                 paddingHorizontal: spacing.lg,
                 paddingVertical: spacing.md,
-                gap: spacing.xl,
+                gap: spacing.sm,
               }}
             >
               {orderedTasks.map((task, index) => (
