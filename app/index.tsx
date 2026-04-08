@@ -56,7 +56,6 @@ import {
   shadows,
 } from "@/constants/Colors";
 import {
-  computeAttentionCounts,
   getTaskSortWeight,
   NOTE_STATUSES,
   noteIsSettledForHistory,
@@ -504,6 +503,9 @@ export default function HomeScreen() {
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
   const [attentionFeedOnly, setAttentionFeedOnly] = useState(false);
+  const [activeWorkFilter, setActiveWorkFilter] = useState<
+    "all" | "failed" | "blocked"
+  >("all");
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isPaused || isSaving;
@@ -705,43 +707,43 @@ export default function HomeScreen() {
 
   const isFiltering = filterUnread || !!filterProject;
 
-  const attentionCounts = useMemo(
-    () => computeAttentionCounts(allTasks),
-    [allTasks]
-  );
-  const attentionTotal =
-    attentionCounts.running + attentionCounts.blocked + attentionCounts.failed;
-
-  const attentionTaskList = useMemo(() => {
+  /** Failed + blocked only (not running) — Active work inbox */
+  const stuckAttentionTasks = useMemo(() => {
     return allTasks
-      .filter((t) =>
-        (
-          [
-            TASK_STATUSES.running,
-            TASK_STATUSES.blocked,
-            TASK_STATUSES.failed,
-          ] as string[]
-        ).includes(t.status)
+      .filter(
+        (t) =>
+          t.status === TASK_STATUSES.failed ||
+          t.status === TASK_STATUSES.blocked
       )
       .sort(
         (a, b) => getTaskSortWeight(a.status) - getTaskSortWeight(b.status)
       );
   }, [allTasks]);
 
-  const issueAttentionTasks = useMemo(
-    () =>
-      attentionTaskList.filter(
-        (t) =>
-          t.status === TASK_STATUSES.failed ||
-          t.status === TASK_STATUSES.blocked
-      ),
-    [attentionTaskList]
+  const stuckFailedCount = useMemo(
+    () => stuckAttentionTasks.filter((t) => t.status === TASK_STATUSES.failed)
+      .length,
+    [stuckAttentionTasks]
   );
-  const runningAttentionTasks = useMemo(
-    () =>
-      attentionTaskList.filter((t) => t.status === TASK_STATUSES.running),
-    [attentionTaskList]
+  const stuckBlockedCount = useMemo(
+    () => stuckAttentionTasks.filter((t) => t.status === TASK_STATUSES.blocked)
+      .length,
+    [stuckAttentionTasks]
   );
+
+  const filteredStuckTasks = useMemo(() => {
+    if (activeWorkFilter === "failed") {
+      return stuckAttentionTasks.filter(
+        (t) => t.status === TASK_STATUSES.failed
+      );
+    }
+    if (activeWorkFilter === "blocked") {
+      return stuckAttentionTasks.filter(
+        (t) => t.status === TASK_STATUSES.blocked
+      );
+    }
+    return stuckAttentionTasks;
+  }, [stuckAttentionTasks, activeWorkFilter]);
 
   const { activeNotes, historyNotes } = useMemo(() => {
     return {
@@ -755,6 +757,15 @@ export default function HomeScreen() {
     [historyNotes, visibleHistoryCount]
   );
   const historyRemaining = Math.max(0, historyNotes.length - visibleHistory.length);
+
+  useEffect(() => {
+    if (activeWorkFilter === "failed" && stuckFailedCount === 0) {
+      setActiveWorkFilter("all");
+    }
+    if (activeWorkFilter === "blocked" && stuckBlockedCount === 0) {
+      setActiveWorkFilter("all");
+    }
+  }, [activeWorkFilter, stuckFailedCount, stuckBlockedCount]);
 
   // Flat task list for filtered view
   const filteredTasks = useMemo(() => {
@@ -1514,189 +1525,201 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                {attentionTotal > 0 ? (
-                  <View
-                    style={{
-                      paddingVertical: spacing.md,
-                      paddingHorizontal: spacing.md,
-                      borderRadius: radii.md,
-                      backgroundColor: colors.backgroundElevated,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      gap: spacing.sm,
-                    }}
-                  >
-                    <Text
+                {stuckAttentionTasks.length > 0 ? (
+                  <View style={{ gap: spacing.sm }}>
+                    <View
                       style={{
-                        color: colors.textTertiary,
-                        fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
-                        letterSpacing: typography.tracking.wider,
-                        textTransform: "uppercase",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing.sm,
+                        flexWrap: "nowrap",
                       }}
-                    >
-                      Now
-                    </Text>
-
-                    {issueAttentionTasks.length > 0 ? (
-                      <>
-                        <Text
-                          style={{
-                            color: colors.textPrimary,
-                            fontSize: typography.sm,
-                            fontFamily: fontFamily.semibold,
-                            lineHeight: 20,
-                          }}
-                        >
-                          {issueAttentionTasks.length}{" "}
-                          {issueAttentionTasks.length === 1
-                            ? "issue needs your attention"
-                            : "issues need your attention"}
-                        </Text>
-                        {issueAttentionTasks.slice(0, 2).map((t) => (
-                          <Text
-                            key={t.id}
-                            numberOfLines={1}
-                            style={{
-                              color: colors.textSecondary,
-                              fontSize: typography.xs,
-                              fontFamily: fontFamily.regular,
-                              lineHeight: 17,
-                            }}
-                          >
-                            • {t.summary || t.input}
-                          </Text>
-                        ))}
-                        <Pressable
-                          onPress={() => {
-                            const t = issueAttentionTasks[0];
-                            setSelectedTaskId(t.id);
-                            setFollowUpText("");
-                            setShowJumpToEnd(false);
-                            setShowJumpToTop(false);
-                            db.transact(db.tx.tasks[t.id].update({ read: true }));
-                            void Haptics.impactAsync(
-                              Haptics.ImpactFeedbackStyle.Light
-                            );
-                          }}
-                          style={({ pressed }) => ({
-                            alignSelf: "flex-start",
-                            marginTop: 2,
-                            paddingVertical: spacing.sm,
-                            paddingHorizontal: spacing.md,
-                            borderRadius: radii.md,
-                            backgroundColor: colors.primaryAlpha20,
-                            opacity: pressed ? 0.85 : 1,
-                          })}
-                        >
-                          <Text
-                            style={{
-                              color: colors.primary,
-                              fontSize: typography.xs,
-                              fontFamily: fontFamily.semibold,
-                            }}
-                          >
-                            Review issues
-                          </Text>
-                        </Pressable>
-                        {issueAttentionTasks.length > 2 ? (
-                          <Text
-                            style={{
-                              color: colors.textTertiary,
-                              fontSize: typography.xs,
-                              fontFamily: fontFamily.regular,
-                            }}
-                          >
-                            {issueAttentionTasks.length - 2} other issues in the
-                            list below
-                          </Text>
-                        ) : null}
-                      </>
-                    ) : null}
-
-                    {runningAttentionTasks.length > 0 ? (
-                      <Text
-                        numberOfLines={2}
-                        style={{
-                          color: colors.textSecondary,
-                          fontSize: typography.xs,
-                          fontFamily: fontFamily.regular,
-                          lineHeight: 17,
-                          marginTop: issueAttentionTasks.length > 0 ? spacing.xs : 0,
-                        }}
-                      >
-                        {runningAttentionTasks.length}{" "}
-                        {runningAttentionTasks.length === 1 ? "task" : "tasks"}{" "}
-                        running
-                        {runningAttentionTasks[0]
-                          ? ` · ${(runningAttentionTasks[0].summary || runningAttentionTasks[0].input).slice(0, 72)}${(runningAttentionTasks[0].summary || runningAttentionTasks[0].input).length > 72 ? "…" : ""}`
-                          : ""}
-                      </Text>
-                    ) : null}
-
-                    <Pressable
-                      onPress={() => {
-                        setAttentionFeedOnly((v) => !v);
-                        void Haptics.impactAsync(
-                          Haptics.ImpactFeedbackStyle.Light
-                        );
-                      }}
-                      style={({ pressed }) => ({
-                        marginTop: spacing.xs,
-                        paddingVertical: spacing.xs,
-                        opacity: pressed ? 0.65 : 1,
-                      })}
                     >
                       <Text
                         style={{
                           color: colors.textTertiary,
                           fontSize: typography.xs,
-                          fontFamily: fontFamily.medium,
+                          fontFamily: fontFamily.semibold,
+                          textTransform: "uppercase",
+                          letterSpacing: typography.tracking.wider,
+                          flexShrink: 0,
                         }}
                       >
-                        {attentionFeedOnly
-                          ? "Show full feed"
-                          : "Hide settled history"}
+                        Active work
                       </Text>
-                    </Pressable>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                          paddingRight: spacing.sm,
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => setActiveWorkFilter("all")}
+                          style={({ pressed }) => ({
+                            paddingHorizontal: spacing.md,
+                            paddingVertical: 6,
+                            borderRadius: 16,
+                            backgroundColor:
+                              activeWorkFilter === "all"
+                                ? colors.primary
+                                : colors.backgroundElevated,
+                            borderWidth: 1,
+                            borderColor:
+                              activeWorkFilter === "all"
+                                ? colors.primary
+                                : colors.border,
+                            opacity: pressed ? 0.85 : 1,
+                          })}
+                        >
+                          <Text
+                            style={{
+                              fontSize: typography.xs,
+                              fontFamily: fontFamily.medium,
+                              color:
+                                activeWorkFilter === "all"
+                                  ? colors.black
+                                  : colors.textSecondary,
+                            }}
+                          >
+                            All ({stuckAttentionTasks.length})
+                          </Text>
+                        </Pressable>
+                        {stuckFailedCount > 0 ? (
+                          <Pressable
+                            onPress={() => setActiveWorkFilter("failed")}
+                            style={({ pressed }) => ({
+                              paddingHorizontal: spacing.md,
+                              paddingVertical: 6,
+                              borderRadius: 16,
+                              backgroundColor:
+                                activeWorkFilter === "failed"
+                                  ? colors.statusFailed
+                                  : colors.backgroundElevated,
+                              borderWidth: 1,
+                              borderColor:
+                                activeWorkFilter === "failed"
+                                  ? colors.statusFailed
+                                  : colors.border,
+                              opacity: pressed ? 0.85 : 1,
+                            })}
+                          >
+                            <Text
+                              style={{
+                                fontSize: typography.xs,
+                                fontFamily: fontFamily.medium,
+                                color:
+                                  activeWorkFilter === "failed"
+                                    ? "#fff"
+                                    : colors.textSecondary,
+                              }}
+                            >
+                              Failed ({stuckFailedCount})
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                        {stuckBlockedCount > 0 ? (
+                          <Pressable
+                            onPress={() => setActiveWorkFilter("blocked")}
+                            style={({ pressed }) => ({
+                              paddingHorizontal: spacing.md,
+                              paddingVertical: 6,
+                              borderRadius: 16,
+                              backgroundColor:
+                                activeWorkFilter === "blocked"
+                                  ? colors.warning
+                                  : colors.backgroundElevated,
+                              borderWidth: 1,
+                              borderColor:
+                                activeWorkFilter === "blocked"
+                                  ? colors.warning
+                                  : colors.border,
+                              opacity: pressed ? 0.85 : 1,
+                            })}
+                          >
+                            <Text
+                              style={{
+                                fontSize: typography.xs,
+                                fontFamily: fontFamily.medium,
+                                color:
+                                  activeWorkFilter === "blocked"
+                                    ? colors.black
+                                    : colors.textSecondary,
+                              }}
+                            >
+                              Blocked ({stuckBlockedCount})
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </ScrollView>
+                    </View>
+
+                    {filteredStuckTasks.length === 0 ? (
+                      <Text
+                        style={{
+                          color: colors.textTertiary,
+                          fontSize: typography.sm,
+                          fontFamily: fontFamily.regular,
+                        }}
+                      >
+                        Nothing in this filter.
+                      </Text>
+                    ) : (
+                      filteredStuckTasks.map((task) => (
+                        <AttentionTaskRow
+                          key={task.id}
+                          title={task.summary || task.input}
+                          status={task.status}
+                          projectLabel={
+                            (task as any).project?.slug ||
+                            (task as any).projectSlug ||
+                            null
+                          }
+                          blockedReason={(task as any).blockedReason}
+                          errorMessage={(task as any).errorMessage}
+                          onPress={() => {
+                            setSelectedTaskId(task.id);
+                            setFollowUpText("");
+                            setShowJumpToEnd(false);
+                            setShowJumpToTop(false);
+                            db.transact(
+                              db.tx.tasks[task.id].update({ read: true })
+                            );
+                          }}
+                        />
+                      ))
+                    )}
                   </View>
                 ) : null}
 
-                {attentionTaskList.length > 0 ? (
-                  <View style={{ gap: spacing.xs }}>
+                {notes.length > 0 ? (
+                  <Pressable
+                    onPress={() => {
+                      setAttentionFeedOnly((v) => !v);
+                      void Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                      );
+                    }}
+                    style={({ pressed }) => ({
+                      paddingVertical: spacing.xs,
+                      opacity: pressed ? 0.65 : 1,
+                    })}
+                  >
                     <Text
                       style={{
                         color: colors.textTertiary,
                         fontSize: typography.xs,
-                        fontFamily: fontFamily.semibold,
-                        textTransform: "uppercase",
-                        letterSpacing: typography.tracking.wider,
+                        fontFamily: fontFamily.medium,
                       }}
                     >
-                      Active work
+                      {attentionFeedOnly
+                        ? "Show full feed"
+                        : "Hide settled history"}
                     </Text>
-                    {attentionTaskList.map((task) => (
-                      <AttentionTaskRow
-                        key={task.id}
-                        title={task.summary || task.input}
-                        status={task.status}
-                        projectLabel={
-                          (task as any).project?.slug ||
-                          (task as any).projectSlug ||
-                          null
-                        }
-                        blockedReason={(task as any).blockedReason}
-                        errorMessage={(task as any).errorMessage}
-                        onPress={() => {
-                          setSelectedTaskId(task.id);
-                          setFollowUpText("");
-                          setShowJumpToEnd(false);
-                          setShowJumpToTop(false);
-                          db.transact(db.tx.tasks[task.id].update({ read: true }));
-                        }}
-                      />
-                    ))}
-                  </View>
+                  </Pressable>
                 ) : null}
 
                 {activeNotes.length > 0 ? (
