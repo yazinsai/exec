@@ -149,7 +149,6 @@ export function NoteListItem({
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
   const hasRunning = counts.running > 0;
-  const unreadCount = tasks.filter((t) => t.read === false).length;
   const aggregate = formatNoteAggregateSummary(status, counts);
   const subline = buildCardSubline(counts, createdAt, aggregate);
 
@@ -329,46 +328,12 @@ export function NoteListItem({
             )}
           </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              gap: 6,
-              flexShrink: 0,
-            }}
-          >
-            {unreadCount > 0 && !expanded && (
-              <View
-                style={{
-                  minWidth: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  backgroundColor: colors.primary,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingHorizontal: 5,
-                  marginTop: 2,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.black,
-                    fontSize: 11,
-                    fontFamily: fontFamily.semibold,
-                    lineHeight: 14,
-                  }}
-                >
-                  {unreadCount}
-                </Text>
-              </View>
-            )}
-            <Ionicons
-              name={expanded ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={colors.textTertiary}
-              style={{ marginTop: 2 }}
-            />
-          </View>
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={colors.textTertiary}
+            style={{ marginTop: 2, flexShrink: 0 }}
+          />
         </View>
       </Pressable>
 
