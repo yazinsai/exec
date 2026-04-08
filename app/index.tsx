@@ -22,6 +22,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Markdown from "react-native-markdown-display";
 import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
 import * as Updates from "expo-updates";
 import { Ionicons } from "@expo/vector-icons";
 import { id } from "@instantdb/react-native";
@@ -507,6 +508,11 @@ export default function HomeScreen() {
   const [showJumpToTop, setShowJumpToTop] = useState(false);
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterProject, setFilterProject] = useState<string | null>(null);
+
+  // TTS state
+  const [ttsActiveId, setTtsActiveId] = useState<string | null>(null);
+  const [ttsSpeed, setTtsSpeed] = useState<1 | 1.5 | 2>(1);
+  const TTS_SPEEDS = [1, 1.5, 2] as const;
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
   /** Voice notes that contain ≥1 task with this status */
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
@@ -1045,6 +1051,59 @@ export default function HomeScreen() {
     }
     setSendingFollowUp(false);
   }, [selectedTask, followUpText]);
+
+  // TTS helpers
+  const stripMarkdown = useCallback((text: string): string => {
+    return text
+      .replace(/```[\s\S]*?```/g, " code block ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/#{1,6}\s+/g, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+      .replace(/^[-*+]\s+/gm, "")
+      .replace(/^\d+\.\s+/gm, "")
+      .replace(/^>\s+/gm, "")
+      .replace(/---+/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }, []);
+
+  const toggleTts = useCallback((contentId: string, text: string) => {
+    if (ttsActiveId === contentId) {
+      Speech.stop();
+      setTtsActiveId(null);
+      return;
+    }
+    Speech.stop();
+    const cleaned = stripMarkdown(text);
+    setTtsActiveId(contentId);
+    Speech.speak(cleaned, {
+      rate: ttsSpeed,
+      onDone: () => setTtsActiveId(null),
+      onStopped: () => setTtsActiveId(null),
+      onError: () => setTtsActiveId(null),
+    });
+  }, [ttsActiveId, ttsSpeed, stripMarkdown]);
+
+  const cycleTtsSpeed = useCallback(() => {
+    const currentIdx = TTS_SPEEDS.indexOf(ttsSpeed);
+    const nextSpeed = TTS_SPEEDS[(currentIdx + 1) % TTS_SPEEDS.length];
+    setTtsSpeed(nextSpeed);
+    if (ttsActiveId) {
+      Speech.stop();
+      setTtsActiveId(null);
+    }
+  }, [ttsSpeed, ttsActiveId, TTS_SPEEDS]);
+
+  // Stop TTS when closing the modal
+  useEffect(() => {
+    if (!selectedTask) {
+      Speech.stop();
+      setTtsActiveId(null);
+    }
+  }, [selectedTask]);
 
   // Voice follow-up recording
   const startFollowUpRecording = useCallback(async () => {
@@ -2271,10 +2330,40 @@ export default function HomeScreen() {
                               fontFamily: fontFamily.semibold,
                               textTransform: "uppercase",
                               letterSpacing: typography.tracking.label,
+                              flex: 1,
                             }}
                           >
                             Result
                           </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                            {ttsActiveId === "result" && (
+                              <Pressable
+                                onPress={cycleTtsSpeed}
+                                hitSlop={8}
+                                style={{
+                                  paddingHorizontal: spacing.sm,
+                                  paddingVertical: 2,
+                                  borderRadius: radii.sm,
+                                  backgroundColor: colors.primaryAlpha20,
+                                }}
+                              >
+                                <Text style={{ color: colors.primary, fontSize: typography.xs, fontFamily: fontFamily.semibold }}>
+                                  {ttsSpeed}×
+                                </Text>
+                              </Pressable>
+                            )}
+                            <Pressable
+                              onPress={() => toggleTts("result", selectedTask.result!)}
+                              hitSlop={12}
+                              style={{ padding: spacing.xs, minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                            >
+                              <Ionicons
+                                name={ttsActiveId === "result" ? "stop-circle" : "play-circle"}
+                                size={20}
+                                color={ttsActiveId === "result" ? colors.statusFailed : colors.textTertiary}
+                              />
+                            </Pressable>
+                          </View>
                         </View>
                         <Markdown style={mdStyles}>
                           {selectedTask.result}
@@ -2284,6 +2373,7 @@ export default function HomeScreen() {
                   }
                   renderItem={({ item: msg }: { item: Message }) => {
                     const isUser = msg.role === "user";
+                    const msgTtsId = `msg-${msg.id}`;
                     return (
                       <View
                         style={{
@@ -2332,18 +2422,57 @@ export default function HomeScreen() {
                             </Markdown>
                           )}
                         </View>
-                        <Text
+                        <View
                           style={{
-                            color: colors.textMuted,
-                            fontSize: typography.xs,
-                            fontFamily: fontFamily.regular,
+                            flexDirection: "row",
+                            alignItems: "center",
                             marginTop: spacing.xs,
                             alignSelf: isUser ? "flex-end" : "flex-start",
                             paddingHorizontal: spacing.xs,
+                            gap: spacing.sm,
                           }}
                         >
-                          {relativeTime(msg.createdAt)}
-                        </Text>
+                          <Text
+                            style={{
+                              color: colors.textMuted,
+                              fontSize: typography.xs,
+                              fontFamily: fontFamily.regular,
+                            }}
+                          >
+                            {relativeTime(msg.createdAt)}
+                          </Text>
+                          {!isUser && (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                              {ttsActiveId === msgTtsId && (
+                                <Pressable
+                                  onPress={cycleTtsSpeed}
+                                  hitSlop={8}
+                                  style={{
+                                    paddingHorizontal: spacing.sm,
+                                    paddingVertical: 2,
+                                    borderRadius: radii.sm,
+                                    backgroundColor: colors.primaryAlpha20,
+                                  }}
+                                >
+                                  <Text style={{ color: colors.primary, fontSize: typography.xs, fontFamily: fontFamily.semibold }}>
+                                    {ttsSpeed}×
+                                  </Text>
+                                </Pressable>
+                              )}
+                              <Pressable
+                                onPress={() => toggleTts(msgTtsId, msg.content)}
+                                hitSlop={12}
+                                style={{ minWidth: 44, minHeight: 28, alignItems: "center", justifyContent: "center" }}
+                              >
+                                <Ionicons
+                                  name={ttsActiveId === msgTtsId ? "stop-circle-outline" : "play-circle-outline"}
+                                  size={18}
+                                  color={ttsActiveId === msgTtsId ? colors.statusFailed : colors.textMuted}
+                                />
+                              </Pressable>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     );
                   }}
