@@ -261,7 +261,15 @@ export function RecordingSheet({
                   paddingTop: spacing.md,
                 }}
               >
-                <Pressable onPress={onDelete} hitSlop={12} style={{ width: 60 }}>
+                <Pressable
+                  onPress={onDelete}
+                  hitSlop={12}
+                  style={{
+                    minWidth: 60,
+                    minHeight: 44,
+                    justifyContent: "center",
+                  }}
+                >
                   <Text
                     style={{
                       color: colors.error,
@@ -295,7 +303,16 @@ export function RecordingSheet({
                   />
                 </Pressable>
 
-                <Pressable onPress={onDone} hitSlop={12} style={{ width: 60, alignItems: "flex-end" }}>
+                <Pressable
+                  onPress={onDone}
+                  hitSlop={12}
+                  style={{
+                    minWidth: 60,
+                    minHeight: 44,
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                  }}
+                >
                   <Text
                     style={{
                       color: colors.primary,

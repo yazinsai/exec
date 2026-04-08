@@ -1112,7 +1112,7 @@ export default function HomeScreen() {
             </Text>
             <Pressable
               onPress={() => setShowDictionary(true)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
               <Ionicons name="book-outline" size={20} color={colors.textTertiary} />
@@ -1169,9 +1169,9 @@ export default function HomeScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 5,
-                paddingHorizontal: spacing.md,
-                paddingVertical: 6,
-                borderRadius: 16,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                borderRadius: 22,
                 backgroundColor: filterUnread
                   ? colors.primary
                   : colors.backgroundElevated,
@@ -1213,9 +1213,9 @@ export default function HomeScreen() {
                   setFilterProject((v) => (v === slug ? null : slug))
                 }
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: 6,
-                  borderRadius: 16,
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                  borderRadius: 22,
                   backgroundColor:
                     filterProject === slug
                       ? colors.primary
@@ -1251,9 +1251,9 @@ export default function HomeScreen() {
                   setFilterProject(null);
                 }}
                 style={({ pressed }) => ({
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: 6,
-                  borderRadius: 16,
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                  borderRadius: 22,
                   opacity: pressed ? 0.5 : 0.7,
                 })}
               >
@@ -1666,8 +1666,9 @@ export default function HomeScreen() {
                             flexDirection: "row",
                             alignItems: "center",
                             gap: spacing.xs,
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: spacing.sm,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.md,
+                            minHeight: 44,
                             backgroundColor: colors.errorBgAlpha,
                             borderRadius: radii.md,
                             marginBottom: spacing.xl,
@@ -1859,10 +1860,10 @@ export default function HomeScreen() {
                     style={{
                       position: "absolute",
                       right: spacing.xl,
-                      bottom: showJumpToEnd ? 130 : 80,
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
+                      bottom: showJumpToEnd ? 134 : 80,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: colors.backgroundElevated,
                       borderWidth: 1,
                       borderColor: colors.border,
@@ -1885,9 +1886,9 @@ export default function HomeScreen() {
                       position: "absolute",
                       right: spacing.xl,
                       bottom: 80,
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: colors.backgroundElevated,
                       borderWidth: 1,
                       borderColor: colors.border,
@@ -1920,7 +1921,10 @@ export default function HomeScreen() {
                       <Pressable
                         onPress={cancelFollowUpRecording}
                         hitSlop={12}
-                        style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+                        style={({ pressed }) => [
+                          { minHeight: 44, justifyContent: "center" as const },
+                          pressed && { opacity: 0.7 },
+                        ]}
                       >
                         <Text
                           style={{
@@ -1961,7 +1965,9 @@ export default function HomeScreen() {
                             backgroundColor: colors.primary,
                             borderRadius: radii.lg,
                             paddingHorizontal: spacing.lg,
-                            paddingVertical: spacing.sm,
+                            paddingVertical: spacing.md,
+                            minHeight: 44,
+                            justifyContent: "center" as const,
                           },
                           pressed && { opacity: 0.7 },
                         ]}
@@ -2021,12 +2027,11 @@ export default function HomeScreen() {
                         onPress={startFollowUpRecording}
                         accessibilityRole="button"
                         accessibilityLabel="Record voice follow-up"
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={({ pressed }) => [
                           {
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
                             backgroundColor: colors.backgroundElevated,
                             alignItems: "center",
                             justifyContent: "center",
@@ -2064,12 +2069,11 @@ export default function HomeScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Send follow-up"
                         accessibilityState={{ disabled: !followUpText.trim() || sendingFollowUp }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={({ pressed }) => [
                           {
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
                             backgroundColor: followUpText.trim()
                               ? colors.primary
                               : colors.backgroundElevated,
