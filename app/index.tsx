@@ -509,7 +509,6 @@ export default function HomeScreen() {
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
-  const [attentionFeedOnly, setAttentionFeedOnly] = useState(false);
   /** Voice notes that contain ≥1 task with this status */
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
     "failed" | "blocked" | null
@@ -748,6 +747,13 @@ export default function HomeScreen() {
     () =>
       notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.blocked))
         .length,
+    [notes]
+  );
+  const unreadNoteCount = useMemo(
+    () =>
+      notes.filter((n) =>
+        (n.tasks ?? []).some((t) => (t as any).read === false)
+      ).length,
     [notes]
   );
 
@@ -1335,7 +1341,7 @@ export default function HomeScreen() {
               contentContainerStyle={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 10,
+                gap: 18,
                 paddingRight: spacing.md,
                 paddingVertical: 2,
               }}
@@ -1343,6 +1349,8 @@ export default function HomeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: filterUnread }}
+                accessibilityHint="Show voice notes that include an unread task"
+                disabled={unreadNoteCount === 0}
                 android_ripple={
                   Platform.OS === "android"
                     ? { color: "rgba(255,255,255,0.12)" }
@@ -1356,8 +1364,8 @@ export default function HomeScreen() {
                 style={({ pressed }) => ({
                   minHeight: 44,
                   justifyContent: "center",
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
                   borderRadius: 22,
                   backgroundColor: filterUnread
                     ? colors.primaryLight
@@ -1368,15 +1376,22 @@ export default function HomeScreen() {
                     : colors.borderLight,
                   ...(filterUnread ? shadows.gold : {}),
                   opacity:
-                    pressed && Platform.OS !== "android" ? 0.88 : 1,
-                  transform: pressed ? [{ scale: 0.98 }] : [],
+                    unreadNoteCount === 0
+                      ? 0.42
+                      : pressed && Platform.OS !== "android"
+                        ? 0.88
+                        : 1,
+                  transform:
+                    unreadNoteCount > 0 && pressed
+                      ? [{ scale: 0.98 }]
+                      : [],
                 })}
               >
                 <View
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   <View
@@ -1399,6 +1414,33 @@ export default function HomeScreen() {
                   >
                     Unread
                   </Text>
+                  <View
+                    style={{
+                      minWidth: 28,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                      backgroundColor: filterUnread
+                        ? "rgba(0,0,0,0.12)"
+                        : colors.backgroundPressed,
+                      borderWidth: filterUnread ? 0 : 1,
+                      borderColor: colors.border,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.xs,
+                        fontFamily: fontFamily.bold,
+                        fontVariant: ["tabular-nums"],
+                        color: filterUnread
+                          ? colors.black
+                          : colors.textPrimary,
+                      }}
+                    >
+                      {unreadNoteCount}
+                    </Text>
+                  </View>
                 </View>
               </Pressable>
 
@@ -1453,7 +1495,7 @@ export default function HomeScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   <Text
@@ -1551,7 +1593,7 @@ export default function HomeScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   <Text
@@ -1596,56 +1638,6 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </View>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: attentionFeedOnly }}
-                accessibilityLabel={
-                  attentionFeedOnly
-                    ? "Show full feed including settled notes"
-                    : "Focus on active notes only"
-                }
-                android_ripple={
-                  Platform.OS === "android"
-                    ? { color: "rgba(255,255,255,0.1)" }
-                    : undefined
-                }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                onPress={() => {
-                  setAttentionFeedOnly((v) => !v);
-                  void Haptics.impactAsync(
-                    Haptics.ImpactFeedbackStyle.Light
-                  );
-                }}
-                style={({ pressed }) => ({
-                  minHeight: 44,
-                  justifyContent: "center",
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  borderRadius: 22,
-                  backgroundColor: attentionFeedOnly
-                    ? colors.primaryAlpha30
-                    : colors.backgroundElevated,
-                  borderWidth: attentionFeedOnly ? 2 : 1.5,
-                  borderColor: attentionFeedOnly
-                    ? colors.primary
-                    : colors.borderLight,
-                  opacity: pressed && Platform.OS !== "android" ? 0.88 : 1,
-                  transform: pressed ? [{ scale: 0.98 }] : [],
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.sm,
-                    fontFamily: fontFamily.semibold,
-                    color: attentionFeedOnly
-                      ? colors.primaryLight
-                      : colors.textSecondary,
-                  }}
-                >
-                  {attentionFeedOnly ? "Full feed" : "Focus"}
-                </Text>
               </Pressable>
             </ScrollView>
 
@@ -1922,7 +1914,7 @@ export default function HomeScreen() {
                   <>{activeNotes.map(renderNoteCard)}</>
                 ) : null}
 
-                {!attentionFeedOnly && historyNotes.length > 0 ? (
+                {historyNotes.length > 0 ? (
                   <>
                     {visibleHistory.map(renderNoteCard)}
                     {historyRemaining > 0 ? (
