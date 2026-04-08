@@ -1160,17 +1160,25 @@ export default function HomeScreen() {
     pre: {
       backgroundColor: colors.backgroundElevated,
       borderRadius: radii.md,
+      padding: spacing.sm,
     },
     link: {
       color: colors.primary,
     },
     blockquote: {
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.backgroundPressed,
       borderLeftColor: colors.primary,
       borderLeftWidth: 3,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       borderRadius: radii.xs,
+      borderWidth: 0,
+    },
+    text: {
+      color: colors.textPrimary,
+    },
+    textgroup: {
+      color: colors.textPrimary,
     },
     bullet_list_icon: {
       color: colors.textTertiary,
@@ -2281,44 +2289,12 @@ export default function HomeScreen() {
                           ) : (
                             <Markdown
                               style={{
+                                ...mdStyles,
                                 body: {
-                                  color: colors.textPrimary,
-                                  fontSize: typography.base,
-                                  fontFamily: fontFamily.regular,
+                                  ...mdStyles.body,
                                   lineHeight: 20,
                                 },
                                 strong: { fontFamily: fontFamily.bold },
-                                code_inline: {
-                                  backgroundColor: colors.backgroundElevated,
-                                  color: colors.primary,
-                                  fontFamily: "SpaceMono",
-                                  fontSize: typography.sm,
-                                  paddingHorizontal: 4,
-                                  borderRadius: 4,
-                                },
-                                code_block: {
-                                  backgroundColor: colors.backgroundElevated,
-                                  padding: spacing.md,
-                                  borderRadius: radii.md,
-                                  fontFamily: fontFamily.mono,
-                                  fontSize: typography.sm,
-                                  color: colors.textSecondary,
-                                },
-                                fence: {
-                                  backgroundColor: colors.backgroundElevated,
-                                  padding: spacing.md,
-                                  borderRadius: radii.md,
-                                  fontFamily: fontFamily.mono,
-                                  fontSize: typography.sm,
-                                  color: colors.textSecondary,
-                                },
-                                pre: {
-                                  backgroundColor: colors.backgroundElevated,
-                                  borderRadius: radii.md,
-                                },
-                                table: { borderColor: colors.borderLight },
-                                th: { borderColor: colors.borderLight, padding: 6 },
-                                td: { borderColor: colors.borderLight, padding: 6 },
                               }}
                             >
                               {msg.content}
