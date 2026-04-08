@@ -1656,39 +1656,46 @@ export default function HomeScreen() {
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
+                        style={{ flexGrow: 1, minWidth: 0 }}
+                        removeClippedSubviews={false}
                         contentContainerStyle={{
                           flexDirection: "row",
                           alignItems: "center",
-                          gap: 6,
+                          gap: spacing.sm,
                           paddingRight: spacing.sm,
                         }}
                       >
                         <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            selected: activeWorkFilter === "all",
+                          }}
                           onPress={() => setActiveWorkFilter("all")}
                           style={({ pressed }) => ({
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: 6,
-                            borderRadius: 16,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: 10,
+                            borderRadius: 20,
                             backgroundColor:
                               activeWorkFilter === "all"
                                 ? colors.primary
                                 : colors.backgroundElevated,
-                            borderWidth: 1,
+                            borderWidth: activeWorkFilter === "all" ? 2 : 1,
                             borderColor:
                               activeWorkFilter === "all"
                                 ? colors.primary
                                 : colors.border,
-                            opacity: pressed ? 0.85 : 1,
+                            ...(activeWorkFilter === "all" ? shadows.sm : {}),
+                            opacity: pressed ? 0.82 : 1,
                           })}
                         >
                           <Text
                             style={{
-                              fontSize: typography.xs,
-                              fontFamily: fontFamily.medium,
+                              fontSize: typography.sm,
+                              fontFamily: fontFamily.semibold,
                               color:
                                 activeWorkFilter === "all"
                                   ? colors.black
-                                  : colors.textSecondary,
+                                  : colors.textPrimary,
                             }}
                           >
                             All ({stuckAttentionTasks.length})
@@ -1696,31 +1703,39 @@ export default function HomeScreen() {
                         </Pressable>
                         {stuckFailedCount > 0 ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              selected: activeWorkFilter === "failed",
+                            }}
                             onPress={() => setActiveWorkFilter("failed")}
                             style={({ pressed }) => ({
-                              paddingHorizontal: spacing.md,
-                              paddingVertical: 6,
-                              borderRadius: 16,
+                              paddingHorizontal: spacing.lg,
+                              paddingVertical: 10,
+                              borderRadius: 20,
                               backgroundColor:
                                 activeWorkFilter === "failed"
                                   ? colors.statusFailed
                                   : colors.backgroundElevated,
-                              borderWidth: 1,
+                              borderWidth:
+                                activeWorkFilter === "failed" ? 2 : 1,
                               borderColor:
                                 activeWorkFilter === "failed"
                                   ? colors.statusFailed
                                   : colors.border,
-                              opacity: pressed ? 0.85 : 1,
+                              ...(activeWorkFilter === "failed"
+                                ? shadows.sm
+                                : {}),
+                              opacity: pressed ? 0.82 : 1,
                             })}
                           >
                             <Text
                               style={{
-                                fontSize: typography.xs,
-                                fontFamily: fontFamily.medium,
+                                fontSize: typography.sm,
+                                fontFamily: fontFamily.semibold,
                                 color:
                                   activeWorkFilter === "failed"
                                     ? "#fff"
-                                    : colors.textSecondary,
+                                    : colors.textPrimary,
                               }}
                             >
                               Failed ({stuckFailedCount})
@@ -1729,31 +1744,39 @@ export default function HomeScreen() {
                         ) : null}
                         {stuckBlockedCount > 0 ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              selected: activeWorkFilter === "blocked",
+                            }}
                             onPress={() => setActiveWorkFilter("blocked")}
                             style={({ pressed }) => ({
-                              paddingHorizontal: spacing.md,
-                              paddingVertical: 6,
-                              borderRadius: 16,
+                              paddingHorizontal: spacing.lg,
+                              paddingVertical: 10,
+                              borderRadius: 20,
                               backgroundColor:
                                 activeWorkFilter === "blocked"
                                   ? colors.warning
                                   : colors.backgroundElevated,
-                              borderWidth: 1,
+                              borderWidth:
+                                activeWorkFilter === "blocked" ? 2 : 1,
                               borderColor:
                                 activeWorkFilter === "blocked"
                                   ? colors.warning
                                   : colors.border,
-                              opacity: pressed ? 0.85 : 1,
+                              ...(activeWorkFilter === "blocked"
+                                ? shadows.sm
+                                : {}),
+                              opacity: pressed ? 0.82 : 1,
                             })}
                           >
                             <Text
                               style={{
-                                fontSize: typography.xs,
-                                fontFamily: fontFamily.medium,
+                                fontSize: typography.sm,
+                                fontFamily: fontFamily.semibold,
                                 color:
                                   activeWorkFilter === "blocked"
                                     ? colors.black
-                                    : colors.textSecondary,
+                                    : colors.textPrimary,
                               }}
                             >
                               Blocked ({stuckBlockedCount})
