@@ -310,7 +310,7 @@ function startLevelMetering(proc) {
 }
 
 function stopLevelMetering() {
-  levelHistory = new Array(LEVEL_HISTORY_SIZE).fill(0);
+  levelHistory = new Array(NUM_BARS).fill(0);
   if (overlay && overlay.isVisible()) {
     overlay.webContents.send("audio-levels", levelHistory);
   }
@@ -322,20 +322,22 @@ function startRecording() {
   console.log("Starting recording with device:", audioInputDevice);
   tempAudioPath = history.makeAudioPath();
 
-  // Spawn ffmpeg: write WAV at 44.1kHz (standard playback) + pipe 16kHz PCM for metering
+  // Spawn ffmpeg: write WAV at native rate + pipe 16kHz PCM for metering
+  // -thread_queue_size prevents avfoundation buffer drops under launchd scheduling
   const proc = spawn("/opt/homebrew/bin/ffmpeg", [
+    "-nostdin",
+    "-thread_queue_size", "4096",
     "-f", "avfoundation",
     "-i", audioInputDevice,
-    "-ar", "44100",
     "-ac", "1",
     "-y", tempAudioPath,
     "-f", "s16le",
     "-ar", "16000",
     "-ac", "1",
     "pipe:1",
-  ], { timeout: 120000 });
+  ], { stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
 
-  proc.stderr.on("data", () => {}); // drain stderr to prevent blocking
+  proc.stderr.on("data", (d) => console.log("[ffmpeg]", d.toString().trim()));
   proc.on("error", (err) => console.error("Recording error:", err.message));
 
   startLevelMetering(proc);
@@ -354,7 +356,21 @@ function stopCurrentRecordingProcess() {
 
     proc.kill("SIGINT");
 
-    setTimeout(() => {
+    // Wait for ffmpeg to actually exit and flush the WAV header
+    const fallback = setTimeout(() => {
+      console.warn("ffmpeg did not exit in 3s, resolving anyway");
+      checkFile();
+    }, 3000);
+
+    proc.on("close", () => {
+      clearTimeout(fallback);
+      checkFile();
+    });
+
+    let resolved = false;
+    function checkFile() {
+      if (resolved) return;
+      resolved = true;
       if (tempAudioPath && fs.existsSync(tempAudioPath)) {
         const stats = fs.statSync(tempAudioPath);
         if (stats.size > 1000) {
@@ -366,7 +382,7 @@ function stopCurrentRecordingProcess() {
       } else {
         resolve(null);
       }
-    }, 300);
+    }
   });
 }
 
@@ -437,11 +453,13 @@ async function togglePause() {
     if (!audioInputDevice) audioInputDevice = getDefaultInputDevice();
     tempAudioPath = history.makeAudioPath();
     const proc = spawn("/opt/homebrew/bin/ffmpeg", [
+      "-nostdin",
+      "-thread_queue_size", "4096",
       "-f", "avfoundation",
       "-i", audioInputDevice,
-      "-ar", "44100", "-ac", "1", "-y", tempAudioPath,
+      "-ac", "1", "-y", tempAudioPath,
       "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1",
-    ], { timeout: 120000 });
+    ], { stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
     proc.stderr.on("data", () => {});
     proc.on("error", (err) => console.error("Recording error:", err.message));
     startLevelMetering(proc);
@@ -536,7 +554,26 @@ function cancelRecording() {
   if (recordingProcess) {
     const proc = recordingProcess;
     recordingProcess = null;
+    stopLevelMetering();
     proc.kill("SIGINT");
+
+    // Wait for ffmpeg to exit and flush before saving to history
+    const savedPath = tempAudioPath;
+    tempAudioPath = null;
+    proc.on("close", () => {
+      if (savedPath && fs.existsSync(savedPath)) {
+        history.addEntry({
+          id: `rec-${Date.now()}`,
+          audioPath: savedPath,
+          transcript: null,
+          status: "cancelled",
+          error: null,
+          noteId: null,
+          createdAt: Date.now(),
+        });
+        rebuildTrayMenu();
+      }
+    });
   }
 
   // Clean up any saved segments
@@ -544,24 +581,6 @@ function cancelRecording() {
     try { fs.unlinkSync(seg); } catch {}
   }
   audioSegments = [];
-
-  // Add to history instead of deleting
-  if (tempAudioPath) {
-    // Wait briefly for ffmpeg to flush the file
-    setTimeout(() => {
-      history.addEntry({
-        id: `rec-${Date.now()}`,
-        audioPath: tempAudioPath,
-        transcript: null,
-        status: "cancelled",
-        error: null,
-        noteId: null,
-        createdAt: Date.now(),
-      });
-      tempAudioPath = null;
-      rebuildTrayMenu();
-    }, 300);
-  }
 
   showOverlay("error", "Cancelled");
   hideOverlayAfter(800);
@@ -933,6 +952,10 @@ function createTray() {
 
 // --- App Lifecycle ---
 app.whenReady().then(async () => {
+  // Prevent macOS App Nap from throttling audio recording in background
+  const { powerSaveBlocker } = require("electron");
+  powerSaveBlocker.start("prevent-app-suspension");
+
   history.init();
 
   // Request mic permission before hiding dock (prompt needs a visible, active app)
