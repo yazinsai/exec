@@ -659,10 +659,14 @@ async function handleTask(taskId: string) {
         await runQuery();
       }
     } else if (error.name === "AbortError" || abortController.signal.aborted) {
-      const r = await db.query({ tasks: { $: { where: { id: taskId } }, project: {} } });
+      const r = await db.query({ tasks: { $: { where: { id: taskId } }, messages: {}, project: {} } });
       // typed as any to tolerate new reverse-link schema additions
       const currentTask = r.tasks[0] as any;
       const wasCancelled = currentTask?.cancelRequested;
+      const messages = [...(currentTask?.messages || [])].sort(
+        (a: any, b: any) => b.createdAt - a.createdAt
+      );
+      const latestMessageId = messages[0]?.id || "";
       const txs: any[] = [
         db.tx.tasks[taskId].update({
           status: wasCancelled ? TASK_STATUSES.cancelled : TASK_STATUSES.failed,
@@ -670,6 +674,7 @@ async function handleTask(taskId: string) {
           liveOutput: "",
           blockedReason: "",
           completedAt: Date.now(),
+          lastSeenMessageId: latestMessageId,
           ...(currentTask?.project ? {} : { sessionId: sessionId || "" }),
         }),
       ];
@@ -779,6 +784,7 @@ async function pollForFollowUps() {
     } as any);
 
     for (const task of resp.tasks as any[]) {
+      if (task.cancelRequested) continue;
       if (!getResumeSessionId(task)) continue;
       if (!hasUnreadUserMessages(task)) continue;
       if (runningTasks.has(task.id)) continue;
