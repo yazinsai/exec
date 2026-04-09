@@ -1958,8 +1958,7 @@ export default function HomeScreen() {
                     <View
                       key={task.id}
                       style={{
-                        borderTopWidth: index === 0 ? 0 : 1,
-                        borderTopColor: colors.borderLight,
+                        marginTop: index === 0 ? 0 : spacing.md,
                       }}
                     >
                       <TaskListItem
