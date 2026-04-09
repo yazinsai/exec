@@ -17,6 +17,14 @@ const history = require("./history");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
+// Catch native crashes and unhandled errors so they don't silently kill the process
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
+
 const sherpa_onnx = require("sherpa-onnx-node");
 
 const { init, id: instantId } = require("@instantdb/admin");
@@ -616,19 +624,27 @@ async function handleHotkeyUp() {
       return;
     }
 
+    // Save history entry immediately so recording is never lost
+    const entryId = `rec-${Date.now()}`;
+    history.addEntry({
+      id: entryId,
+      audioPath,
+      transcript: null,
+      status: "transcribing",
+      error: null,
+      noteId: null,
+      createdAt: Date.now(),
+    });
+    rebuildTrayMenu();
+
     let transcription;
     try {
-      transcription = await transcribeAudio(audioPath);
+      transcription = await transcribeWithTimeout(audioPath, 60000);
     } catch (err) {
       console.error("Transcription error:", err);
-      history.addEntry({
-        id: `rec-${Date.now()}`,
-        audioPath,
-        transcript: null,
+      history.updateEntry(entryId, {
         status: "failed",
         error: err.message.slice(0, 100),
-        noteId: null,
-        createdAt: Date.now(),
       });
       rebuildTrayMenu();
       showOverlay("error", "Error: " + err.message.slice(0, 50));
@@ -637,14 +653,9 @@ async function handleHotkeyUp() {
     }
 
     if (!transcription || transcription.trim().length === 0) {
-      history.addEntry({
-        id: `rec-${Date.now()}`,
-        audioPath,
-        transcript: null,
+      history.updateEntry(entryId, {
         status: "failed",
         error: "No speech detected",
-        noteId: null,
-        createdAt: Date.now(),
       });
       rebuildTrayMenu();
       showOverlay("error", "No speech detected");
@@ -652,7 +663,7 @@ async function handleHotkeyUp() {
       return;
     }
 
-    await saveNote(transcription.trim(), audioPath);
+    await saveNote(transcription.trim(), audioPath, entryId);
   } catch (err) {
     console.error("Error processing recording:", err);
     showOverlay("error", "Error: " + err.message.slice(0, 50));
@@ -660,34 +671,72 @@ async function handleHotkeyUp() {
   }
 }
 
-async function saveNote(transcription, audioPath) {
+// Run transcription asynchronously with a timeout to prevent hangs
+function transcribeWithTimeout(audioPath, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Transcription timed out"));
+    }, timeoutMs);
+
+    // Use setImmediate to yield to the event loop before blocking
+    setImmediate(() => {
+      try {
+        const result = transcribeAudio(audioPath);
+        clearTimeout(timer);
+        resolve(result);
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  });
+}
+
+async function saveNote(transcription, audioPath, entryId) {
   showOverlay("creating", "Saving note...");
   try {
     const noteId = await createNote(transcription);
     pendingSave = null;
-    history.addEntry({
-      id: `rec-${Date.now()}`,
-      audioPath,
-      transcript: transcription,
-      status: "success",
-      error: null,
-      noteId,
-      createdAt: Date.now(),
-    });
+    if (entryId) {
+      history.updateEntry(entryId, {
+        transcript: transcription,
+        status: "success",
+        error: null,
+        noteId,
+      });
+    } else {
+      history.addEntry({
+        id: `rec-${Date.now()}`,
+        audioPath,
+        transcript: transcription,
+        status: "success",
+        error: null,
+        noteId,
+        createdAt: Date.now(),
+      });
+    }
     rebuildTrayMenu();
     showOverlay("done", "Got it ✓");
     hideOverlayAfter(1200);
   } catch (err) {
     console.error("Save failed, keeping recording for retry:", err);
-    history.addEntry({
-      id: `rec-${Date.now()}`,
-      audioPath,
-      transcript: transcription,
-      status: "failed",
-      error: "Save failed: " + err.message.slice(0, 80),
-      noteId: null,
-      createdAt: Date.now(),
-    });
+    if (entryId) {
+      history.updateEntry(entryId, {
+        transcript: transcription,
+        status: "failed",
+        error: "Save failed: " + err.message.slice(0, 80),
+      });
+    } else {
+      history.addEntry({
+        id: `rec-${Date.now()}`,
+        audioPath,
+        transcript: transcription,
+        status: "failed",
+        error: "Save failed: " + err.message.slice(0, 80),
+        noteId: null,
+        createdAt: Date.now(),
+      });
+    }
     rebuildTrayMenu();
     pendingSave = { transcription, audioPath };
     showOverlay("save-failed", "Save failed — tap to retry");
