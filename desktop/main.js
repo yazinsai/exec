@@ -322,11 +322,11 @@ function startRecording() {
   console.log("Starting recording with device:", audioInputDevice);
   tempAudioPath = history.makeAudioPath();
 
-  // Spawn ffmpeg: write WAV to file + pipe raw PCM to stdout for metering
+  // Spawn ffmpeg: write WAV at 44.1kHz (standard playback) + pipe 16kHz PCM for metering
   const proc = spawn("/opt/homebrew/bin/ffmpeg", [
     "-f", "avfoundation",
     "-i", audioInputDevice,
-    "-ar", "16000",
+    "-ar", "44100",
     "-ac", "1",
     "-y", tempAudioPath,
     "-f", "s16le",
@@ -439,7 +439,7 @@ async function togglePause() {
     const proc = spawn("/opt/homebrew/bin/ffmpeg", [
       "-f", "avfoundation",
       "-i", audioInputDevice,
-      "-ar", "16000", "-ac", "1", "-y", tempAudioPath,
+      "-ar", "44100", "-ac", "1", "-y", tempAudioPath,
       "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1",
     ], { timeout: 120000 });
     proc.stderr.on("data", () => {});
@@ -451,11 +451,25 @@ async function togglePause() {
 }
 
 // --- Local Transcription (Parakeet TDT + Silero VAD via sherpa-onnx) ---
+function downsampleTo16k(audioPath) {
+  const tmpPath = audioPath.replace(/\.wav$/, "-16k.wav");
+  execSync(`/opt/homebrew/bin/ffmpeg -y -i "${audioPath}" -ar 16000 -ac 1 "${tmpPath}"`, { timeout: 30000 });
+  return tmpPath;
+}
+
 function transcribeAudio(audioPath) {
   initRecognizer();
-  // Pass false to disable external buffers (required for Electron)
+  // Downsample to 16kHz for Parakeet/VAD which expect 16kHz input
+  let wavPath = audioPath;
+  let tmpFile = null;
   const wave = sherpa_onnx.readWave(audioPath, false);
-  const samples = wave.samples;
+  if (wave.sampleRate !== 16000) {
+    tmpFile = downsampleTo16k(audioPath);
+    wavPath = tmpFile;
+  }
+  const wave16k = tmpFile ? sherpa_onnx.readWave(wavPath, false) : wave;
+  if (tmpFile) try { fs.unlinkSync(tmpFile); } catch {}
+  const samples = wave16k.samples;
   const vad = createVad();
 
   const segments = [];
@@ -481,7 +495,7 @@ function transcribeAudio(audioPath) {
   const texts = [];
   for (const seg of segments) {
     const stream = recognizer.createStream();
-    stream.acceptWaveform({ samples: seg.samples, sampleRate: wave.sampleRate });
+    stream.acceptWaveform({ samples: seg.samples, sampleRate: wave16k.sampleRate });
     recognizer.decode(stream);
     const result = recognizer.getResult(stream);
     if (result.text.trim()) {
