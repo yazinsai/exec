@@ -509,6 +509,7 @@ function cancelRecording() {
   isRecording = false;
   isPaused = false;
   unregisterPauseShortcut();
+  unregisterEscShortcut();
 
   if (recordingProcess) {
     const proc = recordingProcess;
@@ -553,6 +554,14 @@ function unregisterPauseShortcut() {
   globalShortcut.unregister("Space");
 }
 
+function registerEscShortcut() {
+  globalShortcut.register("Escape", cancelRecording);
+}
+
+function unregisterEscShortcut() {
+  globalShortcut.unregister("Escape");
+}
+
 // --- Microphone Permission ---
 async function ensureMicPermission() {
   const status = systemPreferences.getMediaAccessStatus("microphone");
@@ -587,6 +596,7 @@ async function handleHotkeyDown() {
   showOverlay("recording", "Recording...");
   startRecording();
   registerPauseShortcut();
+  registerEscShortcut();
 }
 
 async function handleHotkeyUp() {
@@ -594,6 +604,7 @@ async function handleHotkeyUp() {
   isRecording = false;
   isPaused = false;
   unregisterPauseShortcut();
+  unregisterEscShortcut();
 
   showOverlay("transcribing", "Transcribing...");
 
@@ -897,9 +908,6 @@ app.whenReady().then(async () => {
   ipcMain.on("cancel-recording", cancelRecording);
   ipcMain.on("retry-save", retrySave);
   ipcMain.on("dismiss-save", dismissSave);
-
-  // Register Escape as cancel shortcut
-  globalShortcut.register("Escape", cancelRecording);
 
   // Register global shortcut
   // We use a single shortcut and track key state via IPC
