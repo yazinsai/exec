@@ -1214,6 +1214,11 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const togglePin = useCallback((taskId: string, currentPinned: boolean) => {
+    db.transact(db.tx.tasks[taskId].update({ pinned: !currentPinned }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
   const cancelTask = useCallback(async (taskId: string, currentStatus?: string) => {
     try {
       await db.transact(
@@ -2198,17 +2203,33 @@ export default function HomeScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
-                      onPress={() => {
-                        cancelFollowUpRecording();
-                        setSelectedTaskId(null);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Close task details"
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="close" size={24} color={colors.textSecondary} />
-                    </Pressable>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                      <Pressable
+                        onPress={() => togglePin(selectedTask.id, (selectedTask as any).pinned === true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={(selectedTask as any).pinned ? "Unpin action" : "Pin action"}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Ionicons
+                          name={(selectedTask as any).pinned ? "bookmark" : "bookmark-outline"}
+                          size={20}
+                          color={(selectedTask as any).pinned ? colors.primary : colors.textSecondary}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          cancelFollowUpRecording();
+                          setSelectedTaskId(null);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close task details"
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Ionicons name="close" size={24} color={colors.textSecondary} />
+                      </Pressable>
+                    </View>
                   </View>
                 </SafeAreaView>
 
