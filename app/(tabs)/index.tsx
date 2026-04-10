@@ -684,40 +684,44 @@ export default function ActionsScreen() {
           </View>
         </View>
 
-        {/* Status filter bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.sm,
-            paddingBottom: spacing.sm,
-            gap: spacing.xs,
-          }}
-        >
-          {(["all", "running", "pending", "done", "failed", "blocked"] as StatusFilter[]).map((s) => {
-            const active = statusFilter === s;
-            const count = statusCounts[s];
-            if (s !== "all" && count === 0) return null;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => setStatusFilter(s)}
-                style={pillStyle(active)}
-              >
-                <Text style={pillTextStyle(active)}>
-                  {s === "all" ? "All" : formatTaskStatusLabel(s)}{" "}
-                  <Text style={{ fontFamily: fontFamily.regular, opacity: 0.7 }}>{count}</Text>
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* Project filter bar */}
-        {projectSlugs.length > 0 && (
+        {/* Status filter bar — hidden in Pinned mode */}
+        {viewMode !== "pinned" && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.sm,
+              paddingBottom: spacing.sm,
+              gap: spacing.xs,
+            }}
+          >
+            {(["all", "running", "pending", "done", "failed", "blocked"] as StatusFilter[]).map((s) => {
+              const active = statusFilter === s;
+              const count = statusCounts[s];
+              if (s !== "all" && count === 0) return null;
+              return (
+                <Pressable
+                  key={s}
+                  onPress={() => setStatusFilter(s)}
+                  style={pillStyle(active)}
+                >
+                  <Text style={pillTextStyle(active)}>
+                    {s === "all" ? "All" : formatTaskStatusLabel(s)}{" "}
+                    <Text style={{ fontFamily: fontFamily.regular, opacity: 0.7 }}>{count}</Text>
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {/* Project filter bar — hidden in Pinned mode */}
+        {viewMode !== "pinned" && projectSlugs.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
             contentContainerStyle={{
               paddingHorizontal: spacing.sm,
               paddingBottom: spacing.sm,
