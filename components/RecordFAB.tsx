@@ -52,15 +52,21 @@ export function RecordFAB({
 
   const disabled = isProcessing;
 
+  // Position so the FAB straddles the top edge of the tab bar.
+  // Tab bar is ~49pt + bottom safe area inset. Place FAB center at that edge.
+  const TAB_BAR_HEIGHT = 49;
+  const fabBottom = bottomInset + TAB_BAR_HEIGHT - 32; // 32 = half of 64pt FAB
+
   return (
     <View
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: bottomInset + 22,
+        bottom: fabBottom,
         left: 0,
         right: 0,
         alignItems: "center",
+        zIndex: 10,
       }}
     >
       <AnimatedPressable
