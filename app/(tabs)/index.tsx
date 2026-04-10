@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   ScrollView,
   Pressable,
   TextInput,
@@ -213,6 +214,25 @@ export default function ActionsScreen() {
       return true;
     });
   }, [allTasks, showUnreadOnly, statusFilter, projectFilter, searchQuery]);
+
+  const groupedSections = useMemo(() => {
+    const groups = new Map<string, Task[]>();
+    for (const t of filteredTasks) {
+      const slug = (t as any).project?.slug || (t as any).projectSlug || "";
+      if (!groups.has(slug)) groups.set(slug, []);
+      groups.get(slug)!.push(t);
+    }
+    // Named projects first (sorted), then ungrouped at the end
+    const sections: { title: string; data: Task[] }[] = [];
+    const sorted = [...groups.keys()].filter(Boolean).sort();
+    for (const slug of sorted) {
+      sections.push({ title: slug, data: groups.get(slug)! });
+    }
+    if (groups.has("")) {
+      sections.push({ title: "Other", data: groups.get("")! });
+    }
+    return sections;
+  }, [filteredTasks]);
 
   const selectedTask = selectedTaskId
     ? allTasks.find((task) => task.id === selectedTaskId) ?? null
@@ -718,20 +738,53 @@ export default function ActionsScreen() {
             </Text>
           </View>
         ) : (
-          <FlatList
-            data={filteredTasks}
+          <SectionList
+            sections={groupedSections}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{
               paddingHorizontal: spacing.sm,
               paddingTop: spacing.xs,
               paddingBottom: insets.bottom + 96,
             }}
+            stickySectionHeadersEnabled={false}
             ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+            renderSectionHeader={({ section }) => (
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.xs,
+                marginTop: spacing.md,
+              }}>
+                <Ionicons
+                  name={section.title === "Other" ? "layers-outline" : "folder-outline"}
+                  size={14}
+                  color={colors.textTertiary}
+                />
+                <Text style={{
+                  color: colors.textTertiary,
+                  fontSize: typography.xs,
+                  fontFamily: fontFamily.semibold,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}>
+                  {section.title}
+                </Text>
+                <Text style={{
+                  color: colors.textMuted,
+                  fontSize: typography.xs,
+                  fontFamily: fontFamily.regular,
+                }}>
+                  {section.data.length}
+                </Text>
+              </View>
+            )}
             renderItem={({ item: task }) => (
               <TaskListItem
                 title={task.summary || task.input}
                 status={task.status}
-                projectLabel={(task as any).project?.slug || (task as any).projectSlug || null}
+                projectLabel={null}
                 createdAt={task.createdAt}
                 read={(task as any).read ?? true}
                 onPress={() => openTask(task.id)}
