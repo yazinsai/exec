@@ -476,7 +476,7 @@ function getReleaseInfo() {
   };
 }
 
-export default function NotesScreen() {
+export default function HomeScreen() {
   const { colors, isDark } = useThemeColors();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [expandedNoteIds, setExpandedNoteIds] = useState<string[]>([]);

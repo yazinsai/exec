@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -52,23 +52,15 @@ export function RecordFAB({
 
   const disabled = isProcessing;
 
-  // Position FAB to overlap with the bottom tab bar.
-  const TAB_BAR_HEIGHT = Platform.OS === "android" ? 56 : 49;
-  const fabBottom = Platform.OS === "android"
-    ? -bottomInset // negative inset to sit into the nav bar
-    : bottomInset + TAB_BAR_HEIGHT - 32;
-
   return (
     <View
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: fabBottom,
+        bottom: bottomInset + 22,
         left: 0,
         right: 0,
         alignItems: "center",
-        zIndex: 9999,
-        elevation: 10,
       }}
     >
       <AnimatedPressable
@@ -90,7 +82,6 @@ export function RecordFAB({
             justifyContent: "center",
             opacity: disabled ? 0.5 : 1,
             ...(isRecording ? shadows.sm : shadows.gold),
-            elevation: 12,
           },
           animatedStyle,
         ]}
