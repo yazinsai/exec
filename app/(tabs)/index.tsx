@@ -1032,6 +1032,75 @@ export default function ActionsScreen() {
                   }}
                 />
 
+                {/* Prev/Next project navigation */}
+                {(() => {
+                  const slug = (selectedTask as any).project?.slug || (selectedTask as any).projectSlug;
+                  if (!slug) return null;
+                  const siblings = allTasks
+                    .filter((t) => ((t as any).project?.slug || (t as any).projectSlug) === slug)
+                    .sort((a, b) => a.createdAt - b.createdAt);
+                  const idx = siblings.findIndex((t) => t.id === selectedTask.id);
+                  if (idx === -1) return null;
+                  const prev = siblings.slice(Math.max(0, idx - 2), idx);
+                  const next = siblings.slice(idx + 1, idx + 3);
+                  if (prev.length === 0 && next.length === 0) return null;
+                  return (
+                    <View style={{
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.sm,
+                    }}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs, alignItems: "center" }}>
+                        {prev.map((t) => (
+                          <Pressable
+                            key={t.id}
+                            onPress={() => openTask(t.id)}
+                            style={({ pressed }) => ({
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              backgroundColor: isDark ? "#2c2c2e" : "#f0f0f0",
+                              paddingHorizontal: spacing.sm,
+                              paddingVertical: spacing.xs,
+                              borderRadius: radii.full,
+                              maxWidth: 180,
+                              opacity: pressed ? 0.6 : 1,
+                            })}
+                          >
+                            <Ionicons name="chevron-back" size={12} color={colors.textMuted} />
+                            <Text numberOfLines={1} style={{ fontSize: typography.xs, fontFamily: fontFamily.regular, color: colors.textSecondary, flexShrink: 1 }}>
+                              {t.summary || t.input}
+                            </Text>
+                          </Pressable>
+                        ))}
+                        {next.map((t) => (
+                          <Pressable
+                            key={t.id}
+                            onPress={() => openTask(t.id)}
+                            style={({ pressed }) => ({
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              backgroundColor: isDark ? "#2c2c2e" : "#f0f0f0",
+                              paddingHorizontal: spacing.sm,
+                              paddingVertical: spacing.xs,
+                              borderRadius: radii.full,
+                              maxWidth: 180,
+                              opacity: pressed ? 0.6 : 1,
+                            })}
+                          >
+                            <Text numberOfLines={1} style={{ fontSize: typography.xs, fontFamily: fontFamily.regular, color: colors.textSecondary, flexShrink: 1 }}>
+                              {t.summary || t.input}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  );
+                })()}
+
                 {/* Follow-up input */}
                 <SafeAreaView edges={["bottom"]} style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
                   {isRecordingFollowUp ? (
