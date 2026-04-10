@@ -125,7 +125,8 @@ export default function ActionsScreen() {
   }, [notes]);
 
   // Filters
-  const [showUnreadOnly, setShowUnreadOnly] = useState(true);
+  type ViewMode = "unread" | "all" | "pinned";
+  const [viewMode, setViewMode] = useState<ViewMode>("unread");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -197,10 +198,15 @@ export default function ActionsScreen() {
     () => allTasks.filter((t) => (t as any).read === false).length,
     [allTasks]
   );
+  const pinnedCount = useMemo(
+    () => allTasks.filter((t) => (t as any).pinned === true).length,
+    [allTasks]
+  );
 
   const filteredTasks = useMemo(() => {
     return allTasks.filter((t) => {
-      if (showUnreadOnly && (t as any).read !== false) return false;
+      if (viewMode === "unread" && (t as any).read !== false) return false;
+      if (viewMode === "pinned" && (t as any).pinned !== true) return false;
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (projectFilter) {
         const slug = (t as any).project?.slug || (t as any).projectSlug;
@@ -213,7 +219,7 @@ export default function ActionsScreen() {
       }
       return true;
     });
-  }, [allTasks, showUnreadOnly, statusFilter, projectFilter, searchQuery]);
+  }, [allTasks, viewMode, statusFilter, projectFilter, searchQuery]);
 
   const groupedSections = useMemo(() => {
     const groups = new Map<string, Task[]>();
@@ -582,6 +588,11 @@ export default function ActionsScreen() {
     db.transact(db.tx.tasks[taskId].update({ read: true }));
   }, []);
 
+  const togglePin = useCallback((taskId: string, currentPinned: boolean) => {
+    db.transact(db.tx.tasks[taskId].update({ pinned: !currentPinned }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
@@ -591,21 +602,26 @@ export default function ActionsScreen() {
             Actions
           </Text>
 
-          {/* Unread / All toggle */}
+          {/* View mode toggle */}
           <View style={{
             flexDirection: "row",
             backgroundColor: isDark ? "#2c2c2e" : "#f0f0f0",
             borderRadius: radii.full,
             padding: 3,
           }}>
-            {(["unread", "all"] as const).map((mode) => {
-              const active = mode === "unread" ? showUnreadOnly : !showUnreadOnly;
+            {(["unread", "pinned", "all"] as ViewMode[]).map((mode) => {
+              const active = viewMode === mode;
+              const label = mode === "unread"
+                ? `Unread${unreadCount > 0 ? ` ${unreadCount}` : ""}`
+                : mode === "pinned"
+                  ? `Pinned${pinnedCount > 0 ? ` ${pinnedCount}` : ""}`
+                  : "All";
               return (
                 <Pressable
                   key={mode}
-                  onPress={() => setShowUnreadOnly(mode === "unread")}
+                  onPress={() => setViewMode(mode)}
                   style={{
-                    paddingHorizontal: spacing.md,
+                    paddingHorizontal: spacing.sm,
                     paddingVertical: spacing.xs,
                     borderRadius: radii.full,
                     backgroundColor: active ? colors.primary : "transparent",
@@ -614,11 +630,11 @@ export default function ActionsScreen() {
                   }}
                 >
                   <Text style={{
-                    fontSize: typography.sm,
+                    fontSize: typography.xs,
                     fontFamily: fontFamily.semibold,
-                    color: active ? (isDark ? "#000" : "#000") : colors.textMuted,
+                    color: active ? "#000" : colors.textMuted,
                   }}>
-                    {mode === "unread" ? `Unread${unreadCount > 0 ? ` (${unreadCount})` : ""}` : "All"}
+                    {label}
                   </Text>
                 </Pressable>
               );
@@ -787,7 +803,9 @@ export default function ActionsScreen() {
                 projectLabel={null}
                 createdAt={task.createdAt}
                 read={(task as any).read ?? true}
+                pinned={(task as any).pinned === true}
                 onPress={() => openTask(task.id)}
+                onTogglePin={() => togglePin(task.id, (task as any).pinned === true)}
               />
             )}
           />
@@ -861,6 +879,17 @@ export default function ActionsScreen() {
                       </Text>
                     </View>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                      <Pressable
+                        onPress={() => togglePin(selectedTask.id, (selectedTask as any).pinned === true)}
+                        hitSlop={12}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Ionicons
+                          name={(selectedTask as any).pinned ? "bookmark" : "bookmark-outline"}
+                          size={20}
+                          color={(selectedTask as any).pinned ? colors.primary : colors.textSecondary}
+                        />
+                      </Pressable>
                       {selectedTask.status === "done" || selectedTask.status === "failed" || selectedTask.status === "cancelled" ? (
                         <Pressable
                           onPress={() => retryTask(selectedTask.id)}

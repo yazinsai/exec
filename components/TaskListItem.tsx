@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, fontFamily, radii } from "@/constants/Colors";
 import { formatTaskStatusLabel, TASK_STATUSES } from "@/lib/workflow";
@@ -9,7 +10,9 @@ interface TaskListItemProps {
   projectLabel?: string | null;
   createdAt: number;
   read?: boolean;
+  pinned?: boolean;
   onPress: () => void;
+  onTogglePin?: () => void;
   /** Nested in note card: less horizontal inset, more vertical rhythm, top-aligned rows */
   density?: "default" | "nested";
 }
@@ -51,7 +54,9 @@ export function TaskListItem({
   projectLabel,
   createdAt,
   read = true,
+  pinned = false,
   onPress,
+  onTogglePin,
   density = "default",
 }: TaskListItemProps) {
   const colors = useColors();
@@ -146,6 +151,9 @@ export function TaskListItem({
             >
               {formatTaskStatusLabel(status)}
             </Text>
+            {pinned && (
+              <Ionicons name="bookmark" size={12} color={colors.primary} />
+            )}
           </View>
         </View>
 
