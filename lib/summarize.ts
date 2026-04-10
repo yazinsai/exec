@@ -1,22 +1,22 @@
-const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 /**
- * Generate a short summary title from a voice transcription using Groq LLM.
+ * Generate a short summary title from a voice transcription using OpenAI.
  * Returns null on failure so the caller can fall back to the raw input.
  */
 export async function summarizeInput(input: string): Promise<string | null> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const response = await fetch(GROQ_CHAT_URL, {
+    const response = await fetch(OPENAI_CHAT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -25,7 +25,7 @@ export async function summarizeInput(input: string): Promise<string | null> {
           },
           { role: "user", content: input },
         ],
-        max_tokens: 30,
+        max_completion_tokens: 30,
         temperature: 0,
       }),
     });

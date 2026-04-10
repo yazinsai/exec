@@ -28,7 +28,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ```
 EXPO_PUBLIC_INSTANT_APP_ID=       # InstantDB app ID
-EXPO_PUBLIC_GROQ_API_KEY=         # Groq API key (Whisper transcription)
+EXPO_PUBLIC_OPENAI_API_KEY=       # OpenAI API key (Whisper transcription + summaries)
 INSTANT_APP_ADMIN_TOKEN=          # InstantDB admin token (for agent)
 ```
 
@@ -36,7 +36,7 @@ The desktop app reads from `desktop/.env`:
 ```
 INSTANT_APP_ID=
 INSTANT_ADMIN_TOKEN=
-GROQ_API_KEY=
+OPENAI_API_KEY=
 ```
 
 ## Development

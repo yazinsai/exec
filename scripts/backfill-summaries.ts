@@ -11,27 +11,27 @@ import schema from "../instant.schema";
 
 const APP_ID = process.env.EXPO_PUBLIC_INSTANT_APP_ID || process.env.INSTANT_APP_ID;
 const ADMIN_TOKEN = process.env.INSTANT_APP_ADMIN_TOKEN || process.env.INSTANT_ADMIN_TOKEN;
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 
-if (!APP_ID || !ADMIN_TOKEN || !GROQ_API_KEY) {
-  console.error("Missing env vars. Need INSTANT_APP_ID, ADMIN_TOKEN, and GROQ_API_KEY.");
+if (!APP_ID || !ADMIN_TOKEN || !OPENAI_API_KEY) {
+  console.error("Missing env vars. Need INSTANT_APP_ID, ADMIN_TOKEN, and OPENAI_API_KEY.");
   process.exit(1);
 }
 
 const db: any = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
 
-const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 async function summarize(input: string): Promise<string | null> {
   try {
-    const response = await fetch(GROQ_CHAT_URL, {
+    const response = await fetch(OPENAI_CHAT_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -40,20 +40,20 @@ async function summarize(input: string): Promise<string | null> {
           },
           { role: "user", content: input },
         ],
-        max_tokens: 30,
+        max_completion_tokens: 30,
         temperature: 0,
       }),
     });
 
     if (!response.ok) {
-      console.error(`  Groq error: ${response.status}`);
+      console.error(`  OpenAI error: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content?.trim() || null;
   } catch (e: any) {
-    console.error(`  Groq exception: ${e.message}`);
+    console.error(`  OpenAI exception: ${e.message}`);
     return null;
   }
 }

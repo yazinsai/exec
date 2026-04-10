@@ -1,4 +1,4 @@
-const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+const OPENAI_API_URL = "https://api.openai.com/v1/audio/transcriptions";
 const MAX_PROMPT_CHARS = 800; // ~200 tokens, safe under 224-token limit
 
 export type DictionaryTerm = { term: string };
@@ -16,14 +16,14 @@ export function buildDictionaryPrompt(terms: DictionaryTerm[]): string {
 }
 
 /**
- * Transcribe audio using Groq's Whisper API.
+ * Transcribe audio using OpenAI's Whisper API.
  * @param localFilePath - Path to the audio file
  * @param prompt - Optional prompt to guide transcription spelling (max 224 tokens)
  */
 export async function transcribeAudio(localFilePath: string, prompt?: string): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("GROQ_API_KEY is not configured");
+    throw new Error("OPENAI_API_KEY is not configured");
   }
 
   // React Native FormData expects an object with uri, name, and type
@@ -35,7 +35,7 @@ export async function transcribeAudio(localFilePath: string, prompt?: string): P
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("model", "whisper-large-v3");
+  formData.append("model", "whisper-1");
   formData.append("response_format", "text");
 
   // Add vocabulary prompt if provided
@@ -43,7 +43,7 @@ export async function transcribeAudio(localFilePath: string, prompt?: string): P
     formData.append("prompt", prompt);
   }
 
-  const response = await fetch(GROQ_API_URL, {
+  const response = await fetch(OPENAI_API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -53,7 +53,7 @@ export async function transcribeAudio(localFilePath: string, prompt?: string): P
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Groq API error: ${response.status} - ${errorText}`);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
 
   const transcription = await response.text();
