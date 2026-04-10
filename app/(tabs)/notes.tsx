@@ -517,9 +517,9 @@ export default function NotesScreen() {
   const [ttsSpeed, setTtsSpeed] = useState<1 | 1.5 | 2>(1);
   const TTS_SPEEDS = [1, 1.5, 2] as const;
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
-  /** Voice notes that contain ≥1 task with this status */
+  /** Voice notes that contain ≥1 task with this status / trait */
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
-    "running" | "failed" | "blocked" | null
+    "running" | "failed" | "blocked" | "pinned" | null
   >(null);
   const [showAllProjectPills, setShowAllProjectPills] = useState(false);
   const releaseInfo = getReleaseInfo();
@@ -742,6 +742,10 @@ export default function NotesScreen() {
       if (noteTaskStatusFilter === "blocked") {
         if (!noteHasTaskWithStatus(note, TASK_STATUSES.blocked)) return false;
       }
+      if (noteTaskStatusFilter === "pinned") {
+        const hasPinned = tasks.some((t) => (t as any).pinned === true);
+        if (!hasPinned) return false;
+      }
       return true;
     });
   }, [notes, filterUnread, filterProject, noteTaskStatusFilter]);
@@ -764,6 +768,13 @@ export default function NotesScreen() {
     () =>
       notes.filter((n) => noteHasTaskWithStatus(n, TASK_STATUSES.blocked))
         .length,
+    [notes]
+  );
+  const pinnedNoteCount = useMemo(
+    () =>
+      notes.filter((n) =>
+        ((n.tasks ?? []) as Task[]).some((t) => (t as any).pinned === true)
+      ).length,
     [notes]
   );
   const unreadNoteCount = useMemo(
@@ -791,6 +802,9 @@ export default function NotesScreen() {
         onBlockedBg: colors.warning,
         onBlockedFg: colors.black,
         ringBlocked: "#ffffff",
+        onPinnedBg: colors.primary,
+        onPinnedFg: colors.black,
+        ringPinned: "#ffffff",
       };
     }
     return {
@@ -809,6 +823,9 @@ export default function NotesScreen() {
       onBlockedBg: colors.warning,
       onBlockedFg: colors.black,
       ringBlocked: "#92400e",
+      onPinnedBg: colors.primaryLight,
+      onPinnedFg: colors.black,
+      ringPinned: colors.primaryDark,
     };
   }, [isDark, colors]);
 
@@ -838,7 +855,13 @@ export default function NotesScreen() {
     ) {
       setNoteTaskStatusFilter(null);
     }
-  }, [noteTaskStatusFilter, attentionFailedNoteCount, attentionBlockedNoteCount]);
+    if (
+      noteTaskStatusFilter === "pinned" &&
+      pinnedNoteCount === 0
+    ) {
+      setNoteTaskStatusFilter(null);
+    }
+  }, [noteTaskStatusFilter, attentionFailedNoteCount, attentionBlockedNoteCount, pinnedNoteCount]);
 
   // Flat task list for filtered view
   const filteredTasks = useMemo(() => {
@@ -1738,6 +1761,81 @@ export default function NotesScreen() {
                     }}
                   >
                     {` ${attentionBlockedNoteCount}`}
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: noteTaskStatusFilter === "pinned",
+                }}
+                accessibilityHint="Show voice notes that include a pinned task"
+                disabled={pinnedNoteCount === 0}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: "rgba(255,255,255,0.15)" }
+                    : undefined
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                onPress={() => {
+                  setNoteTaskStatusFilter((prev) =>
+                    prev === "pinned" ? null : "pinned"
+                  );
+                  void Haptics.selectionAsync();
+                }}
+                style={({ pressed }) => ({
+                  minHeight: 40,
+                  justifyContent: "center",
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: 20,
+                  backgroundColor:
+                    noteTaskStatusFilter === "pinned"
+                      ? waFilter.onPinnedBg
+                      : waFilter.offBg,
+                  borderWidth: noteTaskStatusFilter === "pinned" ? 2 : 1.5,
+                  borderColor:
+                    noteTaskStatusFilter === "pinned"
+                      ? waFilter.ringPinned
+                      : waFilter.offBorder,
+                  opacity:
+                    pinnedNoteCount === 0
+                      ? 0.4
+                      : pressed && Platform.OS !== "android"
+                        ? 0.9
+                        : 1,
+                  transform:
+                    pinnedNoteCount > 0 && pressed
+                      ? [{ scale: 0.98 }]
+                      : [],
+                })}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      color:
+                        noteTaskStatusFilter === "pinned"
+                          ? waFilter.onPinnedFg
+                          : colors.primary,
+                    }}
+                  >
+                    Pinned
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.semibold,
+                      fontVariant: ["tabular-nums"],
+                      color:
+                        noteTaskStatusFilter === "pinned"
+                          ? waFilter.onPinnedFg
+                          : waFilter.offCount,
+                    }}
+                  >
+                    {` ${pinnedNoteCount}`}
                   </Text>
                 </View>
               </Pressable>
