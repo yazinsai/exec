@@ -52,11 +52,10 @@ export function RecordFAB({
 
   const disabled = isProcessing;
 
-  // Position FAB to straddle the top edge of the tab bar.
+  // Position FAB to overlap with the bottom tab bar.
   const TAB_BAR_HEIGHT = Platform.OS === "android" ? 56 : 49;
-  // On Android (no home indicator), sit flush so half the FAB overlaps the bar.
   const fabBottom = Platform.OS === "android"
-    ? TAB_BAR_HEIGHT - 32 // 32 = half of 64pt FAB, no bottomInset on Android
+    ? -bottomInset // negative inset to sit into the nav bar
     : bottomInset + TAB_BAR_HEIGHT - 32;
 
   return (
