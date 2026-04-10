@@ -621,7 +621,7 @@ export default function ActionsScreen() {
                   key={mode}
                   onPress={() => {
                     setViewMode(mode);
-                    if (mode === "pinned") {
+                    if (mode === "pinned" || mode === "unread") {
                       setStatusFilter("all");
                       setProjectFilter(null);
                       setSearchQuery("");
@@ -685,7 +685,7 @@ export default function ActionsScreen() {
         </View>
 
         {/* Status filter bar — hidden in Pinned mode */}
-        {viewMode !== "pinned" && (
+        {viewMode === "all" && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
