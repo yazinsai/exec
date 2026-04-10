@@ -89,8 +89,8 @@ export function RecordFAB({
             alignItems: "center",
             justifyContent: "center",
             opacity: disabled ? 0.5 : 1,
-            elevation: 12,
             ...(isRecording ? shadows.sm : shadows.gold),
+            elevation: 12,
           },
           animatedStyle,
         ]}

@@ -2004,37 +2004,7 @@ export default function NotesScreen() {
                   </View>
                 ) : null}
 
-                {activeNotes.length > 0 ? (
-                  <>{activeNotes.map(renderNoteCard)}</>
-                ) : null}
-
-                {historyNotes.length > 0 ? (
-                  <>
-                    {visibleHistory.map(renderNoteCard)}
-                    {historyRemaining > 0 ? (
-                      <Pressable
-                        onPress={() =>
-                          setVisibleHistoryCount(historyNotes.length)
-                        }
-                        style={({ pressed }) => ({
-                          paddingVertical: spacing.md,
-                          alignItems: "center",
-                          opacity: pressed ? 0.7 : 1,
-                        })}
-                      >
-                        <Text
-                          style={{
-                            color: colors.primary,
-                            fontSize: typography.sm,
-                            fontFamily: fontFamily.semibold,
-                          }}
-                        >
-                          Show {historyRemaining} more
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </>
-                ) : null}
+                {filteredNotes.map(renderNoteCard)}
               </>
             )}
           </ScrollView>
