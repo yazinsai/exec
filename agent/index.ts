@@ -195,7 +195,7 @@ async function handleNote(noteId: string) {
     await db.transact(
       db.tx.notes[noteId].update({
         status: NOTE_STATUSES.empty,
-        ...(triage.summary || note.summary ? { summary: triage.summary || note.summary } : {}),
+        ...(note.summary && note.summary !== "Transcribing..." ? {} : triage.summary ? { summary: triage.summary } : {}),
         triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
         triagedAt: now,
       })
@@ -214,7 +214,7 @@ async function handleNote(noteId: string) {
   const txs: any[] = [
     db.tx.notes[noteId].update({
       status: NOTE_STATUSES.ready,
-      ...(triage.summary || note.summary ? { summary: triage.summary || note.summary } : {}),
+      ...(note.summary && note.summary !== "Transcribing..." ? {} : triage.summary ? { summary: triage.summary } : {}),
       triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
       triagedAt: now,
       errorMessage: "",
