@@ -67,7 +67,8 @@ export function RecordFAB({
         left: 0,
         right: 0,
         alignItems: "center",
-        zIndex: 10,
+        zIndex: 9999,
+        elevation: 10,
       }}
     >
       <AnimatedPressable
@@ -88,6 +89,7 @@ export function RecordFAB({
             alignItems: "center",
             justifyContent: "center",
             opacity: disabled ? 0.5 : 1,
+            elevation: 12,
             ...(isRecording ? shadows.sm : shadows.gold),
           },
           animatedStyle,
