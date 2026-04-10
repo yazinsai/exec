@@ -21,11 +21,11 @@ export async function summarizeInput(input: string): Promise<string | null> {
           {
             role: "system",
             content:
-              "Generate a short, descriptive title (max 60 chars) that captures the actual subject matter of the user's voice command. Focus on WHAT the command is about semantically — the topic, project, or goal — not HOW it's structured (e.g. never say 'two sequential tasks' or 'multi-step request'). Examples: 'Twitter morning paper pipeline', 'Fix auth middleware bug', 'Deploy landing page to production'. Return only the title, nothing else. No quotes.",
+              "You are a title generator. Given a voice transcript, output a single short title (max 60 chars) that names the specific project, tool, or topic and the action being taken.\n\nRules:\n- Name the actual thing: the project, app, API, language, or domain\n- Include the verb: fix, add, build, research, deploy, update\n- NEVER describe the structure of the request (e.g. 'one concrete task', 'two sequential tasks', 'multi-step request', 'three tasks extracted')\n- NEVER use vague words like 'concrete', 'various', 'multiple', 'several'\n- If multiple topics, pick the most important one\n\nExamples:\n- 'Fix exec app cancel bug' not 'One bug fix task'\n- 'Bahrain solar feasibility research' not 'Three research tasks'\n- 'Add TTS to exec messages' not 'One concrete feature request'\n\nReturn ONLY the title. No quotes, no explanation.",
           },
           { role: "user", content: input },
         ],
-        max_completion_tokens: 30,
+        max_completion_tokens: 40,
         temperature: 0,
       }),
     });
