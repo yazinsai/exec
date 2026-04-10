@@ -124,6 +124,7 @@ export default function ActionsScreen() {
   }, [notes]);
 
   // Filters
+  const [showUnreadOnly, setShowUnreadOnly] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -191,8 +192,14 @@ export default function ActionsScreen() {
     return counts;
   }, [allTasks]);
 
+  const unreadCount = useMemo(
+    () => allTasks.filter((t) => (t as any).read === false).length,
+    [allTasks]
+  );
+
   const filteredTasks = useMemo(() => {
     return allTasks.filter((t) => {
+      if (showUnreadOnly && (t as any).read !== false) return false;
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (projectFilter) {
         const slug = (t as any).project?.slug || (t as any).projectSlug;
@@ -205,7 +212,7 @@ export default function ActionsScreen() {
       }
       return true;
     });
-  }, [allTasks, statusFilter, projectFilter, searchQuery]);
+  }, [allTasks, showUnreadOnly, statusFilter, projectFilter, searchQuery]);
 
   const selectedTask = selectedTaskId
     ? allTasks.find((task) => task.id === selectedTaskId) ?? null
@@ -559,10 +566,44 @@ export default function ActionsScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         {/* Header */}
-        <View style={{ paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
           <Text style={{ fontSize: typography.xxl, fontFamily: fontFamily.bold, color: colors.textPrimary, letterSpacing: -0.5 }}>
             Actions
           </Text>
+
+          {/* Unread / All toggle */}
+          <View style={{
+            flexDirection: "row",
+            backgroundColor: isDark ? "#2c2c2e" : "#f0f0f0",
+            borderRadius: radii.full,
+            padding: 3,
+          }}>
+            {(["unread", "all"] as const).map((mode) => {
+              const active = mode === "unread" ? showUnreadOnly : !showUnreadOnly;
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => setShowUnreadOnly(mode === "unread")}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.xs,
+                    borderRadius: radii.full,
+                    backgroundColor: active ? colors.primary : "transparent",
+                    minHeight: 32,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{
+                    fontSize: typography.sm,
+                    fontFamily: fontFamily.semibold,
+                    color: active ? (isDark ? "#000" : "#000") : colors.textMuted,
+                  }}>
+                    {mode === "unread" ? `Unread${unreadCount > 0 ? ` (${unreadCount})` : ""}` : "All"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {/* Search bar */}
