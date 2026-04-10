@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -53,8 +53,8 @@ export function RecordFAB({
   const disabled = isProcessing;
 
   // Position so the FAB straddles the top edge of the tab bar.
-  // Tab bar is ~49pt + bottom safe area inset. Place FAB center at that edge.
-  const TAB_BAR_HEIGHT = 49;
+  // iOS tab bar is ~49pt, Android is ~56pt. Place FAB center at that top edge.
+  const TAB_BAR_HEIGHT = Platform.OS === "android" ? 56 : 49;
   const fabBottom = bottomInset + TAB_BAR_HEIGHT - 32; // 32 = half of 64pt FAB
 
   return (
