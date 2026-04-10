@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, spacing, typography } from "@/constants/Colors";
 import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
@@ -39,6 +40,7 @@ export interface StepTaskRowProps {
   totalSteps: number;
   projectLabel?: string | null;
   showProject?: boolean;
+  pinned?: boolean;
   blockedReason?: string | null;
   errorMessage?: string | null;
   resultSnippet?: string | null;
@@ -57,6 +59,7 @@ export function StepTaskRow({
   totalSteps,
   projectLabel,
   showProject = true,
+  pinned = false,
   blockedReason,
   errorMessage,
   resultSnippet,
@@ -141,17 +144,28 @@ export function StepTaskRow({
             </Text>
           </View>
 
-          <Text
-            numberOfLines={4}
-            style={{
-              color: colors.textPrimary,
-              fontSize: typography.base,
-              fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
-              lineHeight: 22,
-            }}
-          >
-            {shortenStepTitle(title, 72)}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              numberOfLines={4}
+              style={{
+                flex: 1,
+                color: colors.textPrimary,
+                fontSize: typography.base,
+                fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
+                lineHeight: 22,
+              }}
+            >
+              {shortenStepTitle(title, 72)}
+            </Text>
+            {pinned && (
+              <Ionicons
+                name="bookmark"
+                size={14}
+                color={colors.primary}
+                style={{ flexShrink: 0, marginTop: 2 }}
+              />
+            )}
+          </View>
 
           <View
             style={{

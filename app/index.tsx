@@ -1349,6 +1349,7 @@ export default function HomeScreen() {
           createdAt: task.createdAt,
           projectLabel: (task as any).project?.slug || (task as any).projectSlug || null,
           read: (task as any).read ?? true,
+          pinned: (task as any).pinned ?? false,
           blockedReason: (task as any).blockedReason ?? null,
           errorMessage: (task as any).errorMessage ?? null,
           extractionIndex: (task as any).extractionIndex ?? null,

@@ -18,6 +18,7 @@ type ChildTask = {
   createdAt: number;
   projectLabel?: string | null;
   read?: boolean;
+  pinned?: boolean;
   blockedReason?: string | null;
   errorMessage?: string | null;
   extractionIndex?: number | null;
@@ -370,6 +371,7 @@ export function NoteListItem({
                     errorMessage={task.errorMessage}
                     resultSnippet={task.resultSnippet}
                     read={task.read}
+                    pinned={task.pinned}
                     expanded={expandedStepId === task.id}
                     onToggleExpand={() =>
                       setExpandedStepId((id) =>

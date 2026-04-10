@@ -605,6 +605,7 @@ async function handleTask(taskId: string) {
           errorMessage: success ? "" : (errors.join("\n") || "Unknown error"),
           completedAt: Date.now(),
           lastSeenMessageId: latestMessageId,
+          read: false,
         });
 
         const txs: any[] = [taskUpdate];
