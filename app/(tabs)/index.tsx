@@ -619,7 +619,14 @@ export default function ActionsScreen() {
               return (
                 <Pressable
                   key={mode}
-                  onPress={() => setViewMode(mode)}
+                  onPress={() => {
+                    setViewMode(mode);
+                    if (mode === "pinned") {
+                      setStatusFilter("all");
+                      setProjectFilter(null);
+                      setSearchQuery("");
+                    }
+                  }}
                   style={{
                     paddingHorizontal: spacing.sm,
                     paddingVertical: spacing.xs,
