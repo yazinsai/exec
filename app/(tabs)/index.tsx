@@ -770,7 +770,7 @@ export default function ActionsScreen() {
               paddingBottom: insets.bottom + 96,
             }}
             stickySectionHeadersEnabled={false}
-            ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
             renderSectionHeader={({ section }) => (
               <View style={{
                 flexDirection: "row",

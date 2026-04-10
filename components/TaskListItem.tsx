@@ -74,11 +74,15 @@ export function TaskListItem({
         flexDirection: "row",
         alignItems: "flex-start",
         paddingHorizontal: nested ? 0 : spacing.md,
-        paddingVertical: spacing.lg,
-        borderRadius: radii.sm,
+        paddingVertical: nested ? spacing.lg : spacing.md,
+        borderRadius: nested ? radii.sm : radii.md,
         backgroundColor: isRunning
           ? "rgba(59, 130, 246, 0.08)"
-          : "transparent",
+          : nested
+            ? "transparent"
+            : colors.backgroundElevated,
+        borderWidth: nested ? 0 : 1,
+        borderColor: nested ? "transparent" : colors.borderLight,
         opacity: pressed ? 0.7 : isDone ? 0.6 : 1,
       })}
     >
