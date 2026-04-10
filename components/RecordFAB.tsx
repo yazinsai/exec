@@ -52,10 +52,12 @@ export function RecordFAB({
 
   const disabled = isProcessing;
 
-  // Position so the FAB straddles the top edge of the tab bar.
-  // iOS tab bar is ~49pt, Android is ~56pt. Place FAB center at that top edge.
+  // Position FAB to straddle the top edge of the tab bar.
   const TAB_BAR_HEIGHT = Platform.OS === "android" ? 56 : 49;
-  const fabBottom = bottomInset + TAB_BAR_HEIGHT - 32; // 32 = half of 64pt FAB
+  // On Android (no home indicator), sit flush so half the FAB overlaps the bar.
+  const fabBottom = Platform.OS === "android"
+    ? TAB_BAR_HEIGHT - 32 // 32 = half of 64pt FAB, no bottomInset on Android
+    : bottomInset + TAB_BAR_HEIGHT - 32;
 
   return (
     <View
