@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, spacing, typography } from "@/constants/Colors";
 import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
+import { HighlightText } from "@/components/HighlightText";
 import {
   TASK_STATUSES,
   describeBlockedSituation,
@@ -47,6 +48,8 @@ export interface StepTaskRowProps {
   read?: boolean;
   /** Failed/blocked row expanded — reason + actions visible */
   expanded: boolean;
+  /** Keyword to highlight in the title */
+  highlightQuery?: string | null;
   onToggleExpand: () => void;
   onPress: () => void;
   onRetry?: () => void;
@@ -65,6 +68,7 @@ export function StepTaskRow({
   resultSnippet,
   read = true,
   expanded,
+  highlightQuery,
   onToggleExpand,
   onPress,
   onRetry,
@@ -145,7 +149,9 @@ export function StepTaskRow({
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text
+            <HighlightText
+              text={shortenStepTitle(title, 72)}
+              highlight={highlightQuery}
               numberOfLines={4}
               style={{
                 flex: 1,
@@ -154,9 +160,7 @@ export function StepTaskRow({
                 fontFamily: isUnread ? fontFamily.semibold : fontFamily.medium,
                 lineHeight: 22,
               }}
-            >
-              {shortenStepTitle(title, 72)}
-            </Text>
+            />
             {pinned && (
               <Ionicons
                 name="bookmark"

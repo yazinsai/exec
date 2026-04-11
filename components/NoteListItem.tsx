@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
 import { StepTaskRow } from "@/components/StepTaskRow";
+import { HighlightText } from "@/components/HighlightText";
 import {
   computeTaskStatusCounts,
   formatNoteAggregateSummary,
@@ -37,6 +38,10 @@ interface NoteListItemProps {
   onRetryTask?: (taskId: string) => void;
   onRetryTranscription?: () => void;
   onRetryExtraction?: () => void;
+  /** Keyword to highlight in title and task titles */
+  highlightQuery?: string | null;
+  /** Project slug to highlight matching tasks */
+  highlightProject?: string | null;
 }
 
 function relativeTime(timestamp: number): string {
@@ -146,6 +151,8 @@ export function NoteListItem({
   onRetryTask,
   onRetryTranscription,
   onRetryExtraction,
+  highlightQuery,
+  highlightProject,
 }: NoteListItemProps) {
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
@@ -201,7 +208,9 @@ export function NoteListItem({
           }}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
+            <HighlightText
+              text={title}
+              highlight={highlightQuery}
               numberOfLines={2}
               style={{
                 color: colors.textPrimary,
@@ -209,9 +218,7 @@ export function NoteListItem({
                 fontFamily: fontFamily.semibold,
                 lineHeight: 22,
               }}
-            >
-              {title}
-            </Text>
+            />
             <Text
               numberOfLines={2}
               style={{
@@ -358,35 +365,54 @@ export function NoteListItem({
                 gap: spacing.sm,
               }}
             >
-              {orderedTasks.map((task, index) => (
-                <View key={task.id}>
-                  <StepTaskRow
-                    title={task.title}
-                    status={task.status}
-                    stepIndex={index + 1}
-                    totalSteps={totalSteps}
-                    projectLabel={task.projectLabel}
-                    showProject={showProjectPerRow}
-                    blockedReason={task.blockedReason}
-                    errorMessage={task.errorMessage}
-                    resultSnippet={task.resultSnippet}
-                    read={task.read}
-                    pinned={task.pinned}
-                    expanded={expandedStepId === task.id}
-                    onToggleExpand={() =>
-                      setExpandedStepId((id) =>
-                        id === task.id ? null : task.id
-                      )
-                    }
-                    onPress={() => onOpenTask(task.id)}
-                    onRetry={
-                      task.status === TASK_STATUSES.failed && onRetryTask
-                        ? () => onRetryTask(task.id)
+              {orderedTasks.map((task, index) => {
+                const isProjectMatch =
+                  !!highlightProject &&
+                  (task.projectLabel || "").toLowerCase() ===
+                    highlightProject.toLowerCase();
+                return (
+                  <View
+                    key={task.id}
+                    style={
+                      isProjectMatch
+                        ? {
+                            backgroundColor: "rgba(250, 204, 21, 0.15)",
+                            borderRadius: 8,
+                            marginHorizontal: -4,
+                            paddingHorizontal: 4,
+                          }
                         : undefined
                     }
-                  />
-                </View>
-              ))}
+                  >
+                    <StepTaskRow
+                      title={task.title}
+                      status={task.status}
+                      stepIndex={index + 1}
+                      totalSteps={totalSteps}
+                      projectLabel={task.projectLabel}
+                      showProject={showProjectPerRow}
+                      blockedReason={task.blockedReason}
+                      errorMessage={task.errorMessage}
+                      resultSnippet={task.resultSnippet}
+                      read={task.read}
+                      pinned={task.pinned}
+                      expanded={expandedStepId === task.id}
+                      highlightQuery={highlightQuery}
+                      onToggleExpand={() =>
+                        setExpandedStepId((id) =>
+                          id === task.id ? null : task.id
+                        )
+                      }
+                      onPress={() => onOpenTask(task.id)}
+                      onRetry={
+                        task.status === TASK_STATUSES.failed && onRetryTask
+                          ? () => onRetryTask(task.id)
+                          : undefined
+                      }
+                    />
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <View

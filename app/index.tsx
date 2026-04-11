@@ -512,6 +512,8 @@ export default function HomeScreen() {
   const [showJumpToTop, setShowJumpToTop] = useState(false);
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterProject, setFilterProject] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
   // TTS state
   const [ttsActiveId, setTtsActiveId] = useState<string | null>(null);
@@ -522,7 +524,6 @@ export default function HomeScreen() {
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
     "running" | "failed" | "blocked" | "pinned" | null
   >(null);
-  const [showAllProjectPills, setShowAllProjectPills] = useState(false);
   const releaseInfo = getReleaseInfo();
 
   const isActive = isRecording || isPaused || isSaving;
@@ -702,23 +703,9 @@ export default function HomeScreen() {
     return Array.from(slugs).sort();
   }, [allTasks]);
 
-  const MAX_PROJECT_PILLS = 4;
-  const visibleProjectSlugs = useMemo(() => {
-    if (showAllProjectPills || projectSlugs.length <= MAX_PROJECT_PILLS) {
-      return projectSlugs;
-    }
-    return projectSlugs.slice(0, MAX_PROJECT_PILLS);
-  }, [projectSlugs, showAllProjectPills]);
-  const projectPillsOverflow = Math.max(
-    0,
-    projectSlugs.length - MAX_PROJECT_PILLS
-  );
-
-  useEffect(() => {
-    setShowAllProjectPills(false);
-  }, [projectSlugs.join("\0")]);
 
   // Apply filters to notes
+  const searchTrimmed = searchQuery.trim().toLowerCase();
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
       const tasks = (note.tasks ?? []) as Task[];
@@ -733,6 +720,21 @@ export default function HomeScreen() {
             (t as any).projectSlug === filterProject
         );
         if (!hasProject) return false;
+      }
+      if (searchTrimmed) {
+        const noteTitle = (note.summary || note.transcript || "").toLowerCase();
+        const noteTranscript = (note.transcript || "").toLowerCase();
+        const titleMatch = noteTitle.includes(searchTrimmed);
+        const transcriptMatch = noteTranscript.includes(searchTrimmed);
+        const taskMatch = tasks.some((t) => {
+          const taskText = (
+            (t.summary || "") +
+            " " +
+            (t.input || "")
+          ).toLowerCase();
+          return taskText.includes(searchTrimmed);
+        });
+        if (!titleMatch && !transcriptMatch && !taskMatch) return false;
       }
       if (noteTaskStatusFilter === "running") {
         if (!noteHasTaskWithStatus(note, TASK_STATUSES.running)) return false;
@@ -749,9 +751,10 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [notes, filterUnread, filterProject, noteTaskStatusFilter]);
+  }, [notes, filterUnread, filterProject, searchTrimmed, noteTaskStatusFilter]);
 
-  const isFiltering = filterUnread || !!filterProject;
+  const isFiltering = filterUnread && !searchTrimmed && !filterProject;
+  const isSearching = !!searchTrimmed || !!filterProject;
 
   const runningNoteCount = useMemo(
     () =>
@@ -1358,7 +1361,7 @@ export default function HomeScreen() {
             ? String((task as any).result).slice(0, 400)
             : null,
         }))}
-        expanded={expandedNoteIds.includes(item.id)}
+        expanded={isSearching || expandedNoteIds.includes(item.id)}
         onToggle={() => {
           setExpandedNoteIds((current) =>
             current.includes(item.id)
@@ -1374,6 +1377,8 @@ export default function HomeScreen() {
           db.transact(db.tx.tasks[taskId].update({ read: true }));
         }}
         onRetryTask={retryTask}
+        highlightQuery={searchTrimmed || null}
+        highlightProject={filterProject}
         onRetryTranscription={
           item.status === NOTE_STATUSES.transcriptionFailed && audioPath
             ? () => retryTranscription(item.id, audioPath)
@@ -1848,146 +1853,228 @@ export default function HomeScreen() {
               </Pressable>
             </ScrollView>
 
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                minHeight: 48,
-              }}
-            >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                fadingEdgeLength={72}
-                style={{ flex: 1, minWidth: 0 }}
-                removeClippedSubviews={false}
-                contentContainerStyle={{
+            {/* Search box + project dropdown */}
+            <View style={{ gap: spacing.xs }}>
+              <View
+                style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 10,
-                  paddingRight: spacing.sm,
-                  paddingVertical: 2,
+                  gap: spacing.sm,
+                  minHeight: 44,
                 }}
               >
-                {visibleProjectSlugs.map((slug) => {
-                  const selected = filterProject === slug;
-                  return (
-                    <Pressable
-                      key={slug}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      android_ripple={
-                        Platform.OS === "android"
-                          ? { color: "rgba(255,255,255,0.1)" }
-                          : undefined
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: isDark ? "#2c2c2e" : "#f2f2f7",
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    height: 40,
+                    borderWidth: (searchTrimmed || filterProject) ? 1.5 : 0,
+                    borderColor: colors.primary,
+                  }}
+                >
+                  <Ionicons
+                    name="search"
+                    size={17}
+                    color={colors.textTertiary}
+                    style={{ marginRight: 8 }}
+                  />
+                  <TextInput
+                    value={searchQuery}
+                    onChangeText={(text) => {
+                      setSearchQuery(text);
+                      if (text.trim()) {
+                        setShowProjectDropdown(false);
                       }
-                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    }}
+                    placeholder="Search voice notes..."
+                    placeholderTextColor={colors.textTertiary}
+                    returnKeyType="search"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    style={{
+                      flex: 1,
+                      color: colors.textPrimary,
+                      fontSize: typography.sm,
+                      fontFamily: fontFamily.regular,
+                      paddingVertical: 0,
+                    }}
+                  />
+                  {(searchQuery || filterProject) ? (
+                    <Pressable
                       onPress={() => {
-                        setFilterProject((v) => (v === slug ? null : slug));
-                        void Haptics.selectionAsync();
+                        setSearchQuery("");
+                        setFilterProject(null);
+                        setShowProjectDropdown(false);
                       }}
-                      style={({ pressed }) => ({
-                        minHeight: 40,
-                        justifyContent: "center",
-                        paddingHorizontal: 14,
-                        paddingVertical: 9,
-                        borderRadius: 20,
-                        backgroundColor: selected
-                          ? waFilter.onGoldBg
-                          : waFilter.offBg,
-                        borderWidth: selected ? 2 : 1.5,
-                        borderColor: selected
-                          ? waFilter.ringGold
-                          : waFilter.offBorder,
-                        opacity:
-                          pressed && Platform.OS !== "android" ? 0.9 : 1,
-                        transform: pressed ? [{ scale: 0.98 }] : [],
-                      })}
+                      hitSlop={8}
                     >
-                      <Text
-                        style={{
-                          fontSize: typography.sm,
-                          fontFamily: fontFamily.semibold,
-                          color: selected
-                            ? waFilter.onGoldFg
-                            : colors.textPrimary,
-                        }}
-                      >
-                        {slug}
-                      </Text>
+                      <Ionicons
+                        name="close-circle"
+                        size={18}
+                        color={colors.textTertiary}
+                      />
                     </Pressable>
-                  );
-                })}
-                {!showAllProjectPills && projectPillsOverflow > 0 ? (
+                  ) : null}
+                </View>
+
+                {projectSlugs.length > 0 ? (
                   <Pressable
-                    onPress={() => setShowAllProjectPills(true)}
+                    onPress={() => {
+                      setShowProjectDropdown((v) => !v);
+                      void Haptics.selectionAsync();
+                    }}
                     style={({ pressed }) => ({
-                      width: 40,
                       height: 40,
-                      borderRadius: 20,
-                      justifyContent: "center",
+                      paddingHorizontal: 12,
+                      borderRadius: 12,
+                      backgroundColor: filterProject
+                        ? waFilter.onGoldBg
+                        : isDark
+                          ? "#2c2c2e"
+                          : "#f2f2f7",
+                      borderWidth: filterProject ? 2 : showProjectDropdown ? 1.5 : 0,
+                      borderColor: filterProject
+                        ? waFilter.ringGold
+                        : colors.primary,
+                      flexDirection: "row",
                       alignItems: "center",
-                      borderWidth: 1.5,
-                      borderColor: waFilter.offBorder,
-                      backgroundColor: waFilter.offBg,
+                      gap: 4,
                       opacity: pressed ? 0.85 : 1,
                     })}
                   >
+                    <Ionicons
+                      name="folder-outline"
+                      size={16}
+                      color={
+                        filterProject
+                          ? waFilter.onGoldFg
+                          : colors.textSecondary
+                      }
+                    />
                     <Text
+                      numberOfLines={1}
                       style={{
-                        fontSize: typography.lg,
-                        fontFamily: fontFamily.medium,
-                        color: colors.textSecondary,
-                        marginTop: -2,
+                        fontSize: typography.sm,
+                        fontFamily: fontFamily.semibold,
+                        color: filterProject
+                          ? waFilter.onGoldFg
+                          : colors.textPrimary,
+                        maxWidth: 100,
                       }}
                     >
-                      +
+                      {filterProject || "Project"}
                     </Text>
+                    <Ionicons
+                      name={showProjectDropdown ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color={
+                        filterProject
+                          ? waFilter.onGoldFg
+                          : colors.textTertiary
+                      }
+                    />
                   </Pressable>
                 ) : null}
-                {showAllProjectPills && projectSlugs.length > MAX_PROJECT_PILLS ? (
+
+                {filterUnread || noteTaskStatusFilter ? (
                   <Pressable
-                    onPress={() => setShowAllProjectPills(false)}
-                    style={({ pressed }) => ({
-                      minHeight: 44,
-                      justifyContent: "center",
-                      paddingHorizontal: 12,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
+                    onPress={() => {
+                      setFilterUnread(false);
+                      setNoteTaskStatusFilter(null);
+                    }}
+                    hitSlop={10}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                   >
                     <Text
                       style={{
                         fontSize: typography.sm,
-                        fontFamily: fontFamily.medium,
-                        color: colors.textTertiary,
+                        fontFamily: fontFamily.semibold,
+                        color: colors.primary,
                       }}
                     >
-                      Less
+                      Clear
                     </Text>
                   </Pressable>
                 ) : null}
-              </ScrollView>
-              {filterUnread || filterProject || noteTaskStatusFilter ? (
-                <Pressable
-                  onPress={() => {
-                    setFilterUnread(false);
-                    setFilterProject(null);
-                    setNoteTaskStatusFilter(null);
+              </View>
+
+              {/* Project dropdown list */}
+              {showProjectDropdown && projectSlugs.length > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: isDark ? "#2c2c2e" : "#ffffff",
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: isDark ? "#5c5c5e" : "rgba(0,0,0,0.1)",
+                    overflow: "hidden",
                   }}
-                  hitSlop={10}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                 >
-                  <Text
-                    style={{
-                      fontSize: typography.sm,
-                      fontFamily: fontFamily.semibold,
-                      color: colors.primary,
-                    }}
-                  >
-                    Clear
-                  </Text>
-                </Pressable>
+                  {projectSlugs.map((slug, index) => {
+                    const selected = filterProject === slug;
+                    return (
+                      <Pressable
+                        key={slug}
+                        onPress={() => {
+                          setFilterProject((v) => (v === slug ? null : slug));
+                          setSearchQuery("");
+                          setShowProjectDropdown(false);
+                          void Haptics.selectionAsync();
+                        }}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          backgroundColor: selected
+                            ? "rgba(250, 204, 21, 0.15)"
+                            : pressed
+                              ? isDark
+                                ? "rgba(255,255,255,0.05)"
+                                : "rgba(0,0,0,0.03)"
+                              : "transparent",
+                          borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0,
+                          borderTopColor: isDark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(0,0,0,0.06)",
+                        })}
+                      >
+                        <Ionicons
+                          name={selected ? "folder" : "folder-outline"}
+                          size={16}
+                          color={
+                            selected ? colors.primary : colors.textSecondary
+                          }
+                          style={{ marginRight: 10 }}
+                        />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: typography.sm,
+                            fontFamily: selected
+                              ? fontFamily.semibold
+                              : fontFamily.regular,
+                            color: selected
+                              ? colors.textPrimary
+                              : colors.textSecondary,
+                          }}
+                        >
+                          {slug}
+                        </Text>
+                        {selected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={18}
+                            color={colors.primary}
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
               ) : null}
             </View>
           </View>
@@ -2104,7 +2191,9 @@ export default function HomeScreen() {
                         textAlign: "center",
                       }}
                     >
-                      No voice notes match these filters.
+                      {isSearching
+                        ? `No results for "${searchTrimmed || filterProject}"`
+                        : "No voice notes match these filters."}
                     </Text>
                   </View>
                 ) : null}
