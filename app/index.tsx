@@ -1936,6 +1936,7 @@ export default function HomeScreen() {
                       height: 40,
                       paddingHorizontal: 12,
                       borderRadius: 12,
+                      flexShrink: 0,
                       backgroundColor: filterProject
                         ? waFilter.onGoldBg
                         : isDark
@@ -2009,14 +2010,15 @@ export default function HomeScreen() {
 
               {/* Project dropdown list */}
               {showProjectDropdown && projectSlugs.length > 0 ? (
-                <View
+                <ScrollView
                   style={{
+                    maxHeight: 280,
                     backgroundColor: isDark ? "#2c2c2e" : "#ffffff",
                     borderRadius: 12,
                     borderWidth: 1,
                     borderColor: isDark ? "#5c5c5e" : "rgba(0,0,0,0.1)",
-                    overflow: "hidden",
                   }}
+                  nestedScrollEnabled
                 >
                   {projectSlugs.map((slug, index) => {
                     const selected = filterProject === slug;
@@ -2029,57 +2031,56 @@ export default function HomeScreen() {
                           setShowProjectDropdown(false);
                           void Haptics.selectionAsync();
                         }}
-                        style={({ pressed }) => ({
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingHorizontal: 14,
-                          paddingVertical: 12,
-                          backgroundColor: selected
-                            ? "rgba(250, 204, 21, 0.15)"
-                            : pressed
-                              ? isDark
-                                ? "rgba(255,255,255,0.05)"
-                                : "rgba(0,0,0,0.03)"
-                              : "transparent",
-                          borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0,
-                          borderTopColor: isDark
-                            ? "rgba(255,255,255,0.08)"
-                            : "rgba(0,0,0,0.06)",
-                        })}
                       >
-                        <Ionicons
-                          name={selected ? "folder" : "folder-outline"}
-                          size={16}
-                          color={
-                            selected ? colors.primary : colors.textSecondary
-                          }
-                          style={{ marginRight: 10 }}
-                        />
-                        <Text
+                        <View
                           style={{
-                            flex: 1,
-                            fontSize: typography.sm,
-                            fontFamily: selected
-                              ? fontFamily.semibold
-                              : fontFamily.regular,
-                            color: selected
-                              ? colors.textPrimary
-                              : colors.textSecondary,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                            backgroundColor: selected
+                              ? "rgba(250, 204, 21, 0.15)"
+                              : "transparent",
+                            borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0,
+                            borderTopColor: isDark
+                              ? "rgba(255,255,255,0.08)"
+                              : "rgba(0,0,0,0.06)",
                           }}
                         >
-                          {slug}
-                        </Text>
-                        {selected ? (
                           <Ionicons
-                            name="checkmark"
-                            size={18}
-                            color={colors.primary}
+                            name={selected ? "folder" : "folder-outline"}
+                            size={16}
+                            color={
+                              selected ? colors.primary : colors.textSecondary
+                            }
+                            style={{ marginRight: 10 }}
                           />
-                        ) : null}
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: typography.sm,
+                              fontFamily: selected
+                                ? fontFamily.semibold
+                                : fontFamily.regular,
+                              color: selected
+                                ? colors.textPrimary
+                                : colors.textSecondary,
+                            }}
+                          >
+                            {slug}
+                          </Text>
+                          {selected ? (
+                            <Ionicons
+                              name="checkmark"
+                              size={18}
+                              color={colors.primary}
+                            />
+                          ) : null}
+                        </View>
                       </Pressable>
                     );
                   })}
-                </View>
+                </ScrollView>
               ) : null}
             </View>
           </View>
