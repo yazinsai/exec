@@ -515,10 +515,26 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
-  // TTS state
+  // TTS state — speed persisted across sessions
   const [ttsActiveId, setTtsActiveId] = useState<string | null>(null);
   const [ttsSpeed, setTtsSpeed] = useState<1 | 1.5 | 2>(1);
   const TTS_SPEEDS = [1, 1.5, 2] as const;
+
+  // Load persisted TTS speed on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+        const saved = await AsyncStorage.getItem("ttsSpeed");
+        if (saved) {
+          const parsed = parseFloat(saved);
+          if (parsed === 1 || parsed === 1.5 || parsed === 2) {
+            setTtsSpeed(parsed as 1 | 1.5 | 2);
+          }
+        }
+      } catch {}
+    })();
+  }, []);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(2);
   /** Voice notes that contain ≥1 task with this status / trait */
   const [noteTaskStatusFilter, setNoteTaskStatusFilter] = useState<
@@ -1126,6 +1142,14 @@ export default function HomeScreen() {
     const currentIdx = TTS_SPEEDS.indexOf(ttsSpeed);
     const nextSpeed = TTS_SPEEDS[(currentIdx + 1) % TTS_SPEEDS.length];
     setTtsSpeed(nextSpeed);
+    // Persist speed preference
+    (async () => {
+      try {
+        const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+        await AsyncStorage.setItem("ttsSpeed", String(nextSpeed));
+      } catch {}
+    })();
+    // Stop current playback — it'll restart at new speed if user taps play
     if (ttsActiveId) {
       Speech.stop();
       setTtsActiveId(null);
@@ -1431,7 +1455,7 @@ export default function HomeScreen() {
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Iconify icon="solar:book-linear" size={16} color={colors.textTertiary} style={{ opacity: 0.6 }} />
+              <Iconify icon="solar:book-linear" size={18} color={colors.textTertiary} />
             </Pressable>
           </View>
 
@@ -2322,7 +2346,7 @@ export default function HomeScreen() {
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
                       >
-                        <Iconify icon="solar:close-circle-linear" size={24} color={colors.textSecondary} />
+                        <Iconify icon="solar:close-square-linear" size={24} color={colors.textSecondary} />
                       </Pressable>
                     </View>
                   </View>
@@ -2522,27 +2546,25 @@ export default function HomeScreen() {
                           >
                             Result
                           </Text>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
-                            {ttsActiveId === "result" && (
-                              <Pressable
-                                onPress={cycleTtsSpeed}
-                                hitSlop={8}
-                                style={{
-                                  paddingHorizontal: spacing.sm,
-                                  paddingVertical: 2,
-                                  borderRadius: radii.sm,
-                                  backgroundColor: colors.primaryAlpha20,
-                                }}
-                              >
-                                <Text style={{ color: colors.primary, fontSize: typography.xs, fontFamily: fontFamily.semibold }}>
-                                  {ttsSpeed}×
-                                </Text>
-                              </Pressable>
-                            )}
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                             <Pressable
-                              onPress={() => toggleTts("result", selectedTask.result!)}
-                              hitSlop={12}
-                              style={{ padding: spacing.xs, minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
+                              onPress={(e) => { e.stopPropagation(); cycleTtsSpeed(); }}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: radii.sm,
+                                backgroundColor: colors.primaryAlpha20,
+                                minWidth: 40,
+                                alignItems: "center",
+                              }}
+                            >
+                              <Text style={{ color: colors.primary, fontSize: typography.sm, fontFamily: fontFamily.bold }}>
+                                {ttsSpeed}×
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={(e) => { e.stopPropagation(); toggleTts("result", selectedTask.result!); }}
+                              style={{ padding: spacing.xs, minWidth: 36, minHeight: 36, alignItems: "center", justifyContent: "center" }}
                             >
                               <Iconify
                                 icon={ttsActiveId === "result" ? "solar:stop-bold" : "solar:play-bold"}
@@ -2630,27 +2652,25 @@ export default function HomeScreen() {
                             {relativeTime(msg.createdAt)}
                           </Text>
                           {!isUser && (
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
-                              {ttsActiveId === msgTtsId && (
-                                <Pressable
-                                  onPress={cycleTtsSpeed}
-                                  hitSlop={8}
-                                  style={{
-                                    paddingHorizontal: spacing.sm,
-                                    paddingVertical: 2,
-                                    borderRadius: radii.sm,
-                                    backgroundColor: colors.primaryAlpha20,
-                                  }}
-                                >
-                                  <Text style={{ color: colors.primary, fontSize: typography.xs, fontFamily: fontFamily.semibold }}>
-                                    {ttsSpeed}×
-                                  </Text>
-                                </Pressable>
-                              )}
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                               <Pressable
-                                onPress={() => toggleTts(msgTtsId, msg.content)}
-                                hitSlop={12}
-                                style={{ minWidth: 44, minHeight: 28, alignItems: "center", justifyContent: "center" }}
+                                onPress={(e) => { e.stopPropagation(); cycleTtsSpeed(); }}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 4,
+                                  borderRadius: radii.sm,
+                                  backgroundColor: colors.primaryAlpha20,
+                                  minWidth: 40,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Text style={{ color: colors.primary, fontSize: typography.sm, fontFamily: fontFamily.bold }}>
+                                  {ttsSpeed}×
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={(e) => { e.stopPropagation(); toggleTts(msgTtsId, msg.content); }}
+                                style={{ minWidth: 36, minHeight: 28, alignItems: "center", justifyContent: "center" }}
                               >
                                 <Iconify
                                   icon={ttsActiveId === msgTtsId ? "solar:stop-bold" : "solar:play-bold"}

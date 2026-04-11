@@ -11,6 +11,7 @@ module.exports = function (api) {
             "solar:arrow-up-linear",
             "solar:alt-arrow-down-linear",
             "solar:alt-arrow-up-linear",
+            "solar:close-square-linear",
             "solar:close-circle-linear",
             "solar:close-circle-bold",
             "solar:check-read-linear",
