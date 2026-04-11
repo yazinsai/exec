@@ -26,15 +26,23 @@ export async function transcribeAudio(localFilePath: string, prompt?: string): P
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  // React Native FormData expects an object with uri, name, and type
-  const file = {
-    uri: localFilePath,
-    name: "recording.m4a",
-    type: "audio/x-m4a",
-  } as unknown as Blob;
-
   const formData = new FormData();
-  formData.append("file", file);
+
+  if (typeof window !== "undefined" && typeof window.document !== "undefined") {
+    // Web: fetch the file URI and convert to a real Blob
+    const res = await fetch(localFilePath);
+    const blob = await res.blob();
+    const ext = localFilePath.match(/\.(\w+)$/)?.[1] ?? "webm";
+    formData.append("file", blob, `recording.${ext}`);
+  } else {
+    // React Native: use the { uri, name, type } convention
+    const file = {
+      uri: localFilePath,
+      name: "recording.m4a",
+      type: "audio/x-m4a",
+    } as unknown as Blob;
+    formData.append("file", file);
+  }
   formData.append("model", "whisper-1");
   formData.append("response_format", "text");
 
