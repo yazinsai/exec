@@ -1865,12 +1865,12 @@ export default function HomeScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: spacing.sm,
-                  minHeight: 44,
                 }}
               >
                 <View
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     flexDirection: "row",
                     alignItems: "center",
                     backgroundColor: isDark ? "#2c2c2e" : "#f2f2f7",
@@ -1932,11 +1932,10 @@ export default function HomeScreen() {
                       setShowProjectDropdown((v) => !v);
                       void Haptics.selectionAsync();
                     }}
-                    style={({ pressed }) => ({
+                    style={{
                       height: 40,
                       paddingHorizontal: 12,
                       borderRadius: 12,
-                      flexShrink: 0,
                       backgroundColor: filterProject
                         ? waFilter.onGoldBg
                         : isDark
@@ -1949,8 +1948,7 @@ export default function HomeScreen() {
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 4,
-                      opacity: pressed ? 0.85 : 1,
-                    })}
+                    }}
                   >
                     <Ionicons
                       name="folder-outline"
