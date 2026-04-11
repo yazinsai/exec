@@ -191,11 +191,17 @@ async function handleNote(noteId: string) {
   const triage = await triageTranscript(note.transcript, dictTerms);
   const now = Date.now();
 
+  // Re-query the note to get the current summary — summarizeInput may have
+  // updated it on the client while triage was running (race condition).
+  const freshResp = await db.query({ notes: { $: { where: { id: noteId } } } } as any);
+  const currentSummary = (freshResp.notes[0] as any)?.summary;
+  const hasRealSummary = currentSummary && currentSummary !== "Transcribing...";
+
   if (triage.tasks.length === 0) {
     await db.transact(
       db.tx.notes[noteId].update({
         status: NOTE_STATUSES.empty,
-        ...(note.summary && note.summary !== "Transcribing..." ? {} : triage.summary ? { summary: triage.summary } : {}),
+        ...(hasRealSummary ? {} : triage.summary ? { summary: triage.summary } : {}),
         triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
         triagedAt: now,
       })
@@ -214,7 +220,7 @@ async function handleNote(noteId: string) {
   const txs: any[] = [
     db.tx.notes[noteId].update({
       status: NOTE_STATUSES.ready,
-      ...(note.summary && note.summary !== "Transcribing..." ? {} : triage.summary ? { summary: triage.summary } : {}),
+      ...(hasRealSummary ? {} : triage.summary ? { summary: triage.summary } : {}),
       triageResult: JSON.stringify(triage.rawStructuredOutput ?? []),
       triagedAt: now,
       errorMessage: "",
