@@ -38,6 +38,7 @@ interface NoteListItemProps {
   onRetryTask?: (taskId: string) => void;
   onRetryTranscription?: () => void;
   onRetryExtraction?: () => void;
+  errorMessage?: string | null;
   /** Keyword to highlight in title and task titles */
   highlightQuery?: string | null;
   /** Project slug to highlight matching tasks */
@@ -151,6 +152,7 @@ export function NoteListItem({
   onRetryTask,
   onRetryTranscription,
   onRetryExtraction,
+  errorMessage,
   highlightQuery,
   highlightProject,
 }: NoteListItemProps) {
@@ -435,6 +437,20 @@ export function NoteListItem({
               >
                 {transcript || "No transcript available yet."}
               </Text>
+
+              {status === NOTE_STATUSES.transcriptionFailed && errorMessage ? (
+                <Text
+                  style={{
+                    color: colors.error,
+                    fontSize: typography.xs,
+                    fontFamily: fontFamily.regular,
+                    marginTop: spacing.sm,
+                  }}
+                  numberOfLines={2}
+                >
+                  {errorMessage}
+                </Text>
+              ) : null}
 
               {status === NOTE_STATUSES.transcriptionFailed && onRetryTranscription ? (
                 <Pressable

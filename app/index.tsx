@@ -1408,6 +1408,7 @@ export default function HomeScreen() {
         onRetryTask={retryTask}
         highlightQuery={searchTrimmed || null}
         highlightProject={filterProject}
+        errorMessage={(item as any).errorMessage ?? null}
         onRetryTranscription={
           item.status === NOTE_STATUSES.transcriptionFailed && audioPath
             ? () => retryTranscription(item.id, audioPath)
