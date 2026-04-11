@@ -1,3 +1,6 @@
+/** Placeholder written to note.summary while transcription is in progress. */
+export const SUMMARY_PLACEHOLDER = "Transcribing...";
+
 export const NOTE_STATUSES = {
   transcribing: "transcribing",
   transcriptionFailed: "transcription_failed",

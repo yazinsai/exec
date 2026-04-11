@@ -17,7 +17,7 @@ import schema from "../instant.schema";
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { resolve } from "path";
-import { NOTE_STATUSES, TASK_STATUSES } from "../lib/workflow";
+import { NOTE_STATUSES, TASK_STATUSES, SUMMARY_PLACEHOLDER } from "../lib/workflow";
 import { triageTranscript } from "./triage";
 import { getProjectPath, getProjectsRoot } from "./project-index";
 import { migrateLegacyTasksToNotes } from "./migrations";
@@ -195,7 +195,7 @@ async function handleNote(noteId: string) {
   // updated it on the client while triage was running (race condition).
   const freshResp = await db.query({ notes: { $: { where: { id: noteId } } } } as any);
   const currentSummary = (freshResp.notes[0] as any)?.summary;
-  const hasRealSummary = currentSummary && currentSummary !== "Transcribing...";
+  const hasRealSummary = currentSummary && currentSummary !== SUMMARY_PLACEHOLDER;
 
   if (triage.tasks.length === 0) {
     await db.transact(

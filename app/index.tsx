@@ -61,6 +61,7 @@ import { shortenRunTitle } from "@/lib/displayCopy";
 import {
   NOTE_STATUSES,
   noteIsSettledForHistory,
+  SUMMARY_PLACEHOLDER,
   TASK_STATUSES,
 } from "@/lib/workflow";
 import type { InstaQLEntity } from "@instantdb/react-native";
@@ -670,7 +671,7 @@ export default function HomeScreen() {
             db.tx.notes[entry.noteId].update({
               transcript: "",
               status: NOTE_STATUSES.transcribing,
-              summary: "Transcribing...",
+              summary: SUMMARY_PLACEHOLDER,
               source: "phone",
               audioFilePath: entry.filePath,
               createdAt: entry.createdAt,
@@ -1026,7 +1027,7 @@ export default function HomeScreen() {
           db.tx.notes[noteId].update({
             transcript: "",
             status: NOTE_STATUSES.transcribing,
-            summary: "Transcribing...",
+            summary: SUMMARY_PLACEHOLDER,
             source: "phone",
             audioFilePath: filePath,
             createdAt: now,

@@ -1,5 +1,5 @@
 import { id } from "@instantdb/admin";
-import { NOTE_STATUSES } from "../lib/workflow";
+import { NOTE_STATUSES, SUMMARY_PLACEHOLDER } from "../lib/workflow";
 
 function mapLegacyTaskStatusToNoteStatus(status: string): string {
   if (status === "transcribing") return NOTE_STATUSES.transcribing;
@@ -20,7 +20,7 @@ export async function migrateLegacyTasksToNotes(db: any) {
 
     const noteId = id();
     const transcript =
-      task.status === "transcribing" || task.input === "Transcribing..."
+      task.status === "transcribing" || task.input === SUMMARY_PLACEHOLDER
         ? ""
         : task.input || "";
 
