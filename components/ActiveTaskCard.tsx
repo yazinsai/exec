@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   Easing,
 } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import {
   spacing,
@@ -185,7 +185,7 @@ export function ActiveTaskCard({
             {isTranscriptionFailed && onRetry && (
               <Pressable onPress={onRetry} hitSlop={8}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Ionicons name="refresh" size={14} color={colors.primary} />
+                  <Iconify icon="solar:refresh-linear" size={14} color={colors.primary} />
                   <Text
                     style={{
                       color: colors.primary,

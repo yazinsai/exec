@@ -16,6 +16,7 @@
   "dependencies": {
     "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
+    "@iconify-json/solar": "^1.2.5",
     "@instantdb/admin": "latest",
     "@instantdb/core": "^0.22.180",
     "@instantdb/react-native": "latest",
@@ -49,10 +50,12 @@
     "react-native-css-interop": "^0.2.1",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "^1.11.0",
+    "react-native-iconify": "^2.0.3",
     "react-native-markdown-display": "^7.0.2",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
     "tailwindcss": "^3.4.17"

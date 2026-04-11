@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, spacing, typography } from "@/constants/Colors";
 import { shortenStepTitle, summarizeErrorForFeed } from "@/lib/displayCopy";
@@ -162,8 +162,8 @@ export function StepTaskRow({
               }}
             />
             {pinned && (
-              <Ionicons
-                name="bookmark"
+              <Iconify
+                icon="solar:bookmark-bold"
                 size={14}
                 color={colors.primary}
                 style={{ flexShrink: 0, marginTop: 2 }}

@@ -25,7 +25,7 @@ import MarkdownIt from "markdown-it";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import * as Updates from "expo-updates";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { id } from "@instantdb/react-native";
 import { db } from "@/lib/db";
 import { transcribeAudio, buildDictionaryPrompt } from "@/lib/transcription";
@@ -116,16 +116,16 @@ const STATUS_LABELS: Record<string, string> = {
 
 // Tool icon mapping
 const TOOL_ICONS: Record<string, { icon: string; label: string }> = {
-  Read: { icon: "document-text-outline", label: "Reading" },
-  Write: { icon: "create-outline", label: "Writing" },
-  Edit: { icon: "pencil-outline", label: "Editing" },
-  Glob: { icon: "search-outline", label: "Finding files" },
-  Grep: { icon: "code-slash-outline", label: "Searching" },
-  Bash: { icon: "terminal-outline", label: "Running" },
-  Agent: { icon: "git-branch-outline", label: "Subagent" },
-  WebSearch: { icon: "globe-outline", label: "Searching web" },
-  WebFetch: { icon: "cloud-download-outline", label: "Fetching" },
-  Skill: { icon: "flash-outline", label: "Using skill" },
+  Read: { icon: "solar:document-text-linear", label: "Reading" },
+  Write: { icon: "solar:pen-new-square-linear", label: "Writing" },
+  Edit: { icon: "solar:pen-linear", label: "Editing" },
+  Glob: { icon: "solar:magnifer-linear", label: "Finding files" },
+  Grep: { icon: "solar:code-linear", label: "Searching" },
+  Bash: { icon: "solar:monitor-linear", label: "Running" },
+  Agent: { icon: "solar:share-circle-linear", label: "Subagent" },
+  WebSearch: { icon: "solar:global-linear", label: "Searching web" },
+  WebFetch: { icon: "solar:cloud-download-linear", label: "Fetching" },
+  Skill: { icon: "solar:bolt-linear", label: "Using skill" },
 };
 
 type ActivityItem = {
@@ -149,7 +149,7 @@ function ActivityRow({
 }) {
   if (item.type === "tool") {
     const toolInfo = TOOL_ICONS[item.name || ""] || {
-      icon: "ellipsis-horizontal-outline",
+      icon: "solar:menu-dots-linear",
       label: item.name || "Tool",
     };
     return (
@@ -162,8 +162,8 @@ function ActivityRow({
           paddingVertical: 3,
         }}
       >
-        <Ionicons
-          name={toolInfo.icon as any}
+        <Iconify
+          icon={toolInfo.icon as any}
           size={14}
           color={isLatest ? colors.statusRunning : colors.textTertiary}
         />
@@ -202,8 +202,8 @@ function ActivityRow({
           paddingVertical: 3,
         }}
       >
-        <Ionicons
-          name="bulb-outline"
+        <Iconify
+          icon="solar:lightbulb-linear"
           size={14}
           color={isLatest ? colors.thinking : colors.textTertiary}
         />
@@ -235,8 +235,8 @@ function ActivityRow({
         paddingVertical: 3,
       }}
     >
-      <Ionicons
-        name="chatbubble-outline"
+      <Iconify
+        icon="solar:chat-round-linear"
         size={14}
         color={isLatest ? colors.textSecondary : colors.textTertiary}
       />
@@ -363,7 +363,7 @@ function LiveActivityFeed({
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Ionicons name="chevron-up" size={14} color={colors.textTertiary} />
+          <Iconify icon="solar:alt-arrow-up-linear" size={14} color={colors.textTertiary} />
           <Text
             style={{
               color: colors.textTertiary,
@@ -394,7 +394,7 @@ function LiveActivityFeed({
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+          <Iconify icon="solar:alt-arrow-down-linear" size={14} color={colors.textTertiary} />
           <Text
             style={{
               color: colors.textTertiary,
@@ -1431,7 +1431,7 @@ export default function HomeScreen() {
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name="book-outline" size={16} color={colors.textTertiary} style={{ opacity: 0.6 }} />
+              <Iconify icon="solar:book-linear" size={16} color={colors.textTertiary} style={{ opacity: 0.6 }} />
             </Pressable>
           </View>
 
@@ -1881,8 +1881,8 @@ export default function HomeScreen() {
                     borderColor: colors.primary,
                   }}
                 >
-                  <Ionicons
-                    name="search"
+                  <Iconify
+                    icon="solar:magnifer-linear"
                     size={17}
                     color={colors.textTertiary}
                     style={{ marginRight: 8 }}
@@ -1917,8 +1917,8 @@ export default function HomeScreen() {
                       }}
                       hitSlop={8}
                     >
-                      <Ionicons
-                        name="close-circle"
+                      <Iconify
+                        icon="solar:close-circle-bold"
                         size={18}
                         color={colors.textTertiary}
                       />
@@ -1950,8 +1950,8 @@ export default function HomeScreen() {
                       gap: 4,
                     }}
                   >
-                    <Ionicons
-                      name="folder-outline"
+                    <Iconify
+                      icon="solar:folder-linear"
                       size={16}
                       color={
                         filterProject
@@ -1972,8 +1972,8 @@ export default function HomeScreen() {
                     >
                       {filterProject || "Project"}
                     </Text>
-                    <Ionicons
-                      name={showProjectDropdown ? "chevron-up" : "chevron-down"}
+                    <Iconify
+                      icon={showProjectDropdown ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"}
                       size={14}
                       color={
                         filterProject
@@ -2045,8 +2045,8 @@ export default function HomeScreen() {
                               : "rgba(0,0,0,0.06)",
                           }}
                         >
-                          <Ionicons
-                            name={selected ? "folder" : "folder-outline"}
+                          <Iconify
+                            icon={selected ? "solar:folder-bold" : "solar:folder-linear"}
                             size={16}
                             color={
                               selected ? colors.primary : colors.textSecondary
@@ -2068,8 +2068,8 @@ export default function HomeScreen() {
                             {slug}
                           </Text>
                           {selected ? (
-                            <Ionicons
-                              name="checkmark"
+                            <Iconify
+                              icon="solar:check-read-linear"
                               size={18}
                               color={colors.primary}
                             />
@@ -2306,8 +2306,8 @@ export default function HomeScreen() {
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
                       >
-                        <Ionicons
-                          name={(selectedTask as any).pinned ? "bookmark" : "bookmark-outline"}
+                        <Iconify
+                          icon={(selectedTask as any).pinned ? "solar:bookmark-bold" : "solar:bookmark-linear"}
                           size={20}
                           color={(selectedTask as any).pinned ? colors.primary : colors.textSecondary}
                         />
@@ -2322,7 +2322,7 @@ export default function HomeScreen() {
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
                       >
-                        <Ionicons name="close" size={24} color={colors.textSecondary} />
+                        <Iconify icon="solar:close-circle-linear" size={24} color={colors.textSecondary} />
                       </Pressable>
                     </View>
                   </View>
@@ -2448,7 +2448,7 @@ export default function HomeScreen() {
                             marginBottom: spacing.xl,
                           }}
                         >
-                          <Ionicons name="close-circle-outline" size={16} color={colors.error} />
+                          <Iconify icon="solar:close-circle-linear" size={16} color={colors.error} />
                           <Text
                             style={{
                               color: colors.error,
@@ -2509,7 +2509,7 @@ export default function HomeScreen() {
                             marginBottom: spacing.sm,
                           }}
                         >
-                          <Ionicons name="checkmark-circle" size={14} color={colors.statusDone} />
+                          <Iconify icon="solar:check-circle-bold" size={14} color={colors.statusDone} />
                           <Text
                             style={{
                               color: colors.textTertiary,
@@ -2544,8 +2544,8 @@ export default function HomeScreen() {
                               hitSlop={12}
                               style={{ padding: spacing.xs, minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
                             >
-                              <Ionicons
-                                name={ttsActiveId === "result" ? "stop-circle" : "play-circle"}
+                              <Iconify
+                                icon={ttsActiveId === "result" ? "solar:stop-bold" : "solar:play-bold"}
                                 size={20}
                                 color={ttsActiveId === "result" ? colors.statusFailed : colors.textTertiary}
                               />
@@ -2652,8 +2652,8 @@ export default function HomeScreen() {
                                 hitSlop={12}
                                 style={{ minWidth: 44, minHeight: 28, alignItems: "center", justifyContent: "center" }}
                               >
-                                <Ionicons
-                                  name={ttsActiveId === msgTtsId ? "stop-circle-outline" : "play-circle-outline"}
+                                <Iconify
+                                  icon={ttsActiveId === msgTtsId ? "solar:stop-bold" : "solar:play-bold"}
                                   size={18}
                                   color={ttsActiveId === msgTtsId ? colors.statusFailed : colors.textMuted}
                                 />
@@ -2687,7 +2687,7 @@ export default function HomeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Jump to top"
                   >
-                    <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
+                    <Iconify icon="solar:alt-arrow-up-linear" size={20} color={colors.textSecondary} />
                   </Pressable>
                 )}
 
@@ -2712,7 +2712,7 @@ export default function HomeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Jump to end"
                   >
-                    <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                    <Iconify icon="solar:alt-arrow-down-linear" size={20} color={colors.textSecondary} />
                   </Pressable>
                 )}
 
@@ -2852,7 +2852,7 @@ export default function HomeScreen() {
                           pressed && { opacity: 0.7 },
                         ]}
                       >
-                        <Ionicons name="mic" size={18} color={colors.textMuted} />
+                        <Iconify icon="solar:microphone-bold" size={18} color={colors.textMuted} />
                       </Pressable>
 
                       <TextInput
@@ -2901,8 +2901,8 @@ export default function HomeScreen() {
                         {sendingFollowUp ? (
                           <ActivityIndicator size="small" color={colors.white} />
                         ) : (
-                          <Ionicons
-                            name="arrow-up"
+                          <Iconify
+                            icon="solar:arrow-up-linear"
                             size={18}
                             color={followUpText.trim() ? colors.white : colors.textMuted}
                           />

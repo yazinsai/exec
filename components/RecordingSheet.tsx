@@ -16,7 +16,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { Waveform } from "./Waveform";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { spacing, typography, radii, fontFamily } from "@/constants/Colors";
@@ -307,8 +307,8 @@ export function RecordingSheet({
                     opacity: pressed ? 0.82 : 1,
                   })}
                 >
-                  <Ionicons
-                    name={isPaused ? "play" : "pause"}
+                  <Iconify
+                    icon={isPaused ? "solar:play-bold" : "solar:pause-bold"}
                     size={22}
                     color={
                       isPaused ? (isDark ? colors.white : colors.black) : colors.textPrimary

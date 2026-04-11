@@ -8,7 +8,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import { shadows } from "@/constants/Colors";
 
@@ -86,8 +86,8 @@ export function RecordFAB({
           animatedStyle,
         ]}
       >
-        <Ionicons
-          name={isRecording ? "stop" : "mic"}
+        <Iconify
+          icon={isRecording ? "solar:stop-bold" : "solar:microphone-bold"}
           size={isRecording ? 24 : 28}
           color={colors.white}
         />

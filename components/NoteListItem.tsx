@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View, Animated, Easing } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
 import { StepTaskRow } from "@/components/StepTaskRow";
@@ -336,8 +336,8 @@ export function NoteListItem({
             )}
           </View>
 
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
+          <Iconify
+            icon={expanded ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"}
             size={18}
             color={colors.textTertiary}
             style={{ marginTop: 2, flexShrink: 0 }}

@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { id } from "@instantdb/react-native";
 import * as Haptics from "expo-haptics";
 import { db } from "@/lib/db";
@@ -103,7 +103,7 @@ export function DictionarySheet({ visible, onClose, terms }: DictionarySheetProp
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <Iconify icon="solar:close-circle-linear" size={24} color={colors.textSecondary} />
             </Pressable>
           </View>
 
@@ -151,8 +151,8 @@ export function DictionarySheet({ visible, onClose, terms }: DictionarySheetProp
                 opacity: pressed ? 0.7 : 1,
               })}
             >
-              <Ionicons
-                name="add"
+              <Iconify
+                icon="solar:add-circle-linear"
                 size={20}
                 color={newTerm.trim() ? "#fff" : colors.textTertiary}
               />
@@ -228,8 +228,8 @@ export function DictionarySheet({ visible, onClose, terms }: DictionarySheetProp
                     opacity: pressed ? 0.55 : 1,
                   })}
                 >
-                  <Ionicons
-                    name="close-circle"
+                  <Iconify
+                    icon="solar:close-circle-bold"
                     size={22}
                     color={colors.textTertiary}
                   />

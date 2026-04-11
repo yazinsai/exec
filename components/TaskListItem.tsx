@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import { spacing, typography, fontFamily, radii } from "@/constants/Colors";
 import { formatTaskStatusLabel, TASK_STATUSES } from "@/lib/workflow";
@@ -156,7 +156,7 @@ export function TaskListItem({
               {formatTaskStatusLabel(status)}
             </Text>
             {pinned && (
-              <Ionicons name="bookmark" size={12} color={colors.primary} />
+              <Iconify icon="solar:bookmark-bold" size={12} color={colors.primary} />
             )}
           </View>
         </View>

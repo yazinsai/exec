@@ -1,3 +1,4 @@
+// @@iconify-code-gen
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
 import "../global.css";
 import { useEffect } from "react";
