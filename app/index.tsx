@@ -629,9 +629,9 @@ export default function HomeScreen() {
     },
   } as any);
 
-  // Query all projects for the dropdown (not limited by notes window)
+  // Query all projects with their tasks for popularity sorting
   const { data: allProjectsData } = db.useQuery({
-    projects: { $: { order: { slug: "asc" } } },
+    projects: { $: { order: { slug: "asc" } }, tasks: {} },
   } as any);
 
   // On startup, retry any notes stuck in "transcribing" state (app was killed mid-transcription)
@@ -698,10 +698,16 @@ export default function HomeScreen() {
 
   const allTasks = notes.flatMap((note) => (note.tasks ?? []) as Task[]);
 
-  // All project slugs from the projects table (not limited by notes window)
+  // All project slugs sorted by task count (most popular first)
   const projectSlugs = useMemo(() => {
-    const projects = ((allProjectsData as any)?.projects ?? []) as { slug: string }[];
-    return projects.map((p) => p.slug).filter(Boolean).sort();
+    const projects = ((allProjectsData as any)?.projects ?? []) as {
+      slug: string;
+      tasks?: any[];
+    }[];
+    return projects
+      .filter((p) => p.slug)
+      .sort((a, b) => (b.tasks?.length ?? 0) - (a.tasks?.length ?? 0))
+      .map((p) => p.slug);
   }, [allProjectsData]);
 
 
