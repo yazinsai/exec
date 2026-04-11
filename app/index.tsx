@@ -1431,7 +1431,7 @@ export default function HomeScreen() {
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name="book-outline" size={20} color={colors.textTertiary} />
+              <Ionicons name="book-outline" size={16} color={colors.textTertiary} style={{ opacity: 0.6 }} />
             </Pressable>
           </View>
 
