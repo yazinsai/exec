@@ -729,10 +729,8 @@ export default function HomeScreen() {
         if (!hasProject) return false;
       }
       if (searchTrimmed) {
-        const noteTitle = (note.summary || note.transcript || "").toLowerCase();
-        const noteTranscript = (note.transcript || "").toLowerCase();
+        const noteTitle = (note.summary || "").toLowerCase();
         const titleMatch = noteTitle.includes(searchTrimmed);
-        const transcriptMatch = noteTranscript.includes(searchTrimmed);
         const taskMatch = tasks.some((t) => {
           const taskText = (
             (t.summary || "") +
@@ -741,7 +739,7 @@ export default function HomeScreen() {
           ).toLowerCase();
           return taskText.includes(searchTrimmed);
         });
-        if (!titleMatch && !transcriptMatch && !taskMatch) return false;
+        if (!titleMatch && !taskMatch) return false;
       }
       if (noteTaskStatusFilter === "running") {
         if (!noteHasTaskWithStatus(note, TASK_STATUSES.running)) return false;
