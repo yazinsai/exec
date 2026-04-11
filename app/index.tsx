@@ -629,6 +629,11 @@ export default function HomeScreen() {
     },
   } as any);
 
+  // Query all projects for the dropdown (not limited by notes window)
+  const { data: allProjectsData } = db.useQuery({
+    projects: { $: { order: { slug: "asc" } } },
+  } as any);
+
   // On startup, retry any notes stuck in "transcribing" state (app was killed mid-transcription)
   const retriedNotesRef = useRef(new Set<string>());
   const notes = (((notesData as { notes?: Note[] } | undefined)?.notes) ?? []) as Note[];
@@ -693,15 +698,11 @@ export default function HomeScreen() {
 
   const allTasks = notes.flatMap((note) => (note.tasks ?? []) as Task[]);
 
-  // Derive unique project slugs for filter
+  // All project slugs from the projects table (not limited by notes window)
   const projectSlugs = useMemo(() => {
-    const slugs = new Set<string>();
-    for (const task of allTasks) {
-      const slug = (task as any).project?.slug || (task as any).projectSlug;
-      if (slug) slugs.add(slug);
-    }
-    return Array.from(slugs).sort();
-  }, [allTasks]);
+    const projects = ((allProjectsData as any)?.projects ?? []) as { slug: string }[];
+    return projects.map((p) => p.slug).filter(Boolean).sort();
+  }, [allProjectsData]);
 
 
   // Apply filters to notes
