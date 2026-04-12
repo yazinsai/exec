@@ -1,3 +1,9 @@
+import { Platform } from "react-native";
+import {
+  uploadAsync,
+  FileSystemUploadType,
+} from "expo-file-system/legacy";
+
 const OPENAI_API_URL = "https://api.openai.com/v1/audio/transcriptions";
 const MAX_PROMPT_CHARS = 800; // ~200 tokens, safe under 224-token limit
 
@@ -26,34 +32,47 @@ export async function transcribeAudio(localFilePath: string, prompt?: string): P
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  const formData = new FormData();
-
-  // Read file as blob (works on both web and native)
-  const res = await fetch(localFilePath);
-  const blob = await res.blob();
   const ext = localFilePath.match(/\.(\w+)$/)?.[1] ?? "m4a";
-  formData.append("file", blob, `recording.${ext}`);
-  formData.append("model", "whisper-1");
-  formData.append("response_format", "text");
 
-  // Add vocabulary prompt if provided
-  if (prompt) {
-    formData.append("prompt", prompt);
+  if (Platform.OS === "web") {
+    const formData = new FormData();
+    const res = await fetch(localFilePath);
+    const blob = await res.blob();
+    formData.append("file", blob, `recording.${ext}`);
+    formData.append("model", "whisper-1");
+    formData.append("response_format", "text");
+    if (prompt) formData.append("prompt", prompt);
+
+    const response = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+    return (await response.text()).trim();
   }
 
-  const response = await fetch(OPENAI_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: formData,
+  // Native (iOS/Android): use expo-file-system uploadAsync for reliable multipart
+  const parameters: Record<string, string> = {
+    model: "whisper-1",
+    response_format: "text",
+  };
+  if (prompt) parameters.prompt = prompt;
+
+  const response = await uploadAsync(OPENAI_API_URL, localFilePath, {
+    httpMethod: "POST",
+    uploadType: FileSystemUploadType.MULTIPART,
+    fieldName: "file",
+    mimeType: ext === "m4a" ? "audio/m4a" : `audio/${ext}`,
+    parameters,
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`OpenAI API error: ${response.status} - ${response.body}`);
   }
-
-  const transcription = await response.text();
-  return transcription.trim();
+  return response.body.trim();
 }
