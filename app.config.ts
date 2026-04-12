@@ -79,6 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         androidMultiIntentFilters: ["audio/*"],
       },
     ],
+    "./plugins/withAsyncStorageLocalRepo.js",
   ],
   experiments: {
     typedRoutes: true,
