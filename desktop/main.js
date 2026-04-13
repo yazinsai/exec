@@ -335,7 +335,7 @@ function startRecording() {
     "-ar", "16000",
     "-ac", "1",
     "pipe:1",
-  ], { stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
+  ], { stdio: ["ignore", "pipe", "pipe"] });
 
   proc.stderr.on("data", (d) => console.log("[ffmpeg]", d.toString().trim()));
   proc.on("error", (err) => console.error("Recording error:", err.message));
@@ -459,7 +459,7 @@ async function togglePause() {
       "-i", audioInputDevice,
       "-ac", "1", "-y", tempAudioPath,
       "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1",
-    ], { stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
+    ], { stdio: ["ignore", "pipe", "pipe"] });
     proc.stderr.on("data", () => {});
     proc.on("error", (err) => console.error("Recording error:", err.message));
     startLevelMetering(proc);
