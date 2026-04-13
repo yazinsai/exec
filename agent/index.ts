@@ -361,15 +361,21 @@ async function reconcileTaskDependencies() {
     let desiredStatus = task.status;
     let blockedReason = "";
 
+    // A dependency is "satisfied" if it has ever completed (completedAt set),
+    // regardless of its current status. This prevents re-blocking downstream
+    // tasks when a previously-completed predecessor is cancelled or rerun.
+    const isSatisfied = (blocker: any) =>
+      blocker.status === TASK_STATUSES.done || blocker.completedAt;
+
     if (blockers.length === 0) {
       desiredStatus = TASK_STATUSES.pending;
-    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.failed)) {
+    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.failed && !blocker.completedAt)) {
       desiredStatus = TASK_STATUSES.blocked;
       blockedReason = "dependency_failed";
-    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.cancelled)) {
+    } else if (blockers.some((blocker: any) => blocker.status === TASK_STATUSES.cancelled && !blocker.completedAt)) {
       desiredStatus = TASK_STATUSES.blocked;
       blockedReason = "dependency_cancelled";
-    } else if (blockers.some((blocker: any) => blocker.status !== TASK_STATUSES.done)) {
+    } else if (blockers.some((blocker: any) => !isSatisfied(blocker))) {
       desiredStatus = TASK_STATUSES.blocked;
       blockedReason = "waiting_on_dependencies";
     } else {
