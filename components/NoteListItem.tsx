@@ -159,6 +159,7 @@ export function NoteListItem({
   const colors = useColors();
   const counts = computeTaskStatusCounts(tasks);
   const hasRunning = counts.running > 0;
+  const hasPinned = tasks.some((t) => (t as any).pinned === true);
   const aggregate = formatNoteAggregateSummary(status, counts);
   const subline = buildCardSubline(counts, createdAt, aggregate);
 
@@ -252,7 +253,7 @@ export function NoteListItem({
                       paddingHorizontal: spacing.sm,
                       paddingVertical: 3,
                       borderRadius: 6,
-                      backgroundColor: "rgba(59, 130, 246, 0.15)",
+                      backgroundColor: "rgba(59, 130, 246, 0.22)",
                     }}
                   >
                     <Text

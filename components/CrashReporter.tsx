@@ -35,7 +35,7 @@ export class CrashReporter extends Component<Props, State> {
         <View
           style={{
             flex: 1,
-            backgroundColor: "#000",
+            backgroundColor: "#000000",
             padding: 24,
             paddingTop: 80,
           }}
@@ -50,27 +50,28 @@ export class CrashReporter extends Component<Props, State> {
           >
             App Crashed
           </Text>
-          <Text style={{ color: "#fca5a5", fontSize: 14, marginBottom: 16 }}>
-            A crash report has been sent. Details below:
+          <Text style={{ color: "#fca5a5", fontSize: 14, marginBottom: 16, lineHeight: 20 }}>
+            A crash report has been logged. Details below:
           </Text>
           <ScrollView
             style={{
               flex: 1,
-              backgroundColor: "#111",
+              backgroundColor: "#111111",
               borderRadius: 8,
               padding: 12,
             }}
           >
             <Text
-              style={{ color: "#f87171", fontFamily: "monospace", fontSize: 12 }}
+              style={{ color: "#f87171", fontFamily: "monospace", fontSize: 12, lineHeight: 18 }}
             >
               {this.state.error.message}
             </Text>
             <Text
               style={{
-                color: "#888",
+                color: "#a1a1aa",
                 fontFamily: "monospace",
                 fontSize: 10,
+                lineHeight: 15,
                 marginTop: 12,
               }}
             >
@@ -79,9 +80,10 @@ export class CrashReporter extends Component<Props, State> {
             {this.state.errorInfo?.componentStack && (
               <Text
                 style={{
-                  color: "#666",
+                  color: "#737373",
                   fontFamily: "monospace",
                   fontSize: 10,
+                  lineHeight: 15,
                   marginTop: 12,
                 }}
               >
@@ -93,13 +95,15 @@ export class CrashReporter extends Component<Props, State> {
             onPress={() => this.setState({ error: null, errorInfo: null })}
             style={{
               marginTop: 16,
-              backgroundColor: "#333",
+              backgroundColor: "#2a2a2a",
               padding: 14,
               borderRadius: 8,
               alignItems: "center",
+              minHeight: 48,
+              justifyContent: "center",
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "600" }}>
+            <Text style={{ color: "#ffffff", fontWeight: "600", fontSize: 15 }}>
               Try Again
             </Text>
           </Pressable>

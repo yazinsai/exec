@@ -1525,7 +1525,7 @@ export default function HomeScreen() {
                     ? { color: "rgba(255,255,255,0.12)" }
                     : undefined
                 }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => {
                   setFilterUnread((v) => !v);
                   void Haptics.selectionAsync();
@@ -1545,7 +1545,7 @@ export default function HomeScreen() {
                     : waFilter.offBorder,
                   opacity:
                     unreadNoteCount === 0
-                      ? 0.4
+                      ? 0.55
                       : pressed && Platform.OS !== "android"
                         ? 0.88
                         : 1,
@@ -1594,7 +1594,7 @@ export default function HomeScreen() {
                     ? { color: "rgba(255,255,255,0.15)" }
                     : undefined
                 }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => {
                   setNoteTaskStatusFilter((prev) =>
                     prev === "running" ? null : "running"
@@ -1618,7 +1618,7 @@ export default function HomeScreen() {
                       : waFilter.offBorder,
                   opacity:
                     runningNoteCount === 0
-                      ? 0.4
+                      ? 0.55
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -1669,7 +1669,7 @@ export default function HomeScreen() {
                     ? { color: "rgba(255,255,255,0.15)" }
                     : undefined
                 }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => {
                   setNoteTaskStatusFilter((prev) =>
                     prev === "failed" ? null : "failed"
@@ -1693,7 +1693,7 @@ export default function HomeScreen() {
                       : waFilter.offBorder,
                   opacity:
                     attentionFailedNoteCount === 0
-                      ? 0.4
+                      ? 0.55
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -1744,7 +1744,7 @@ export default function HomeScreen() {
                     ? { color: "rgba(0,0,0,0.08)" }
                     : undefined
                 }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => {
                   setNoteTaskStatusFilter((prev) =>
                     prev === "blocked" ? null : "blocked"
@@ -1768,7 +1768,7 @@ export default function HomeScreen() {
                       : waFilter.offBorder,
                   opacity:
                     attentionBlockedNoteCount === 0
-                      ? 0.4
+                      ? 0.55
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -1819,7 +1819,7 @@ export default function HomeScreen() {
                     ? { color: "rgba(255,255,255,0.15)" }
                     : undefined
                 }
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => {
                   setNoteTaskStatusFilter((prev) =>
                     prev === "pinned" ? null : "pinned"
@@ -1843,7 +1843,7 @@ export default function HomeScreen() {
                       : waFilter.offBorder,
                   opacity:
                     pinnedNoteCount === 0
-                      ? 0.4
+                      ? 0.55
                       : pressed && Platform.OS !== "android"
                         ? 0.9
                         : 1,
@@ -2139,9 +2139,9 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingTop: spacing.sm,
-              paddingHorizontal: spacing.sm,
+              paddingHorizontal: spacing.md,
               paddingBottom: insets.bottom + 96,
-              gap: spacing.md,
+              gap: spacing.lg,
             }}
           >
             {isFiltering ? (
@@ -2161,7 +2161,7 @@ export default function HomeScreen() {
                         fontFamily: fontFamily.regular,
                       }}
                     >
-                      No matching tasks
+                      No matching tasks. Try clearing filters.
                     </Text>
                   </View>
                 )}
@@ -2671,7 +2671,7 @@ export default function HomeScreen() {
                               </Pressable>
                               <Pressable
                                 onPress={(e) => { e.stopPropagation(); toggleTts(msgTtsId, msg.content); }}
-                                style={{ minWidth: 36, minHeight: 28, alignItems: "center", justifyContent: "center" }}
+                                style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
                               >
                                 <Iconify
                                   icon={ttsActiveId === msgTtsId ? "solar:stop-bold" : "solar:play-bold"}

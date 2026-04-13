@@ -26,7 +26,7 @@ const mono = {
   cream: "#fafaf9",
   silver: "#a1a1aa",
   gray: "#71717a",
-  darkGray: "#52525b",
+  darkGray: "#737373",
 };
 
 // Semantic colors - minimal, status only
@@ -99,7 +99,7 @@ const darkColors = {
   thinking: semantic.thinking,
 
   // Status dot / label
-  statusPending: "#71717a",
+  statusPending: "#8b8b94",
   statusRunning: semantic.info,
   statusDone: semantic.success,
   statusFailed: semantic.error,
@@ -112,7 +112,7 @@ const darkColors = {
   // Overlays
   overlay: "rgba(0, 0, 0, 0.85)",
   overlayLight: "rgba(0, 0, 0, 0.7)",
-  errorBgAlpha: "rgba(239, 68, 68, 0.12)",
+  errorBgAlpha: "rgba(239, 68, 68, 0.18)",
 
   // Shadows
   shadow: "#000",
@@ -153,7 +153,7 @@ const lightColors = {
   info: semantic.info,
   thinking: semantic.thinking,
 
-  statusPending: "#71717a",
+  statusPending: "#8b8b94",
   statusRunning: semantic.info,
   statusDone: semantic.success,
   statusFailed: semantic.error,
