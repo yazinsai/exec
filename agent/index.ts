@@ -332,6 +332,7 @@ async function reconcileTaskDependencies() {
           or: [
             { status: TASK_STATUSES.pending },
             { status: TASK_STATUSES.blocked },
+            { status: TASK_STATUSES.running, cancelRequested: true },
           ],
         },
       },
@@ -345,6 +346,12 @@ async function reconcileTaskDependencies() {
       .filter(Boolean);
 
     if (task.cancelRequested) {
+      // Don't finalize tasks that are actively running in this process —
+      // handleTask's abort path will update status. Only reconcile tasks
+      // that are pending/blocked, or running but not owned by us (stale).
+      if (task.status === TASK_STATUSES.running && runningTasks.has(task.id)) {
+        continue;
+      }
       if (task.status !== TASK_STATUSES.cancelled) {
         await db.transact(
           db.tx.tasks[task.id].update({
@@ -352,6 +359,7 @@ async function reconcileTaskDependencies() {
             blockedReason: "",
             errorMessage: "Cancelled by user",
             completedAt: Date.now(),
+            cancelRequested: false,
           })
         );
       }
@@ -573,6 +581,8 @@ async function handleTask(taskId: string) {
         await flushLiveOutput();
       }
 
+      if (abortController.signal.aborted) break;
+
       if (message.type === "result") {
         const resultMessage = message as SDKResultMessage;
         const success = resultMessage.subtype === "success";
@@ -634,6 +644,11 @@ async function handleTask(taskId: string) {
 
   try {
     await runQuery();
+    if (abortController.signal.aborted) {
+      const err: any = new Error("Aborted");
+      err.name = "AbortError";
+      throw err;
+    }
   } catch (error: any) {
     // Session has oversized images — try compacting the session to strip them,
     // then retry. If /compact itself fails, fall back to a fresh session with
@@ -688,6 +703,7 @@ async function handleTask(taskId: string) {
           blockedReason: "",
           completedAt: Date.now(),
           lastSeenMessageId: latestMessageId,
+          cancelRequested: false,
           ...(currentTask?.project ? {} : { sessionId: sessionId || "" }),
         }),
       ];
