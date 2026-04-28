@@ -1,5 +1,5 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
-import fs from "node:fs";
+import * as fs from "node:fs";
 
 function resolveGoogleServicesFile(): string | undefined {
   const candidate = process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json";
@@ -79,7 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         androidMultiIntentFilters: ["audio/*"],
       },
     ],
-    "./plugins/withAsyncStorageLocalRepo.js",
+    "@react-native-async-storage/expo-with-async-storage",
   ],
   experiments: {
     typedRoutes: true,
