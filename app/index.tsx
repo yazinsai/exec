@@ -505,6 +505,7 @@ export default function HomeScreen() {
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const modalListRef = useRef<FlatList>(null);
+  const followUpInputRef = useRef<TextInput>(null);
   const modalListLayoutHeight = useRef(0);
   const modalListContentHeight = useRef(0);
   const modalListScrollY = useRef(0);
@@ -907,6 +908,16 @@ export default function HomeScreen() {
     ? allTasks.find((task) => task.id === selectedTaskId) ?? null
     : null;
 
+  const lastUserMessageId = useMemo(() => {
+    const messages = selectedTask?.messages ?? [];
+    let latest: Message | null = null;
+    for (const m of messages as Message[]) {
+      if (m.role !== "user") continue;
+      if (!latest || m.createdAt > latest.createdAt) latest = m;
+    }
+    return latest?.id ?? null;
+  }, [selectedTask?.messages]);
+
   // Recording handlers
   const startRecording = useCallback(async () => {
     if (hasPermission === false || recordingRef.current || isProcessing) return;
@@ -1079,6 +1090,16 @@ export default function HomeScreen() {
     setDuration(0);
     setMetering(-160);
   }, [transcribeNote]);
+
+  const editUserMessage = useCallback(async (msg: Message) => {
+    setFollowUpText(msg.content);
+    try {
+      await db.transact(db.tx.messages[msg.id].delete());
+    } catch (error) {
+      console.error("Failed to delete message for edit:", error);
+    }
+    requestAnimationFrame(() => followUpInputRef.current?.focus());
+  }, []);
 
   // Follow-up message handler
   const sendFollowUp = useCallback(async () => {
@@ -1419,6 +1440,7 @@ export default function HomeScreen() {
             ? () => retryExtraction(item.id)
             : undefined
         }
+        onReprocess={() => retryExtraction(item.id)}
       />
     );
   };
@@ -2652,6 +2674,29 @@ export default function HomeScreen() {
                           >
                             {relativeTime(msg.createdAt)}
                           </Text>
+                          {isUser && msg.id === lastUserMessageId && (
+                            <Pressable
+                              onPress={(e) => { e.stopPropagation(); editUserMessage(msg); }}
+                              accessibilityRole="button"
+                              accessibilityLabel="Edit message"
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={({ pressed }) => [
+                                { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 2 },
+                                pressed && { opacity: 0.6 },
+                              ]}
+                            >
+                              <Iconify icon="solar:pen-linear" size={12} color={colors.textMuted} />
+                              <Text
+                                style={{
+                                  color: colors.textMuted,
+                                  fontSize: typography.xs,
+                                  fontFamily: fontFamily.regular,
+                                }}
+                              >
+                                Edit
+                              </Text>
+                            </Pressable>
+                          )}
                           {!isUser && (
                             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                               <Pressable
@@ -2877,6 +2922,7 @@ export default function HomeScreen() {
                       </Pressable>
 
                       <TextInput
+                        ref={followUpInputRef}
                         value={followUpText}
                         onChangeText={setFollowUpText}
                         placeholder="Follow up..."

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View, Animated, Easing } from "react-native";
+import { ActionSheetIOS, Alert, Platform, Pressable, Text, View, Animated, Easing } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Iconify } from "react-native-iconify";
 import { useColors } from "@/hooks/useThemeColors";
 import { fontFamily, radii, spacing, typography } from "@/constants/Colors";
@@ -38,6 +39,7 @@ interface NoteListItemProps {
   onRetryTask?: (taskId: string) => void;
   onRetryTranscription?: () => void;
   onRetryExtraction?: () => void;
+  onReprocess?: () => void;
   errorMessage?: string | null;
   /** Keyword to highlight in title and task titles */
   highlightQuery?: string | null;
@@ -152,6 +154,7 @@ export function NoteListItem({
   onRetryTask,
   onRetryTranscription,
   onRetryExtraction,
+  onReprocess,
   errorMessage,
   highlightQuery,
   highlightProject,
@@ -418,7 +421,25 @@ export function NoteListItem({
               })}
             </View>
           ) : (
-            <View
+            <Pressable
+              onLongPress={() => {
+                if (!onReprocess) return;
+                if (Platform.OS === "ios") {
+                  ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      options: ["Reprocess", "Cancel"],
+                      cancelButtonIndex: 1,
+                    },
+                    (idx) => { if (idx === 0) onReprocess(); }
+                  );
+                } else {
+                  Alert.alert("Note Options", undefined, [
+                    { text: "Reprocess", onPress: onReprocess },
+                    { text: "Cancel", style: "cancel" },
+                  ]);
+                }
+              }}
+              delayLongPress={400}
               style={{
                 marginTop: spacing.md,
                 backgroundColor: colors.backgroundSubtle,
@@ -500,7 +521,7 @@ export function NoteListItem({
                   </Text>
                 </Pressable>
               ) : null}
-            </View>
+            </Pressable>
           )}
         </View>
       )}
