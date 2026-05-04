@@ -87,9 +87,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   updates: {
     url: "https://u.expo.dev/5ec9c9e2-8570-48d7-981d-0ce40288330b",
   },
-  runtimeVersion: {
-    policy: "appVersion",
-  },
+  runtimeVersion: "1.0.0",
   extra: {
     router: {},
     eas: {
