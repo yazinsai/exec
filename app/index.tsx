@@ -632,6 +632,7 @@ export default function HomeScreen() {
         errorMessage: "",
       })
     );
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
   // Query notes with nested child tasks

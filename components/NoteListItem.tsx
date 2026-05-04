@@ -460,6 +460,23 @@ export function NoteListItem({
                 {transcript || "No transcript available yet."}
               </Text>
 
+              {(status === NOTE_STATUSES.pending || status === NOTE_STATUSES.triaging) && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md }}>
+                  <Animated.View
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: colors.primary,
+                      opacity: 0.7,
+                    }}
+                  />
+                  <Text style={{ color: colors.primary, fontSize: typography.xs, fontFamily: fontFamily.medium }}>
+                    {status === NOTE_STATUSES.pending ? "Queued for reprocessing..." : "Extracting tasks..."}
+                  </Text>
+                </View>
+              )}
+
               {status === NOTE_STATUSES.transcriptionFailed && errorMessage ? (
                 <Text
                   style={{
