@@ -884,6 +884,12 @@ async function main() {
   setInterval(() => void pollForFollowUps(), FOLLOW_UP_POLL_MS);
   setInterval(() => void dispatchRunnableTasks(), TASK_POLL_MS);
 
+  setInterval(() => {
+    console.log(
+      `[heartbeat ${new Date().toISOString()}] tasks=${runningTasks.size} notes=${runningNotes.size} locks=${projectLocks.size}`,
+    );
+  }, 5 * 60 * 1000);
+
   console.log("Listening for notes and tasks...");
 }
 
