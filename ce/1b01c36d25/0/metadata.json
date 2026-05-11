@@ -1,0 +1,77 @@
+{
+  "cli_version": "0.6.1",
+  "checkpoint_id": "ce1b01c36d25",
+  "session_id": "ccbce3ff-803f-4652-8ddd-068baee53b59",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-11T10:23:18.628078Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "941682b5f8f0",
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 98639,
+    "cache_read_tokens": 3588617,
+    "output_tokens": 28855,
+    "api_call_count": 48
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5099,
+      "user_lines_removed": 3,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/agents/entire-search.md": 25,
+        ".claude/settings.json": 84,
+        ".codex/agents/entire-search.toml": 23,
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 40,
+        ".cursor/hooks.json": 40,
+        "hooks/useThemeColors.tsx": 12,
+        "ios/.gitignore": 30,
+        "ios/.xcode.env": 11,
+        "ios/Exec.xcodeproj/project.pbxproj": 724,
+        "ios/Exec.xcodeproj/xcshareddata/xcschemes/Exec.xcscheme": 88,
+        "ios/Exec.xcworkspace/contents.xcworkspacedata": 10,
+        "ios/Exec/AppDelegate.swift": 70,
+        "ios/Exec/Exec-Bridging-Header.h": 3,
+        "ios/Exec/Exec.entitlements": 12,
+        "ios/Exec/Images.xcassets/AppIcon.appiconset/Contents.json": 14,
+        "ios/Exec/Images.xcassets/Contents.json": 6,
+        "ios/Exec/Images.xcassets/SplashScreenBackground.colorset/Contents.json": 38,
+        "ios/Exec/Images.xcassets/SplashScreenLogo.imageset/Contents.json": 56,
+        "ios/Exec/Info.plist": 87,
+        "ios/Exec/PrivacyInfo.xcprivacy": 48,
+        "ios/Exec/SplashScreen.storyboard": 46,
+        "ios/Exec/Supporting/Expo.plist": 16,
+        "ios/Podfile": 63,
+        "ios/Podfile.lock": 2578,
+        "ios/Podfile.properties.json": 5,
+        "ios/ShareExtension/MainInterface.storyboard": 25,
+        "ios/ShareExtension/PrivacyInfo.xcprivacy": 48,
+        "ios/ShareExtension/ShareExtension-Info.plist": 43,
+        "ios/ShareExtension/ShareExtension.entitlements": 10,
+        "ios/ShareExtension/ShareExtensionPreprocessor.js": 28,
+        "ios/ShareExtension/ShareViewController.swift": 783,
+        "metro.config.js": 30
+      },
+      "user_removed_per_file": {
+        "hooks/useThemeColors.tsx": 3
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5099,
+      "agent_lines_removed": 3
+    }
+  ]
+}
