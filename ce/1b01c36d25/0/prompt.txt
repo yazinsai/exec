@@ -1,1 +1,5 @@
 is the exec launchd/daemon running on this dekstop?
+
+---
+
+any idea why ti's not generateing child tasks? (e.g. for last couple of notes)
