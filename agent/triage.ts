@@ -148,7 +148,11 @@ export async function triageTranscript(transcript: string, manualDictionaryTerms
     throw new Error(errors);
   }
 
-  const raw = (resultMessage.structured_output ?? {}) as RawTriageOutput;
+  if (!resultMessage.structured_output) {
+    throw new Error("Triage returned no structured output — will retry");
+  }
+
+  const raw = resultMessage.structured_output as RawTriageOutput;
   const taskArray = Array.isArray(raw.tasks) ? raw.tasks as RawTriageTask[] : [];
   const tasks = taskArray
     .map((task, index) => normalizeTask(task, index, taskArray.length))
